@@ -1,0 +1,39 @@
+{
+  "Servers": [
+    {
+      "Id": "replace-with-a-unique-id",
+      "Name": "APP-SERVER-01",
+      "Host": "APP-SERVER-01",
+      "Enabled": true
+    }
+  ],
+  "MonitoredTasks": [
+    {
+      "ServerId": "replace-with-a-unique-id",
+      "TaskPath": "\\Production\\DailyUpload",
+      "DisplayName": "DailyUpload",
+      "Enabled": true
+    }
+  ],
+  "Email": {
+    "Enabled": false,
+    "SmtpServer": "smtp.company.com",
+    "Port": 25,
+    "EnableTls": false,
+    "Username": "",
+    "EncryptedPassword": "",
+    "Sender": "scheduler-monitor@company.com",
+    "Recipients": [
+      "serveradmin@company.com"
+    ]
+  },
+  "Schedule": {
+    "Enabled": false,
+    "RunTime": "07:00"
+  },
+  "Monitoring": {
+    "TimeoutSeconds": 30,
+    "LogRetentionDays": 30,
+    "ReportRetentionDays": 30
+  }
+}
