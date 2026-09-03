@@ -68,17 +68,39 @@ public static class AlertTemplate
         return $"{(int)value.TotalDays} days";
     }
 
-    /// <summary>Example result used by the template preview in Configuration.</summary>
-    public static TaskMonitorResult Sample() => new()
+    /// <summary>
+    /// Example result for the template preview. It is built from the first task actually selected
+    /// for monitoring, so the preview shows the real job name and server rather than an invented
+    /// one; only the timings are simulated. A configuration with no selection falls back to a
+    /// neutral placeholder job.
+    /// </summary>
+    public static TaskMonitorResult Sample(AppConfig? config = null)
     {
-        ServerName = "Test", Host = "TESTSRV01",
-        TaskPath = @"\Microsoft\BE1MES\TAM_Test Task", DisplayName = "TAM_Test Task",
-        WindowsState = "Running", Status = MonitorStatus.LongRunning,
-        LastRunTime = DateTime.Now.AddMinutes(-103.6), LastResult = "267009",
-        NextRunTime = DateTime.Now.AddMinutes(2), RepeatInterval = TimeSpan.FromMinutes(2),
-        RunningFor = TimeSpan.FromMinutes(103.6),
-        LongRunningEventId = 322, LongRunningEventTime = DateTime.Now.AddMinutes(-101.6),
-        EventSummary = "322 - start skipped, already running",
-        Detail = "Windows event 322: a scheduled start was skipped because this run is still going"
-    };
+        var selected = config?.MonitoredTasks.FirstOrDefault(task => task.Enabled);
+        var server = selected is null
+            ? null
+            : config?.Servers.FirstOrDefault(item => item.Id == selected.ServerId);
+
+        var name = string.IsNullOrWhiteSpace(selected?.DisplayName)
+            ? LastSegment(selected?.TaskPath) ?? "Example Task"
+            : selected!.DisplayName;
+
+        return new TaskMonitorResult
+        {
+            ServerName = server?.ToString() ?? "Example Server",
+            Host = server?.Host ?? Environment.MachineName,
+            TaskPath = selected?.TaskPath ?? @"\Example Task",
+            DisplayName = name,
+            WindowsState = "Running", Status = MonitorStatus.LongRunning,
+            LastRunTime = DateTime.Now.AddMinutes(-103.6), LastResult = "267009",
+            NextRunTime = DateTime.Now.AddMinutes(2), RepeatInterval = TimeSpan.FromMinutes(2),
+            RunningFor = TimeSpan.FromMinutes(103.6),
+            LongRunningEventId = 322, LongRunningEventTime = DateTime.Now.AddMinutes(-101.6),
+            EventSummary = "322 - start skipped, already running",
+            Detail = "Windows event 322: a scheduled start was skipped because this run is still going"
+        };
+    }
+
+    private static string? LastSegment(string? taskPath) =>
+        string.IsNullOrWhiteSpace(taskPath) ? null : taskPath.TrimEnd('\\').Split('\\').LastOrDefault();
 }

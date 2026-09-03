@@ -238,9 +238,12 @@ public sealed class ConfigurationForm : Form
     private void PreviewAlert()
     {
         SaveAlerts(false);
-        var sample = AlertTemplate.Sample();
+        var sample = AlertTemplate.Sample(_config);
         var text = $"Subject:\r\n{AlertTemplate.Render(_config.Alerts.SubjectTemplate, sample)}"
-                   + $"\r\n\r\nBody:\r\n{AlertTemplate.Render(_config.Alerts.BodyTemplate, sample)}";
+                   + $"\r\n\r\nBody:\r\n{AlertTemplate.Render(_config.Alerts.BodyTemplate, sample)}"
+                   + $"\r\n\r\nThe job name, path and server come from '{sample.DisplayName}', the first task "
+                   + "selected for monitoring. Times and the event are simulated; a real alert uses the "
+                   + "values from the check.";
         MessageBox.Show(text, "Alert preview", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
