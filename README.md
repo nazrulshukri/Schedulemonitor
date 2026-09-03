@@ -57,7 +57,9 @@ the time it was logged. The event IDs, the
 lookback window and the whole check are configurable in **Configuration → Schedule**; a server that
 denies the event log is logged and falls back to the timing rule below.
 
-**Source 2 — elapsed time**, compared with a budget:
+**Source 2 — elapsed time.** Off by default: a run that is merely slow, with no event, stays
+`RUNNING` and then `SUCCESS`. Ticking **Also flag LONG RUNNING from elapsed time** in
+**Configuration → Schedule** compares the elapsed time with a budget:
 
 1. The per-task **Max Run (min)** value in **Configuration → Tasks**.
 2. Otherwise the task's own repetition interval (`Repeat: Every`), while

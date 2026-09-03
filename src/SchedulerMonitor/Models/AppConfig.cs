@@ -55,7 +55,13 @@ public sealed class MonitoringConfig
 {
     public int TimeoutSeconds { get; set; } = 30;
 
-    /// <summary>Default runtime budget, in minutes, for tasks without their own limit.</summary>
+    /// <summary>
+    /// Off by default: LONG RUNNING comes from the Task Scheduler event log, which states the
+    /// overlap as fact. Turn this on to also flag a run purely because it passed its time budget.
+    /// </summary>
+    public bool UseElapsedTimeLimit { get; set; }
+
+    /// <summary>Default runtime budget, in minutes, used only when <see cref="UseElapsedTimeLimit"/> is on.</summary>
     public int LongRunningMinutes { get; set; } = 5;
 
     /// <summary>

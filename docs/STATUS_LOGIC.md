@@ -9,8 +9,9 @@ Evaluation order:
 1. A failed server query produces `UNREACHABLE` for every selected task on that server.
 2. A selected task absent from a successful scan produces `FAILED` with `Task not found`.
 3. A disabled task produces `DISABLED`.
-4. A Windows state containing `Running` produces `LONG RUNNING` when the execution has already
-   passed its runtime budget, otherwise `RUNNING`.
+4. A Windows state containing `Running` produces `LONG RUNNING` when Windows logged an overlap
+   event for this execution (or, when the optional timing rule is on, when the execution passed its
+   budget), otherwise `RUNNING`.
 5. A Windows state containing `Queued` produces `PENDING`.
 6. A next-run time older than five minutes produces `OVERDUE`.
 7. A task without a last-run time produces `PENDING` with `Task has not run yet`.
@@ -40,10 +41,14 @@ current execution, that is, it was logged after the current last-run time.
 The event log read is best effort. A server that denies it (Remote Event Log Management blocked, no
 permission) is logged as a warning and the task still falls back to the elapsed-time rule below.
 
-### Source 2: elapsed time
+### Source 2: elapsed time (optional, off by default)
 
-`now - Last Run Time` while the Windows state is `Running`. The runtime budget it is compared
-against is resolved in this order:
+Being slower than expected is not by itself an overlap, so timing alone does not raise
+`LONG RUNNING`. A long run with no event stays `RUNNING`, and `SUCCESS` once it ends.
+
+Enabling **Also flag LONG RUNNING from elapsed time** in Configuration → Schedule adds the timing
+rule: `now - Last Run Time` while the Windows state is `Running`, compared with a budget resolved in
+this order:
 
 1. The per-task **Max Run (min)** value set on the Tasks tab of Configuration.
 2. The repetition interval declared in Task Scheduler (`Repeat: Every`), when

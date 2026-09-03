@@ -149,7 +149,8 @@ public sealed class MonitoringService
                 detail = $"Windows event {currentOverlap.EventId} at {currentOverlap.TimeCreated:g}: "
                          + "a scheduled start was skipped because this run is still going";
             }
-            else if (runningFor is not null && threshold is not null && runningFor > threshold)
+            else if (monitoring.UseElapsedTimeLimit && runningFor is not null && threshold is not null
+                     && runningFor > threshold)
             {
                 status = MonitorStatus.LongRunning;
                 detail = $"Running for {Describe(runningFor.Value)}, expected to finish within {Describe(threshold.Value)}";
@@ -223,6 +224,8 @@ public sealed class MonitoringService
     internal static TimeSpan? ResolveThreshold(DiscoveredTask task, MonitoringConfig monitoring,
         MonitoredTaskConfig? selected)
     {
+        if (!monitoring.UseElapsedTimeLimit) return null;
+
         if (selected is { LongRunningMinutes: > 0 })
             return TimeSpan.FromMinutes(selected.LongRunningMinutes);
 

@@ -26,6 +26,11 @@ public sealed class ConfigurationForm : Form
     private Dictionary<string, int> _workingLimits = new(StringComparer.OrdinalIgnoreCase);
     private bool _loadingMonitoring;
     private readonly NumericUpDown _defaultLongRunning = new() { Minimum = 0, Maximum = 10080, Value = 5, Width = 90 };
+    private readonly CheckBox _useElapsedLimit = new()
+    {
+        Text = "Also flag LONG RUNNING from elapsed time, without waiting for a Task Scheduler event",
+        AutoSize = true
+    };
     private readonly CheckBox _useRepeatInterval = new()
     {
         Text = "Use the repeat interval from Task Scheduler as the limit when a task has one",
@@ -169,7 +174,7 @@ public sealed class ConfigurationForm : Form
     private TabPage BuildScheduleTab()
     {
         var page = NewPage("Schedule");
-        var panel = new TableLayoutPanel { Dock = DockStyle.Top, Height = 560, Padding = new Padding(25), ColumnCount = 2, RowCount = 10 };
+        var panel = new TableLayoutPanel { Dock = DockStyle.Top, Height = 610, Padding = new Padding(25), ColumnCount = 2, RowCount = 11 };
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190)); panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         AddField(panel, 0, "", _scheduleEnabled);
         AddField(panel, 1, "Daily run time", _runTime);
@@ -187,14 +192,16 @@ public sealed class ConfigurationForm : Form
             Text = "The tool registers SchedulerMonitor-Daily in Windows Task Scheduler. It runs this portable EXE with --run --silent. Register it while signed in with the Windows account that has permission to query the remote servers."
         };
         panel.Controls.Add(note, 1, 4);
-        AddField(panel, 5, "Default max run (min)", _defaultLongRunning);
-        AddField(panel, 6, "", _useRepeatInterval);
-        AddField(panel, 7, "", _useEventLog);
-        AddField(panel, 8, "Event IDs", _eventIds);
-        AddField(panel, 9, "Event lookback (min)", _eventLookback);
+        AddField(panel, 5, "", _useEventLog);
+        AddField(panel, 6, "Event IDs", _eventIds);
+        AddField(panel, 7, "Event lookback (min)", _eventLookback);
+        AddField(panel, 8, "", _useElapsedLimit);
+        AddField(panel, 9, "Default max run (min)", _defaultLongRunning);
+        AddField(panel, 10, "", _useRepeatInterval);
         _defaultLongRunning.ValueChanged += (_, _) => SaveMonitoring();
         _useRepeatInterval.CheckedChanged += (_, _) => SaveMonitoring();
         _useEventLog.CheckedChanged += (_, _) => SaveMonitoring();
+        _useElapsedLimit.CheckedChanged += (_, _) => SaveMonitoring();
         _eventIds.Leave += (_, _) => SaveMonitoring();
         _eventLookback.ValueChanged += (_, _) => SaveMonitoring();
         page.Controls.Add(panel); return page;
@@ -443,10 +450,12 @@ public sealed class ConfigurationForm : Form
     {
         _loadingMonitoring = true;
         _defaultLongRunning.Value = Math.Clamp(_config.Monitoring.LongRunningMinutes, 0, 10080);
+        _useElapsedLimit.Checked = _config.Monitoring.UseElapsedTimeLimit;
         _useRepeatInterval.Checked = _config.Monitoring.UseRepeatIntervalAsLimit;
         _useEventLog.Checked = _config.Monitoring.UseEventLog;
         _eventIds.Text = string.Join(", ", _config.Monitoring.LongRunningEventIds);
         _eventLookback.Value = Math.Clamp(_config.Monitoring.EventLookbackMinutes, 5, 20160);
+        _defaultLongRunning.Enabled = _useRepeatInterval.Enabled = _useElapsedLimit.Checked;
         _loadingMonitoring = false;
     }
 
@@ -454,7 +463,9 @@ public sealed class ConfigurationForm : Form
     {
         if (_loadingMonitoring) return;
         _config.Monitoring.LongRunningMinutes = (int)_defaultLongRunning.Value;
+        _config.Monitoring.UseElapsedTimeLimit = _useElapsedLimit.Checked;
         _config.Monitoring.UseRepeatIntervalAsLimit = _useRepeatInterval.Checked;
+        _defaultLongRunning.Enabled = _useRepeatInterval.Enabled = _useElapsedLimit.Checked;
         _config.Monitoring.UseEventLog = _useEventLog.Checked;
         _config.Monitoring.EventLookbackMinutes = (int)_eventLookback.Value;
 
