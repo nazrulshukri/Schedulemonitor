@@ -12,7 +12,7 @@ The administrator scans a server, selects only the important scheduled tasks, an
 - Search the scan result and select only tasks that should appear in monitoring and email.
 - Preserve previous selections during rescans; new tasks are unselected by default.
 - Report a selected task as `FAILED – Task not found` if it was deleted or renamed.
-- Display `SUCCESS`, `RUNNING`, `PENDING`, `FAILED`, `OVERDUE`, `DISABLED`, and `UNREACHABLE`.
+- Display `SUCCESS`, `RUNNING`, `LONG RUNNING`, `PENDING`, `FAILED`, `OVERDUE`, `DISABLED`, and `UNREACHABLE`.
 - Retain Windows state, last run, last result code, and next run for troubleshooting.
 - Generate a compact HTML report and optionally send it through SMTP.
 - Encrypt the SMTP password with Windows DPAPI for the current Windows user.
@@ -25,7 +25,8 @@ Windows `Ready` is only a current scheduler state. Scheduler Monitor combines cu
 
 | Windows information | Monitor result |
 |---|---|
-| Running | RUNNING |
+| Running, still inside its runtime budget | RUNNING |
+| Running, past its runtime budget | LONG RUNNING |
 | Queued | PENDING |
 | Disabled | DISABLED |
 | Ready + last result `0` or `0x0` | SUCCESS |
@@ -36,6 +37,22 @@ Windows `Ready` is only a current scheduler state. Scheduler Monitor combines cu
 `OVERDUE` is used only when a returned next-run time is already more than five minutes in the past. Task Scheduler normally advances its next-run time, so this is intentionally conservative in V1.
 
 Task Scheduler does not normally expose percentage progress. A running task is shown as `RUNNING` with its available start/last-run time; application-specific progress would require the job's own log, API, file, or database.
+
+### Long running
+
+Task Scheduler reports that a task is running but never for how long, so the monitor measures
+`now - Last Run Time` itself and compares it with a runtime budget:
+
+1. The per-task **Max Run (min)** value in **Configuration → Tasks**.
+2. Otherwise the task's own repetition interval (`Repeat: Every`), while
+   **Use the repeat interval** is enabled in **Configuration → Schedule**. A task that repeats every
+   5 minutes is expected to finish inside 5 minutes, so an execution still alive after that window
+   overlaps its own next start.
+3. Otherwise the global **Default max run (min)**, 5 minutes by default.
+
+`LONG RUNNING` is treated as a problem: it is highlighted in the grid, counted in the Problems card,
+listed under Attention Required in the email report, and returns exit code 2 in silent runs. The
+**Running For** column shows the measured elapsed time.
 
 ## Requirements
 
