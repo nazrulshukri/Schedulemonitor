@@ -205,7 +205,7 @@ public sealed class MainForm : Form
     private void ShowTaskDetails(int rowIndex)
     {
         if (rowIndex < 0 || _grid.Rows[rowIndex].Tag is not TaskMonitorResult task) return;
-        var details = $"Server: {task.ServerName}\r\nHost: {task.Host}\r\n\r\nTask: {task.TaskPath}\r\nMonitor Status: {task.StatusText}\r\nWindows State: {task.WindowsState}\r\n\r\nLast Run: {task.LastRunTime?.ToString("F") ?? "-"}\r\nLast Result: {EmptyDash(task.LastResult)}\r\nNext Run: {task.NextRunTime?.ToString("F") ?? "-"}\r\nRunning For: {(task.RunningFor is { } elapsed ? MonitoringService.Describe(elapsed) : "-")}\r\nExpected Within: {(task.LongRunningThreshold is { } limit ? MonitoringService.Describe(limit) : "-")}\r\nLast Checked: {task.CheckedAt:F}\r\n\r\nDetail: {task.Detail}";
+        var details = $"Server: {task.ServerName}\r\nHost: {task.Host}\r\n\r\nTask: {task.TaskPath}\r\nMonitor Status: {task.StatusText}\r\nWindows State: {task.WindowsState}\r\n\r\nLast Run: {task.LastRunTime?.ToString("F") ?? "-"}\r\nLast Result: {EmptyDash(task.LastResult)}\r\nNext Run: {task.NextRunTime?.ToString("F") ?? "-"}\r\nRunning For: {(task.RunningFor is { } elapsed ? MonitoringService.Describe(elapsed) : "-")}\r\nExpected Within: {(task.LongRunningThreshold is { } limit ? MonitoringService.Describe(limit) : "-")}\r\nWindows Event: {(task.LongRunningEventId is { } eventId ? $"{eventId} at {task.LongRunningEventTime:g}" : "-")}\r\nLast Checked: {task.CheckedAt:F}\r\n\r\nDetail: {task.Detail}";
         MessageBox.Show(details, "Task Details", MessageBoxButtons.OK, task.Status == MonitorStatus.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
     }
 

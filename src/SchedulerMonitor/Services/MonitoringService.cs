@@ -6,12 +6,14 @@ namespace SchedulerMonitor.Services;
 public sealed class MonitoringService
 {
     private readonly RemoteTaskQuery _query;
+    private readonly TaskEventQuery _events;
     private readonly FileLogger _logger;
 
-    public MonitoringService(RemoteTaskQuery query, FileLogger logger)
+    public MonitoringService(RemoteTaskQuery query, FileLogger logger, TaskEventQuery? events = null)
     {
         _query = query;
         _logger = logger;
+        _events = events ?? new TaskEventQuery(logger);
     }
 
     public async Task<MonitorRunResult> RunAsync(AppConfig config,
@@ -36,6 +38,7 @@ public sealed class MonitoringService
                 var discovered = await _query.ScanAsync(server.Host, config.Monitoring.TimeoutSeconds,
                     cancellationToken);
                 var lookup = discovered.ToDictionary(task => task.TaskPath, StringComparer.OrdinalIgnoreCase);
+                var events = await ReadEventsAsync(server, config.Monitoring, cancellationToken);
 
                 foreach (var selectedTask in selected)
                 {
@@ -52,7 +55,8 @@ public sealed class MonitoringService
                         continue;
                     }
 
-                    var item = Classify(server, task, config.Monitoring, selectedTask);
+                    events.TryGetValue(task.TaskPath, out var taskEvent);
+                    var item = Classify(server, task, config.Monitoring, selectedTask, taskEvent);
                     run.Tasks.Add(item);
                     _logger.Info($"{server}: {task.TaskPath} = {item.StatusText} ({item.Detail})");
                 }
@@ -78,8 +82,35 @@ public sealed class MonitoringService
         return run;
     }
 
+    /// <summary>
+    /// Reads the overlap events for one server, keeping the newest event per task. A server that
+    /// refuses the event log is not a monitoring failure: the elapsed-time rule still applies.
+    /// </summary>
+    private async Task<Dictionary<string, TaskEvent>> ReadEventsAsync(ServerConfig server,
+        MonitoringConfig monitoring, CancellationToken cancellationToken)
+    {
+        if (!monitoring.UseEventLog || monitoring.LongRunningEventIds.Count == 0)
+            return new Dictionary<string, TaskEvent>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            var events = await _events.QueryAsync(server.Host, monitoring.LongRunningEventIds,
+                monitoring.EventLookbackMinutes, monitoring.TimeoutSeconds, cancellationToken);
+            return events
+                .GroupBy(item => item.TaskPath, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.OrderByDescending(item => item.TimeCreated).First(),
+                    StringComparer.OrdinalIgnoreCase);
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"{server}: event log unavailable, using elapsed time only ({ex.Message})");
+            return new Dictionary<string, TaskEvent>(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
     internal static TaskMonitorResult Classify(ServerConfig server, DiscoveredTask task,
-        MonitoringConfig? monitoring = null, MonitoredTaskConfig? selected = null)
+        MonitoringConfig? monitoring = null, MonitoredTaskConfig? selected = null,
+        TaskEvent? overlapEvent = null)
     {
         monitoring ??= new MonitoringConfig();
         var state = task.WindowsState.Trim();
@@ -92,6 +123,18 @@ public sealed class MonitoringService
         {
             status = MonitorStatus.Disabled;
             detail = "Task is disabled";
+        }
+        else if (overlapEvent is not null)
+        {
+            if (task.LastRunTime is not null && state.Contains("Running", StringComparison.OrdinalIgnoreCase))
+            {
+                var elapsed = DateTime.Now - task.LastRunTime.Value;
+                if (elapsed > TimeSpan.Zero) runningFor = elapsed;
+            }
+
+            status = MonitorStatus.LongRunning;
+            detail = $"Windows event {overlapEvent.EventId} at {overlapEvent.TimeCreated:g}: "
+                     + "a scheduled start was skipped because the previous run was still going";
         }
         else if (state.Contains("Running", StringComparison.OrdinalIgnoreCase))
         {
@@ -150,6 +193,7 @@ public sealed class MonitoringService
             LastRunTime = task.LastRunTime, LastResult = task.LastResult,
             NextRunTime = task.NextRunTime, Detail = detail,
             RunningFor = runningFor, LongRunningThreshold = threshold,
+            LongRunningEventId = overlapEvent?.EventId, LongRunningEventTime = overlapEvent?.TimeCreated,
             CheckedAt = DateTime.Now
         };
     }

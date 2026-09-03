@@ -64,6 +64,21 @@ public sealed class MonitoringConfig
     /// </summary>
     public bool UseRepeatIntervalAsLimit { get; set; } = true;
 
+    /// <summary>
+    /// When true, the monitor also reads Microsoft-Windows-TaskScheduler/Operational and reports a
+    /// task as LONG RUNNING when Windows itself logged one of <see cref="LongRunningEventIds"/>.
+    /// </summary>
+    public bool UseEventLog { get; set; } = true;
+
+    /// <summary>
+    /// Event IDs that prove an execution outlived its schedule. 322 is "launch request ignored,
+    /// instance already running"; 324 is the same refusal under the "queue" instance policy.
+    /// </summary>
+    public List<int> LongRunningEventIds { get; set; } = [322, 324];
+
+    /// <summary>How far back the event log is read, in minutes.</summary>
+    public int EventLookbackMinutes { get; set; } = 720;
+
     public int LogRetentionDays { get; set; } = 30;
     public int ReportRetentionDays { get; set; } = 30;
 }

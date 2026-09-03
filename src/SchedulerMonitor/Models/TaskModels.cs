@@ -46,6 +46,12 @@ public sealed class TaskMonitorResult
     /// <summary>Runtime the task is expected to stay below before it counts as long running.</summary>
     public TimeSpan? LongRunningThreshold { get; init; }
 
+    /// <summary>The Task Scheduler event that flagged this task, when the event log was the source.</summary>
+    public int? LongRunningEventId { get; init; }
+
+    /// <summary>When that event was logged.</summary>
+    public DateTime? LongRunningEventTime { get; init; }
+
     public string StatusText => Status == MonitorStatus.LongRunning
         ? "LONG RUNNING"
         : Status.ToString().ToUpperInvariant();

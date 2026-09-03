@@ -43,6 +43,17 @@ Task Scheduler does not normally expose percentage progress. A running task is s
 Task Scheduler reports that a task is running but never for how long, so the monitor measures
 `now - Last Run Time` itself and compares it with a runtime budget:
 
+**Source 1 — the Task Scheduler event log.** `Microsoft-Windows-TaskScheduler/Operational` is read
+with `wevtutil.exe` for event **322** (*launch request ignored, instance already running*) and
+**324** (*launch request queued, instance already running*). Windows logs these when a scheduled
+start is skipped because the previous run is still going — the exact mismatch between a 5-minute
+schedule and a 3-minute-plus executable. Any such event inside the lookback window flags the task,
+and the event ID and time are shown in the task details and the email report. The event IDs, the
+lookback window and the whole check are configurable in **Configuration → Schedule**; a server that
+denies the event log is logged and falls back to the timing rule below.
+
+**Source 2 — elapsed time**, compared with a budget:
+
 1. The per-task **Max Run (min)** value in **Configuration → Tasks**.
 2. Otherwise the task's own repetition interval (`Repeat: Every`), while
    **Use the repeat interval** is enabled in **Configuration → Schedule**. A task that repeats every
@@ -60,6 +71,9 @@ listed under Attention Required in the email report, and returns exit code 2 in 
 - Visual Studio 2022 with the .NET desktop development workload, or .NET 8 SDK, to build.
 - The Windows account running the tool must have permission to query Task Scheduler on each remote machine.
 - Remote Task Scheduler/RPC access and applicable Windows Firewall rules must be enabled.
+- For the event-based long running check, the **Remote Event Log Management** firewall rules must be
+  enabled on the monitored servers and the account must be able to read the Task Scheduler
+  operational log. Without it, monitoring still works using elapsed time only.
 - English Windows Task Scheduler command output. V1 parses the standard English `schtasks.exe /Query /FO CSV /V` headers.
 
 No server username or password is stored. Remote queries use the Windows identity that runs the EXE or its registered scheduled task.
