@@ -10,12 +10,24 @@ public sealed class MainForm : Form
     private readonly AppPaths _paths;
     private readonly ConfigStore _store;
     private readonly FileLogger _logger;
-    private readonly DataGridView _grid = new() { Dock = DockStyle.Fill, ReadOnly = true };
+    private readonly BufferedGrid _grid = new() { Dock = DockStyle.Fill, ReadOnly = true };
     private readonly Label _lastCheck = new() { AutoSize = true, ForeColor = Color.DimGray };
     private readonly Label _activity = new() { AutoSize = true, ForeColor = UiTheme.Petrol };
     private readonly Dictionary<string, Label> _summary = new();
+    private readonly List<Button> _actionButtons = [];
     private readonly Button _runButton;
+    private readonly ProgressBar _progress = new()
+    {
+        Style = ProgressBarStyle.Marquee, MarqueeAnimationSpeed = 30,
+        Width = 150, Height = 6, Visible = false, Margin = new Padding(6, 15, 6, 3)
+    };
     private MonitorRunResult? _lastRun;
+
+    /// <summary>DataGridView repaints row by row; buffering it removes the flicker on refresh.</summary>
+    private sealed class BufferedGrid : DataGridView
+    {
+        public BufferedGrid() => DoubleBuffered = true;
+    }
 
     public MainForm(AppPaths paths, ConfigStore store, FileLogger logger)
     {
@@ -44,7 +56,9 @@ public sealed class MainForm : Form
         config.Click += (_, _) => OpenConfiguration();
         logs.Click += (_, _) => OpenFolder(_paths.LogDirectory);
         actions.Controls.Add(_runButton); actions.Controls.Add(send); actions.Controls.Add(config); actions.Controls.Add(logs);
+        actions.Controls.Add(_progress);
         actions.Controls.Add(_activity);
+        _actionButtons.AddRange([_runButton, send, config, logs]);
         root.Controls.Add(actions, 0, 3);
         Controls.Add(root);
 
@@ -64,9 +78,9 @@ public sealed class MainForm : Form
     private Control BuildSummary()
     {
         var panel = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(17, 14, 10, 8), WrapContents = false, AutoScroll = true };
-        foreach (var key in new[] { "Total", "Success", "Running", "Pending", "Problems" })
+        foreach (var key in new[] { "Total", "Success", "Running", "Long Running", "Pending", "Problems" })
         {
-            var card = new Panel { Width = 175, Height = 72, BackColor = Color.White, Margin = new Padding(4) };
+            var card = new Panel { Width = 150, Height = 72, BackColor = Color.White, Margin = new Padding(4) };
             card.Paint += (_, e) => ControlPaint.DrawBorder(e.Graphics, card.ClientRectangle, UiTheme.Border, ButtonBorderStyle.Solid);
             var value = new Label { Text = "0", AutoSize = true, Location = new Point(14, 8), Font = new Font("Segoe UI Semibold", 20F), ForeColor = UiTheme.Petrol };
             var label = new Label { Text = key.ToUpperInvariant(), AutoSize = true, Location = new Point(15, 45), ForeColor = Color.DimGray };
@@ -88,6 +102,7 @@ public sealed class MainForm : Form
         _grid.Columns.Add("Task", "Task");
         _grid.Columns.Add("Status", "Monitor Status");
         _grid.Columns.Add("Windows", "Windows State");
+        _grid.Columns.Add("Duration", "Running For");
         _grid.Columns.Add("LastRun", "Last Run");
         _grid.Columns.Add("Result", "Last Result");
         _grid.Columns.Add("NextRun", "Next Run");
@@ -114,9 +129,15 @@ public sealed class MainForm : Form
                     MessageBoxButtons.OK, MessageBoxIcon.Information); return;
             }
             var progress = new Progress<string>(message => _activity.Text = message);
-            _lastRun = await new MonitoringService(new RemoteTaskQuery(_logger), _logger).RunAsync(config, progress);
-            DisplayRun(_lastRun);
-            var report = new ReportBuilder(_paths).BuildAndSave(_lastRun);
+            var monitor = new MonitoringService(new RemoteTaskQuery(_logger), _logger);
+
+            // schtasks, CSV parsing and report writing all stay off the UI thread so the
+            // window keeps repainting while the check runs.
+            var run = await Task.Run(() => monitor.RunAsync(config, progress));
+            var report = await Task.Run(() => new ReportBuilder(_paths).BuildAndSave(run));
+
+            _lastRun = run;
+            DisplayRun(run);
             _activity.Text = $"Completed • {Path.GetFileName(report.FilePath)}";
         }
         catch (Exception ex)
@@ -129,21 +150,25 @@ public sealed class MainForm : Form
 
     private void DisplayRun(MonitorRunResult run)
     {
+        _grid.SuspendLayout();
         _grid.Rows.Clear();
         foreach (var task in run.Tasks.OrderBy(task => StatusOrder(task.Status)).ThenBy(task => task.ServerName).ThenBy(task => task.DisplayName))
         {
             var rowIndex = _grid.Rows.Add(task.ServerName, task.DisplayName, task.StatusText, task.WindowsState,
+                task.RunningFor is { } elapsed ? MonitoringService.Describe(elapsed) : "-",
                 task.LastRunTime?.ToString("dd-MMM-yyyy HH:mm") ?? "-", EmptyDash(task.LastResult),
                 task.NextRunTime?.ToString("dd-MMM-yyyy HH:mm") ?? "-");
             var row = _grid.Rows[rowIndex]; row.Tag = task;
             row.Cells[2].Style.ForeColor = StatusColor(task.Status);
             row.Cells[2].Style.Font = new Font(_grid.Font, FontStyle.Bold);
         }
+        _grid.ResumeLayout();
         _summary["Total"].Text = run.Tasks.Count.ToString();
         _summary["Success"].Text = run.Tasks.Count(task => task.Status == MonitorStatus.Success).ToString();
         _summary["Running"].Text = run.Tasks.Count(task => task.Status == MonitorStatus.Running).ToString();
+        _summary["Long Running"].Text = run.Tasks.Count(task => task.Status == MonitorStatus.LongRunning).ToString();
         _summary["Pending"].Text = run.Tasks.Count(task => task.Status == MonitorStatus.Pending).ToString();
-        _summary["Problems"].Text = run.Tasks.Count(task => task.Status is MonitorStatus.Failed or MonitorStatus.Overdue or MonitorStatus.Disabled or MonitorStatus.Unreachable).ToString();
+        _summary["Problems"].Text = run.Tasks.Count(task => task.Status is MonitorStatus.Failed or MonitorStatus.Overdue or MonitorStatus.Disabled or MonitorStatus.Unreachable or MonitorStatus.LongRunning).ToString();
         _lastCheck.Text = $"Last check: {run.CompletedAt:dd-MMM-yyyy HH:mm:ss} • Servers: {run.ServerCount}";
     }
 
@@ -158,7 +183,8 @@ public sealed class MainForm : Form
         {
             SetBusy(true, "Sending report...");
             var config = _store.Load();
-            var report = new ReportBuilder(_paths).BuildAndSave(_lastRun);
+            var run = _lastRun!;
+            var report = await Task.Run(() => new ReportBuilder(_paths).BuildAndSave(run));
             await new EmailService(_logger).SendAsync(config.Email, report.Subject, report.Html);
             MessageBox.Show("Report sent successfully.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
@@ -179,25 +205,27 @@ public sealed class MainForm : Form
     private void ShowTaskDetails(int rowIndex)
     {
         if (rowIndex < 0 || _grid.Rows[rowIndex].Tag is not TaskMonitorResult task) return;
-        var details = $"Server: {task.ServerName}\r\nHost: {task.Host}\r\n\r\nTask: {task.TaskPath}\r\nMonitor Status: {task.StatusText}\r\nWindows State: {task.WindowsState}\r\n\r\nLast Run: {task.LastRunTime?.ToString("F") ?? "-"}\r\nLast Result: {EmptyDash(task.LastResult)}\r\nNext Run: {task.NextRunTime?.ToString("F") ?? "-"}\r\nLast Checked: {task.CheckedAt:F}\r\n\r\nDetail: {task.Detail}";
+        var details = $"Server: {task.ServerName}\r\nHost: {task.Host}\r\n\r\nTask: {task.TaskPath}\r\nMonitor Status: {task.StatusText}\r\nWindows State: {task.WindowsState}\r\n\r\nLast Run: {task.LastRunTime?.ToString("F") ?? "-"}\r\nLast Result: {EmptyDash(task.LastResult)}\r\nNext Run: {task.NextRunTime?.ToString("F") ?? "-"}\r\nRunning For: {(task.RunningFor is { } elapsed ? MonitoringService.Describe(elapsed) : "-")}\r\nExpected Within: {(task.LongRunningThreshold is { } limit ? MonitoringService.Describe(limit) : "-")}\r\nLast Checked: {task.CheckedAt:F}\r\n\r\nDetail: {task.Detail}";
         MessageBox.Show(details, "Task Details", MessageBoxButtons.OK, task.Status == MonitorStatus.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
     }
 
     private void SetBusy(bool busy, string? text = null)
     {
-        _runButton.Enabled = !busy;
-        UseWaitCursor = busy;
+        foreach (var button in _actionButtons) button.Enabled = !busy;
+        _progress.Visible = busy;
+        Cursor = busy ? Cursors.AppStarting : Cursors.Default;
         if (text is not null) _activity.Text = text;
+        _activity.Refresh();
     }
 
     private static void OpenFolder(string path) => Process.Start(new ProcessStartInfo("explorer.exe", path) { UseShellExecute = true });
     private static string EmptyDash(string value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
-    private static int StatusOrder(MonitorStatus status) => status switch { MonitorStatus.Failed => 0, MonitorStatus.Unreachable => 1, MonitorStatus.Overdue => 2, MonitorStatus.Disabled => 3, MonitorStatus.Running => 4, MonitorStatus.Pending => 5, _ => 6 };
+    private static int StatusOrder(MonitorStatus status) => status switch { MonitorStatus.Failed => 0, MonitorStatus.Unreachable => 1, MonitorStatus.Overdue => 2, MonitorStatus.Disabled => 3, MonitorStatus.LongRunning => 4, MonitorStatus.Running => 5, MonitorStatus.Pending => 6, _ => 7 };
 
     private void InitializeComponent()
     {
 
     }
 
-    private static Color StatusColor(MonitorStatus status) => status switch { MonitorStatus.Success => Color.FromArgb(32, 114, 69), MonitorStatus.Running or MonitorStatus.Pending => Color.FromArgb(18, 97, 160), MonitorStatus.Overdue or MonitorStatus.Disabled => Color.FromArgb(192, 100, 0), _ => Color.FromArgb(180, 35, 24) };
+    private static Color StatusColor(MonitorStatus status) => status switch { MonitorStatus.Success => Color.FromArgb(32, 114, 69), MonitorStatus.Running or MonitorStatus.Pending => Color.FromArgb(18, 97, 160), MonitorStatus.LongRunning => Color.FromArgb(198, 74, 0), MonitorStatus.Overdue or MonitorStatus.Disabled => Color.FromArgb(192, 100, 0), _ => Color.FromArgb(180, 35, 24) };
 }

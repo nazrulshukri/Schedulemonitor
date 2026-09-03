@@ -23,6 +23,13 @@ public sealed class ConfigurationForm : Form
     private readonly Label _jobMessage = new() { AutoSize = true, ForeColor = Color.DimGray };
     private List<DiscoveredTask> _scannedTasks = [];
     private HashSet<string> _workingSelection = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, int> _workingLimits = new(StringComparer.OrdinalIgnoreCase);
+    private readonly NumericUpDown _defaultLongRunning = new() { Minimum = 0, Maximum = 10080, Value = 5, Width = 90 };
+    private readonly CheckBox _useRepeatInterval = new()
+    {
+        Text = "Use the repeat interval from Task Scheduler as the limit when a task has one",
+        AutoSize = true
+    };
 
     private readonly CheckBox _emailEnabled = new() { Text = "Send email after automatic monitoring", AutoSize = true };
     private readonly TextBox _smtp = new();
@@ -51,7 +58,7 @@ public sealed class ConfigurationForm : Form
         tabs.TabPages.Add(BuildScheduleTab());
         Controls.Add(tabs);
 
-        LoadServers(); LoadEmail(); LoadSchedule();
+        LoadServers(); LoadEmail(); LoadSchedule(); LoadMonitoring();
         Shown += async (_, _) => await RefreshScheduleStatusAsync();
     }
 
@@ -109,6 +116,11 @@ public sealed class ConfigurationForm : Form
         _jobGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Task", HeaderText = "Task Name", ReadOnly = true, FillWeight = 130 });
         _jobGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Path", HeaderText = "Task Path", ReadOnly = true, FillWeight = 210 });
         _jobGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "State", HeaderText = "Current State", ReadOnly = true, FillWeight = 75 });
+        _jobGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "Limit", HeaderText = "Max Run (min)", FillWeight = 70,
+            ToolTipText = "Runtime budget for this task. 0 or empty uses the schedule interval, otherwise the default limit."
+        });
         _jobGrid.CurrentCellDirtyStateChanged += (_, _) =>
         {
             if (_jobGrid.IsCurrentCellDirty) _jobGrid.CommitEdit(DataGridViewDataErrorContexts.Commit);
@@ -118,7 +130,7 @@ public sealed class ConfigurationForm : Form
         var bottom = ActionBar();
         var save = UiTheme.Button("Save Selection", true); save.Click += (_, _) => SaveTaskSelection();
         bottom.Controls.Add(save);
-        bottom.Controls.Add(new Label { Text = "Only selected tasks appear in monitoring and email.", AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(10, 9, 3, 3) });
+        bottom.Controls.Add(new Label { Text = "Only selected tasks appear in monitoring and email. Max Run flags a task as LONG RUNNING once it exceeds that many minutes.", AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(10, 9, 3, 3) });
 
         top.Dock = DockStyle.Fill; bottom.Dock = DockStyle.Fill;
         layout.Controls.Add(top, 0, 0); layout.Controls.Add(_jobGrid, 0, 1); layout.Controls.Add(bottom, 0, 2);
@@ -149,7 +161,7 @@ public sealed class ConfigurationForm : Form
     private TabPage BuildScheduleTab()
     {
         var page = NewPage("Schedule");
-        var panel = new TableLayoutPanel { Dock = DockStyle.Top, Height = 300, Padding = new Padding(25), ColumnCount = 2, RowCount = 5 };
+        var panel = new TableLayoutPanel { Dock = DockStyle.Top, Height = 420, Padding = new Padding(25), ColumnCount = 2, RowCount = 7 };
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190)); panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         AddField(panel, 0, "", _scheduleEnabled);
         AddField(panel, 1, "Daily run time", _runTime);
@@ -166,7 +178,12 @@ public sealed class ConfigurationForm : Form
             ForeColor = Color.DimGray,
             Text = "The tool registers SchedulerMonitor-Daily in Windows Task Scheduler. It runs this portable EXE with --run --silent. Register it while signed in with the Windows account that has permission to query the remote servers."
         };
-        panel.Controls.Add(note, 1, 4); page.Controls.Add(panel); return page;
+        panel.Controls.Add(note, 1, 4);
+        AddField(panel, 5, "Default max run (min)", _defaultLongRunning);
+        AddField(panel, 6, "", _useRepeatInterval);
+        _defaultLongRunning.ValueChanged += (_, _) => SaveMonitoring();
+        _useRepeatInterval.CheckedChanged += (_, _) => SaveMonitoring();
+        page.Controls.Add(panel); return page;
     }
 
     private void LoadServers()
@@ -226,9 +243,13 @@ public sealed class ConfigurationForm : Form
         try
         {
             UseWaitCursor = true; _jobMessage.Text = $"Scanning {server}...";
-            var scanned = (await new RemoteTaskQuery(_logger).ScanAsync(server.Host, _config.Monitoring.TimeoutSeconds)).ToList();
+            var query = new RemoteTaskQuery(_logger);
+            var timeout = _config.Monitoring.TimeoutSeconds;
+            var scanned = (await Task.Run(() => query.ScanAsync(server.Host, timeout))).ToList();
             var saved = _config.MonitoredTasks.Where(task => task.ServerId == server.Id && task.Enabled).ToList();
             _workingSelection = new HashSet<string>(saved.Select(task => task.TaskPath), StringComparer.OrdinalIgnoreCase);
+            _workingLimits = saved.Where(task => task.LongRunningMinutes > 0)
+                .ToDictionary(task => task.TaskPath, task => task.LongRunningMinutes, StringComparer.OrdinalIgnoreCase);
 
             foreach (var missing in saved.Where(savedTask => scanned.All(task => !task.TaskPath.Equals(savedTask.TaskPath, StringComparison.OrdinalIgnoreCase))))
             {
@@ -250,11 +271,13 @@ public sealed class ConfigurationForm : Form
 
     private void ResetTaskView()
     {
-        _scannedTasks = []; _workingSelection.Clear(); _jobGrid.Rows.Clear();
+        _scannedTasks = []; _workingSelection.Clear(); _workingLimits.Clear(); _jobGrid.Rows.Clear();
         if (_jobServer.SelectedItem is ServerConfig server)
         {
-            _workingSelection = new HashSet<string>(_config.MonitoredTasks
-                .Where(task => task.ServerId == server.Id && task.Enabled).Select(task => task.TaskPath), StringComparer.OrdinalIgnoreCase);
+            var saved = _config.MonitoredTasks.Where(task => task.ServerId == server.Id && task.Enabled).ToList();
+            _workingSelection = new HashSet<string>(saved.Select(task => task.TaskPath), StringComparer.OrdinalIgnoreCase);
+            _workingLimits = saved.Where(task => task.LongRunningMinutes > 0)
+                .ToDictionary(task => task.TaskPath, task => task.LongRunningMinutes, StringComparer.OrdinalIgnoreCase);
             _jobMessage.Text = $"{_workingSelection.Count} saved • Click Scan Tasks";
         }
     }
@@ -288,7 +311,7 @@ public sealed class ConfigurationForm : Form
                      && (!_selectedOnly.Checked || _workingSelection.Contains(task.TaskPath))))
         {
             var row = _jobGrid.Rows[_jobGrid.Rows.Add(_workingSelection.Contains(task.TaskPath), task.DisplayName,
-                task.TaskPath, task.WindowsState)];
+                task.TaskPath, task.WindowsState, LimitText(task))];
             row.Tag = task;
             if (task.WindowsState.Equals("Not Found", StringComparison.OrdinalIgnoreCase)) row.DefaultCellStyle.ForeColor = Color.FromArgb(180, 35, 24);
         }
@@ -296,10 +319,45 @@ public sealed class ConfigurationForm : Form
 
     private void JobGridCellValueChanged(object? sender, DataGridViewCellEventArgs eventArgs)
     {
-        if (eventArgs.RowIndex < 0 || eventArgs.ColumnIndex != 0 || _jobGrid.Rows[eventArgs.RowIndex].Tag is not DiscoveredTask task) return;
-        var selected = Convert.ToBoolean(_jobGrid.Rows[eventArgs.RowIndex].Cells[0].Value);
+        if (eventArgs.RowIndex < 0 || _jobGrid.Rows[eventArgs.RowIndex].Tag is not DiscoveredTask task) return;
+        var row = _jobGrid.Rows[eventArgs.RowIndex];
+
+        if (eventArgs.ColumnIndex == 4)
+        {
+            var text = Convert.ToString(row.Cells[4].Value)?.Trim() ?? "";
+            if (text.Length == 0 || (int.TryParse(text, out var minutes) && minutes == 0))
+            {
+                _workingLimits.Remove(task.TaskPath);
+                row.Cells[4].Value = AutomaticLimitText(task);
+            }
+            else if (int.TryParse(text, out minutes) && minutes > 0)
+            {
+                _workingLimits[task.TaskPath] = minutes;
+                row.Cells[4].Value = minutes.ToString();
+            }
+            else
+            {
+                row.Cells[4].Value = LimitText(task);
+            }
+            return;
+        }
+
+        if (eventArgs.ColumnIndex != 0) return;
+        var selected = Convert.ToBoolean(row.Cells[0].Value);
         if (selected) _workingSelection.Add(task.TaskPath); else _workingSelection.Remove(task.TaskPath);
         _jobMessage.Text = $"{_scannedTasks.Count} found • {_workingSelection.Count} selected";
+    }
+
+    /// <summary>Cell text for the per-task runtime budget: an explicit value, or the automatic one.</summary>
+    private string LimitText(DiscoveredTask task) =>
+        _workingLimits.TryGetValue(task.TaskPath, out var minutes) && minutes > 0
+            ? minutes.ToString()
+            : AutomaticLimitText(task);
+
+    private string AutomaticLimitText(DiscoveredTask task)
+    {
+        var resolved = MonitoringService.ResolveThreshold(task, _config.Monitoring, null);
+        return resolved is null ? "-" : $"auto ({(int)Math.Max(1, resolved.Value.TotalMinutes)})";
     }
 
     private void SetAllVisible(bool selected)
@@ -325,7 +383,11 @@ public sealed class ConfigurationForm : Form
         {
             var found = _scannedTasks.FirstOrDefault(task => task.TaskPath.Equals(path, StringComparison.OrdinalIgnoreCase));
             if (found is null) continue;
-            _config.MonitoredTasks.Add(new MonitoredTaskConfig { ServerId = server.Id, TaskPath = path, DisplayName = found.DisplayName, Enabled = true });
+            _config.MonitoredTasks.Add(new MonitoredTaskConfig
+            {
+                ServerId = server.Id, TaskPath = path, DisplayName = found.DisplayName, Enabled = true,
+                LongRunningMinutes = _workingLimits.TryGetValue(path, out var minutes) ? minutes : 0
+            });
         }
         SaveConfig(); MessageBox.Show($"{_workingSelection.Count} task(s) selected for {server}.", Text,
             MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -361,6 +423,20 @@ public sealed class ConfigurationForm : Form
         }
         catch (Exception ex) { MessageBox.Show(ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error); }
         finally { UseWaitCursor = false; }
+    }
+
+    private void LoadMonitoring()
+    {
+        _defaultLongRunning.Value = Math.Clamp(_config.Monitoring.LongRunningMinutes, 0, 10080);
+        _useRepeatInterval.Checked = _config.Monitoring.UseRepeatIntervalAsLimit;
+    }
+
+    private void SaveMonitoring()
+    {
+        _config.Monitoring.LongRunningMinutes = (int)_defaultLongRunning.Value;
+        _config.Monitoring.UseRepeatIntervalAsLimit = _useRepeatInterval.Checked;
+        SaveConfig();
+        RebuildTaskGrid();
     }
 
     private void LoadSchedule()

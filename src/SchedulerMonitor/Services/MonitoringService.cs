@@ -52,7 +52,7 @@ public sealed class MonitoringService
                         continue;
                     }
 
-                    var item = Classify(server, task);
+                    var item = Classify(server, task, config.Monitoring, selectedTask);
                     run.Tasks.Add(item);
                     _logger.Info($"{server}: {task.TaskPath} = {item.StatusText} ({item.Detail})");
                 }
@@ -78,9 +78,13 @@ public sealed class MonitoringService
         return run;
     }
 
-    internal static TaskMonitorResult Classify(ServerConfig server, DiscoveredTask task)
+    internal static TaskMonitorResult Classify(ServerConfig server, DiscoveredTask task,
+        MonitoringConfig? monitoring = null, MonitoredTaskConfig? selected = null)
     {
+        monitoring ??= new MonitoringConfig();
         var state = task.WindowsState.Trim();
+        var threshold = ResolveThreshold(task, monitoring, selected);
+        TimeSpan? runningFor = null;
         MonitorStatus status;
         string detail;
 
@@ -91,8 +95,24 @@ public sealed class MonitoringService
         }
         else if (state.Contains("Running", StringComparison.OrdinalIgnoreCase))
         {
-            status = MonitorStatus.Running;
-            detail = task.LastRunTime is null ? "Task is running" : $"Running since {task.LastRunTime:g}";
+            if (task.LastRunTime is not null)
+            {
+                var elapsed = DateTime.Now - task.LastRunTime.Value;
+                if (elapsed > TimeSpan.Zero) runningFor = elapsed;
+            }
+
+            if (runningFor is not null && threshold is not null && runningFor > threshold)
+            {
+                status = MonitorStatus.LongRunning;
+                detail = $"Running for {Describe(runningFor.Value)}, expected to finish within {Describe(threshold.Value)}";
+            }
+            else
+            {
+                status = MonitorStatus.Running;
+                detail = runningFor is not null
+                    ? $"Running for {Describe(runningFor.Value)} since {task.LastRunTime:g}"
+                    : task.LastRunTime is null ? "Task is running" : $"Running since {task.LastRunTime:g}";
+            }
         }
         else if (state.Contains("Queued", StringComparison.OrdinalIgnoreCase))
         {
@@ -129,8 +149,35 @@ public sealed class MonitoringService
             WindowsState = state, Status = status,
             LastRunTime = task.LastRunTime, LastResult = task.LastResult,
             NextRunTime = task.NextRunTime, Detail = detail,
+            RunningFor = runningFor, LongRunningThreshold = threshold,
             CheckedAt = DateTime.Now
         };
+    }
+
+    /// <summary>
+    /// Picks the runtime budget for a task: an explicit per-task limit wins, then the repetition
+    /// interval declared in Task Scheduler, then the global default.
+    /// </summary>
+    internal static TimeSpan? ResolveThreshold(DiscoveredTask task, MonitoringConfig monitoring,
+        MonitoredTaskConfig? selected)
+    {
+        if (selected is { LongRunningMinutes: > 0 })
+            return TimeSpan.FromMinutes(selected.LongRunningMinutes);
+
+        if (monitoring.UseRepeatIntervalAsLimit && task.RepeatInterval is { } interval && interval > TimeSpan.Zero)
+            return interval;
+
+        return monitoring.LongRunningMinutes > 0
+            ? TimeSpan.FromMinutes(monitoring.LongRunningMinutes)
+            : null;
+    }
+
+    internal static string Describe(TimeSpan value)
+    {
+        if (value.TotalMinutes < 1) return $"{Math.Max(1, (int)value.TotalSeconds)}s";
+        if (value.TotalHours < 1) return $"{(int)value.TotalMinutes}m";
+        if (value.TotalDays < 1) return $"{(int)value.TotalHours}h {value.Minutes}m";
+        return $"{(int)value.TotalDays}d {value.Hours}h";
     }
 
     private static bool IsSuccessResult(string value)
