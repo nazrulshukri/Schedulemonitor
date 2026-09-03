@@ -91,6 +91,27 @@ public sealed class TaskEventQuery
         return events;
     }
 
+    /// <summary>
+    /// Short label for the Events column. The ID stays in the text because it is the authoritative
+    /// value to look up in Event Viewer; the wording is only a reminder of what it means.
+    /// </summary>
+    public static string Describe(int eventId) => eventId switch
+    {
+        100 => "100 - task started",
+        101 => "101 - task start failed",
+        102 => "102 - task completed",
+        103 => "103 - action start failed",
+        111 => "111 - task terminated",
+        200 => "200 - action started",
+        201 => "201 - action completed",
+        202 => "202 - action failed",
+        203 => "203 - action failed to start",
+        322 => "322 - start skipped, already running",
+        324 => "324 - start blocked, already running",
+        329 => "329 - terminated, time limit exceeded",
+        _ => $"{eventId} - Task Scheduler event"
+    };
+
     private static string EnsureLeadingSlash(string value) => value.StartsWith('\\') ? value : "\\" + value;
 
     private static bool IsLocalHost(string host) =>

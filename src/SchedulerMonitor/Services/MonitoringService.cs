@@ -38,7 +38,10 @@ public sealed class MonitoringService
                 var discovered = await _query.ScanAsync(server.Host, config.Monitoring.TimeoutSeconds,
                     cancellationToken);
                 var lookup = discovered.ToDictionary(task => task.TaskPath, StringComparer.OrdinalIgnoreCase);
-                var events = await ReadEventsAsync(server, config.Monitoring, cancellationToken);
+                var overlapEvents = await ReadEventsAsync(server, config.Monitoring,
+                    config.Monitoring.LongRunningEventIds, cancellationToken);
+                var statusEvents = await ReadEventsAsync(server, config.Monitoring,
+                    config.Monitoring.StatusEventIds, cancellationToken);
 
                 foreach (var selectedTask in selected)
                 {
@@ -55,8 +58,9 @@ public sealed class MonitoringService
                         continue;
                     }
 
-                    events.TryGetValue(task.TaskPath, out var taskEvent);
-                    var item = Classify(server, task, config.Monitoring, selectedTask, taskEvent);
+                    overlapEvents.TryGetValue(task.TaskPath, out var overlap);
+                    statusEvents.TryGetValue(task.TaskPath, out var statusEvent);
+                    var item = Classify(server, task, config.Monitoring, selectedTask, overlap, statusEvent);
                     run.Tasks.Add(item);
                     _logger.Info($"{server}: {task.TaskPath} = {item.StatusText} ({item.Detail})");
                 }
@@ -87,14 +91,14 @@ public sealed class MonitoringService
     /// refuses the event log is not a monitoring failure: the elapsed-time rule still applies.
     /// </summary>
     private async Task<Dictionary<string, TaskEvent>> ReadEventsAsync(ServerConfig server,
-        MonitoringConfig monitoring, CancellationToken cancellationToken)
+        MonitoringConfig monitoring, IReadOnlyCollection<int> eventIds, CancellationToken cancellationToken)
     {
-        if (!monitoring.UseEventLog || monitoring.LongRunningEventIds.Count == 0)
+        if (!monitoring.UseEventLog || eventIds.Count == 0)
             return new Dictionary<string, TaskEvent>(StringComparer.OrdinalIgnoreCase);
 
         try
         {
-            var events = await _events.QueryAsync(server.Host, monitoring.LongRunningEventIds,
+            var events = await _events.QueryAsync(server.Host, eventIds,
                 monitoring.EventLookbackMinutes, monitoring.TimeoutSeconds, cancellationToken);
             return events
                 .GroupBy(item => item.TaskPath, StringComparer.OrdinalIgnoreCase)
@@ -110,7 +114,7 @@ public sealed class MonitoringService
 
     internal static TaskMonitorResult Classify(ServerConfig server, DiscoveredTask task,
         MonitoringConfig? monitoring = null, MonitoredTaskConfig? selected = null,
-        TaskEvent? overlapEvent = null)
+        TaskEvent? overlapEvent = null, TaskEvent? statusEvent = null)
     {
         monitoring ??= new MonitoringConfig();
         var state = task.WindowsState.Trim();
@@ -124,18 +128,6 @@ public sealed class MonitoringService
             status = MonitorStatus.Disabled;
             detail = "Task is disabled";
         }
-        else if (overlapEvent is not null)
-        {
-            if (task.LastRunTime is not null && state.Contains("Running", StringComparison.OrdinalIgnoreCase))
-            {
-                var elapsed = DateTime.Now - task.LastRunTime.Value;
-                if (elapsed > TimeSpan.Zero) runningFor = elapsed;
-            }
-
-            status = MonitorStatus.LongRunning;
-            detail = $"Windows event {overlapEvent.EventId} at {overlapEvent.TimeCreated:g}: "
-                     + "a scheduled start was skipped because the previous run was still going";
-        }
         else if (state.Contains("Running", StringComparison.OrdinalIgnoreCase))
         {
             if (task.LastRunTime is not null)
@@ -144,7 +136,20 @@ public sealed class MonitoringService
                 if (elapsed > TimeSpan.Zero) runningFor = elapsed;
             }
 
-            if (runningFor is not null && threshold is not null && runningFor > threshold)
+            // Windows logging a skipped start is proof the current execution outlived its schedule.
+            // The event must belong to this execution, not to an earlier one inside the lookback window.
+            var currentOverlap = overlapEvent is not null
+                                 && (task.LastRunTime is null || overlapEvent.TimeCreated >= task.LastRunTime.Value)
+                ? overlapEvent
+                : null;
+
+            if (currentOverlap is not null)
+            {
+                status = MonitorStatus.LongRunning;
+                detail = $"Windows event {currentOverlap.EventId} at {currentOverlap.TimeCreated:g}: "
+                         + "a scheduled start was skipped because this run is still going";
+            }
+            else if (runningFor is not null && threshold is not null && runningFor > threshold)
             {
                 status = MonitorStatus.LongRunning;
                 detail = $"Running for {Describe(runningFor.Value)}, expected to finish within {Describe(threshold.Value)}";
@@ -194,8 +199,21 @@ public sealed class MonitoringService
             NextRunTime = task.NextRunTime, Detail = detail,
             RunningFor = runningFor, LongRunningThreshold = threshold,
             LongRunningEventId = overlapEvent?.EventId, LongRunningEventTime = overlapEvent?.TimeCreated,
+            EventSummary = SummariseEvent(overlapEvent, statusEvent),
             CheckedAt = DateTime.Now
         };
+    }
+
+    /// <summary>
+    /// Text for the Events column: the overlap event when there is one, otherwise the last
+    /// informational event Windows logged for the task.
+    /// </summary>
+    internal static string SummariseEvent(TaskEvent? overlapEvent, TaskEvent? statusEvent)
+    {
+        var newest = overlapEvent is null ? statusEvent
+            : statusEvent is null || overlapEvent.TimeCreated >= statusEvent.TimeCreated ? overlapEvent
+            : statusEvent;
+        return newest is null ? "" : $"{TaskEventQuery.Describe(newest.EventId)} • {newest.TimeCreated:dd-MMM HH:mm}";
     }
 
     /// <summary>

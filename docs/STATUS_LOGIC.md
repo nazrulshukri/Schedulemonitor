@@ -4,6 +4,8 @@ The V1 classifier intentionally stays small and operational.
 
 Evaluation order:
 
+0. The Events column is filled from the same event log for every task, independently of the status.
+
 1. A failed server query produces `UNREACHABLE` for every selected task on that server.
 2. A selected task absent from a successful scan produces `FAILED` with `Task not found`.
 3. A disabled task produces `DISABLED`.
@@ -31,9 +33,9 @@ IDs, by default:
 | 324 | Launch request queued, instance already running |
 
 Windows logs these when a scheduled start is skipped because the previous execution is still going,
-which is exactly the mismatch between a 5-minute schedule and an executable that needs longer. Any
-such event inside the lookback window (12 hours by default) marks the task `LONG RUNNING`, and the
-event ID and its time are kept in the task details and the report.
+which is exactly the mismatch between a 5-minute schedule and an executable that needs longer. Such
+an event marks the task `LONG RUNNING` while the task is still running and the event belongs to the
+current execution, that is, it was logged after the current last-run time.
 
 The event log read is best effort. A server that denies it (Remote Event Log Management blocked, no
 permission) is logged as a warning and the task still falls back to the elapsed-time rule below.
@@ -50,8 +52,10 @@ against is resolved in this order:
    next start.
 3. The global **Default max run (min)** value, 5 minutes out of the box.
 
-Evaluation puts the event log first: if Windows itself reported the overlap, the task is
-`LONG RUNNING` even when the current execution has already finished.
+`LONG RUNNING` is a live state, not a memory. When the execution ends and Task Scheduler returns to
+`Ready` with result `0`, the task reports `SUCCESS` again. What happened stays visible in the
+**Events** column, which shows the last Task Scheduler event for every task — `322` for an overrun,
+`102` for a normal completion — with the time it was logged.
 
 `LONG RUNNING` counts as a problem: it appears under Attention Required in the email report, it is
 included in the Problems card, and headless runs exit with code 2 when it appears.

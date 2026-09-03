@@ -52,6 +52,9 @@ public sealed class TaskMonitorResult
     /// <summary>When that event was logged.</summary>
     public DateTime? LongRunningEventTime { get; init; }
 
+    /// <summary>Short text for the Events column: the last relevant Task Scheduler event.</summary>
+    public string EventSummary { get; init; } = "";
+
     public string StatusText => Status == MonitorStatus.LongRunning
         ? "LONG RUNNING"
         : Status.ToString().ToUpperInvariant();

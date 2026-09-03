@@ -74,7 +74,14 @@ public sealed class MonitoringConfig
     /// Event IDs that prove an execution outlived its schedule. 322 is "launch request ignored,
     /// instance already running"; 324 is the same refusal under the "queue" instance policy.
     /// </summary>
-    public List<int> LongRunningEventIds { get; set; } = [322, 324];
+    public List<int> LongRunningEventIds { get; set; } = [322, 324, 329];
+
+    /// <summary>
+    /// Informational events shown in the Events column so a healthy task also states what Windows
+    /// last logged for it, instead of leaving the column empty.
+    /// </summary>
+    public List<int> StatusEventIds { get; set; } = [101, 102, 103, 111, 201, 202, 203];
+
 
     /// <summary>How far back the event log is read, in minutes.</summary>
     public int EventLookbackMinutes { get; set; } = 720;

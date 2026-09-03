@@ -103,10 +103,12 @@ public sealed class MainForm : Form
         _grid.Columns.Add("Status", "Monitor Status");
         _grid.Columns.Add("Windows", "Windows State");
         _grid.Columns.Add("Duration", "Running For");
+        _grid.Columns.Add("Event", "Events");
         _grid.Columns.Add("LastRun", "Last Run");
         _grid.Columns.Add("Result", "Last Result");
         _grid.Columns.Add("NextRun", "Next Run");
         _grid.Columns[1].FillWeight = 160;
+        _grid.Columns[5].FillWeight = 150;
         _grid.CellDoubleClick += (_, eventArgs) => ShowTaskDetails(eventArgs.RowIndex);
     }
 
@@ -156,6 +158,7 @@ public sealed class MainForm : Form
         {
             var rowIndex = _grid.Rows.Add(task.ServerName, task.DisplayName, task.StatusText, task.WindowsState,
                 task.RunningFor is { } elapsed ? MonitoringService.Describe(elapsed) : "-",
+                EmptyDash(task.EventSummary),
                 task.LastRunTime?.ToString("dd-MMM-yyyy HH:mm") ?? "-", EmptyDash(task.LastResult),
                 task.NextRunTime?.ToString("dd-MMM-yyyy HH:mm") ?? "-");
             var row = _grid.Rows[rowIndex]; row.Tag = task;
@@ -205,7 +208,7 @@ public sealed class MainForm : Form
     private void ShowTaskDetails(int rowIndex)
     {
         if (rowIndex < 0 || _grid.Rows[rowIndex].Tag is not TaskMonitorResult task) return;
-        var details = $"Server: {task.ServerName}\r\nHost: {task.Host}\r\n\r\nTask: {task.TaskPath}\r\nMonitor Status: {task.StatusText}\r\nWindows State: {task.WindowsState}\r\n\r\nLast Run: {task.LastRunTime?.ToString("F") ?? "-"}\r\nLast Result: {EmptyDash(task.LastResult)}\r\nNext Run: {task.NextRunTime?.ToString("F") ?? "-"}\r\nRunning For: {(task.RunningFor is { } elapsed ? MonitoringService.Describe(elapsed) : "-")}\r\nExpected Within: {(task.LongRunningThreshold is { } limit ? MonitoringService.Describe(limit) : "-")}\r\nWindows Event: {(task.LongRunningEventId is { } eventId ? $"{eventId} at {task.LongRunningEventTime:g}" : "-")}\r\nLast Checked: {task.CheckedAt:F}\r\n\r\nDetail: {task.Detail}";
+        var details = $"Server: {task.ServerName}\r\nHost: {task.Host}\r\n\r\nTask: {task.TaskPath}\r\nMonitor Status: {task.StatusText}\r\nWindows State: {task.WindowsState}\r\n\r\nLast Run: {task.LastRunTime?.ToString("F") ?? "-"}\r\nLast Result: {EmptyDash(task.LastResult)}\r\nNext Run: {task.NextRunTime?.ToString("F") ?? "-"}\r\nRunning For: {(task.RunningFor is { } elapsed ? MonitoringService.Describe(elapsed) : "-")}\r\nExpected Within: {(task.LongRunningThreshold is { } limit ? MonitoringService.Describe(limit) : "-")}\r\nWindows Event: {EmptyDash(task.EventSummary)}\r\nLast Checked: {task.CheckedAt:F}\r\n\r\nDetail: {task.Detail}";
         MessageBox.Show(details, "Task Details", MessageBoxButtons.OK, task.Status == MonitorStatus.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
     }
 

@@ -45,10 +45,15 @@ Task Scheduler reports that a task is running but never for how long, so the mon
 
 **Source 1 — the Task Scheduler event log.** `Microsoft-Windows-TaskScheduler/Operational` is read
 with `wevtutil.exe` for event **322** (*launch request ignored, instance already running*) and
-**324** (*launch request queued, instance already running*). Windows logs these when a scheduled
-start is skipped because the previous run is still going — the exact mismatch between a 5-minute
-schedule and a 3-minute-plus executable. Any such event inside the lookback window flags the task,
-and the event ID and time are shown in the task details and the email report. The event IDs, the
+**324** (*start blocked, instance already running*) and **329** (*terminated, time limit exceeded*).
+Windows logs these when a scheduled start is skipped because the previous run is still going — the
+exact mismatch between a 5-minute schedule and a 3-minute-plus executable. Such an event marks the
+task `LONG RUNNING` while it is still running.
+
+The status follows Windows: once the run ends and the task is `Ready` with result `0` it reports
+`SUCCESS` again. The **Events** column keeps the history visible — it shows the last Task Scheduler
+event for every task, such as `322 - start skipped, already running` or `102 - task completed`, with
+the time it was logged. The event IDs, the
 lookback window and the whole check are configurable in **Configuration → Schedule**; a server that
 denies the event log is logged and falls back to the timing rule below.
 

@@ -78,13 +78,14 @@ public sealed class ReportBuilder
 
     private static string BuildTable(IReadOnlyList<TaskMonitorResult> tasks)
     {
-        var sb = new StringBuilder("<table><thead><tr><th>Server</th><th>Task</th><th>Status</th><th>Running For</th><th>Last Run</th><th>Result</th><th>Detail</th></tr></thead><tbody>");
+        var sb = new StringBuilder("<table><thead><tr><th>Server</th><th>Task</th><th>Status</th><th>Running For</th><th>Events</th><th>Last Run</th><th>Result</th><th>Detail</th></tr></thead><tbody>");
         foreach (var task in tasks)
         {
             sb.Append("<tr>")
               .Append(Td(task.ServerName)).Append(Td(task.DisplayName))
               .Append($"<td class='status {task.StatusCode}'>{task.StatusText}</td>")
               .Append(Td(task.RunningFor is { } elapsed ? MonitoringService.Describe(elapsed) : "-"))
+              .Append(Td(string.IsNullOrWhiteSpace(task.EventSummary) ? "-" : task.EventSummary))
               .Append(Td(task.LastRunTime?.ToString("dd-MMM-yyyy HH:mm") ?? "-"))
               .Append(Td(string.IsNullOrWhiteSpace(task.LastResult) ? "-" : task.LastResult))
               .Append(Td(task.Detail)).Append("</tr>");
