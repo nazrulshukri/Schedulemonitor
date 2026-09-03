@@ -72,6 +72,34 @@ denies the event log is logged and falls back to the timing rule below.
 listed under Attention Required in the email report, and returns exit code 2 in silent runs. The
 **Running For** column shows the measured elapsed time.
 
+## Long running email alert
+
+When a check finds a task that Task Scheduler reported as long running (event 322 and friends), the
+tool emails an alert immediately, separately from the daily report. Both the subject and the body
+are templates edited in **Configuration → Alerts**, so the wording belongs to the administrator:
+
+```text
+Subject: Follow {JobName} ALERT - long run ({StartTime}) - {Now}
+
+Task Scheduler Job: {JobName}
+
+Job '{JobName}' is expected to run every {Interval}, but the run that started {StartTime} is still
+going - already {ElapsedMinutes} minutes ago. Task Scheduler logged event {EventId} at {EventTime}:
+a scheduled start was skipped because the previous run had not finished.
+Please check Task Scheduler and the server {Server} ({Host}).
+```
+
+Available placeholders: `{JobName}` `{TaskPath}` `{Server}` `{Host}` `{Status}` `{Interval}`
+`{StartTime}` `{ElapsedMinutes}` `{Elapsed}` `{EventId}` `{EventTime}` `{Events}` `{WindowsState}`
+`{LastResult}` `{NextRun}` `{Detail}` `{Now}`. An unknown placeholder is left in the text, so a typo
+is visible instead of silently removing words.
+
+- One email per long running task, sent by both **Run Check** and the daily silent run.
+- **Repeat after (min)** limits how often the same execution alerts again; `0` sends once per
+  execution. A new execution always alerts again. This is kept in `alertstate.json`.
+- **Recipients** can differ from the report recipients; leave it blank to reuse them.
+- **Preview** renders the templates with example values, **Send Sample Alert** emails that example.
+
 ## Requirements
 
 - Windows 10/11 or Windows Server 2016 or later.

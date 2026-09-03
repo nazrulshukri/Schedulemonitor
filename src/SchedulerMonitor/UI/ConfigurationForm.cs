@@ -53,6 +53,12 @@ public sealed class ConfigurationForm : Form
     private readonly TextBox _sender = new();
     private readonly TextBox _recipients = new() { Multiline = true, ScrollBars = ScrollBars.Vertical };
 
+    private readonly CheckBox _alertEnabled = new() { Text = "Email an alert as soon as a check finds a LONG RUNNING task", AutoSize = true };
+    private readonly TextBox _alertSubject = new();
+    private readonly TextBox _alertBody = new() { Multiline = true, ScrollBars = ScrollBars.Vertical, AcceptsReturn = true };
+    private readonly NumericUpDown _alertCooldown = new() { Minimum = 0, Maximum = 10080, Value = 60, Width = 90 };
+    private readonly TextBox _alertRecipients = new() { Multiline = true, ScrollBars = ScrollBars.Vertical };
+
     private readonly CheckBox _scheduleEnabled = new() { Text = "Daily monitoring enabled", AutoSize = true };
     private readonly DateTimePicker _runTime = new() { Format = DateTimePickerFormat.Time, ShowUpDown = true, Width = 120 };
     private readonly Label _scheduleStatus = new() { AutoSize = true, ForeColor = Color.DimGray };
@@ -68,10 +74,11 @@ public sealed class ConfigurationForm : Form
         tabs.TabPages.Add(BuildServersTab());
         tabs.TabPages.Add(BuildJobsTab());
         tabs.TabPages.Add(BuildEmailTab());
+        tabs.TabPages.Add(BuildAlertTab());
         tabs.TabPages.Add(BuildScheduleTab());
         Controls.Add(tabs);
 
-        LoadServers(); LoadEmail(); LoadSchedule(); LoadMonitoring();
+        LoadServers(); LoadEmail(); LoadAlerts(); LoadSchedule(); LoadMonitoring();
         Shown += async (_, _) => await RefreshScheduleStatusAsync();
     }
 
@@ -169,6 +176,85 @@ public sealed class ConfigurationForm : Form
         save.Click += (_, _) => SaveEmail(true); test.Click += async (_, _) => await TestEmailAsync();
         actions.Controls.Add(save); actions.Controls.Add(test); panel.Controls.Add(actions, 1, 8);
         page.Controls.Add(panel); return page;
+    }
+
+    private TabPage BuildAlertTab()
+    {
+        var page = NewPage("Alerts");
+        var panel = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(22), ColumnCount = 2, RowCount = 7 };
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        AddField(panel, 0, "", _alertEnabled);
+        AddField(panel, 1, "Subject", _alertSubject);
+        AddField(panel, 2, "Body", _alertBody, 150);
+        AddField(panel, 3, "Repeat after (min)", _alertCooldown);
+        AddField(panel, 4, "Recipients\r\n(blank = report list)", _alertRecipients, 70);
+
+        var hint = new Label
+        {
+            AutoSize = true, MaximumSize = new Size(700, 0), ForeColor = Color.DimGray,
+            Text = "Placeholders: " + string.Join("  ", AlertTemplate.Placeholders)
+                   + "\r\nOne email is sent per long running task. Repeat after controls how often the same "
+                   + "execution may alert again; 0 sends only once per execution."
+        };
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 74));
+        panel.Controls.Add(hint, 1, 5);
+
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Fill };
+        var save = UiTheme.Button("Save Alerts", true);
+        var preview = UiTheme.Button("Preview");
+        var test = UiTheme.Button("Send Sample Alert");
+        save.Click += (_, _) => SaveAlerts(true);
+        preview.Click += (_, _) => PreviewAlert();
+        test.Click += async (_, _) => await SendSampleAlertAsync();
+        actions.Controls.Add(save); actions.Controls.Add(preview); actions.Controls.Add(test);
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
+        panel.Controls.Add(actions, 1, 6);
+
+        page.Controls.Add(panel); return page;
+    }
+
+    private void LoadAlerts()
+    {
+        _alertEnabled.Checked = _config.Alerts.Enabled;
+        _alertSubject.Text = _config.Alerts.SubjectTemplate;
+        _alertBody.Text = _config.Alerts.BodyTemplate;
+        _alertCooldown.Value = Math.Clamp(_config.Alerts.CooldownMinutes, 0, 10080);
+        _alertRecipients.Lines = [.. _config.Alerts.Recipients];
+    }
+
+    private void SaveAlerts(bool showMessage)
+    {
+        _config.Alerts.Enabled = _alertEnabled.Checked;
+        _config.Alerts.SubjectTemplate = _alertSubject.Text.Trim();
+        _config.Alerts.BodyTemplate = _alertBody.Text;
+        _config.Alerts.CooldownMinutes = (int)_alertCooldown.Value;
+        _config.Alerts.Recipients = _alertRecipients.Lines.Select(line => line.Trim())
+            .Where(line => line.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        SaveConfig();
+        if (showMessage) MessageBox.Show("Alert templates saved.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    /// <summary>Shows the templates filled with example values, without sending anything.</summary>
+    private void PreviewAlert()
+    {
+        SaveAlerts(false);
+        var sample = AlertTemplate.Sample();
+        var text = $"Subject:\r\n{AlertTemplate.Render(_config.Alerts.SubjectTemplate, sample)}"
+                   + $"\r\n\r\nBody:\r\n{AlertTemplate.Render(_config.Alerts.BodyTemplate, sample)}";
+        MessageBox.Show(text, "Alert preview", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private async Task SendSampleAlertAsync()
+    {
+        try
+        {
+            UseWaitCursor = true; SaveAlerts(false);
+            var alerts = new AlertService(new EmailService(_logger), new AlertStateStore(_paths, _logger), _logger);
+            await alerts.SendPreviewAsync(_config);
+            MessageBox.Show("Sample alert sent.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex) { MessageBox.Show(ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        finally { UseWaitCursor = false; }
     }
 
     private TabPage BuildScheduleTab()

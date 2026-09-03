@@ -62,6 +62,9 @@ this order:
 **Events** column, which shows the last Task Scheduler event for every task — `322` for an overrun,
 `102` for a normal completion — with the time it was logged.
 
+A `LONG RUNNING` result also raises an immediate email alert, using the templates in
+Configuration → Alerts and the repeat window kept in `alertstate.json`.
+
 `LONG RUNNING` counts as a problem: it appears under Attention Required in the email report, it is
 included in the Problems card, and headless runs exit with code 2 when it appears.
 

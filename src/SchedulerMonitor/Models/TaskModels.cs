@@ -52,6 +52,9 @@ public sealed class TaskMonitorResult
     /// <summary>When that event was logged.</summary>
     public DateTime? LongRunningEventTime { get; init; }
 
+    /// <summary>Repetition interval declared in Task Scheduler, used by the alert template.</summary>
+    public TimeSpan? RepeatInterval { get; init; }
+
     /// <summary>Short text for the Events column: the last relevant Task Scheduler event.</summary>
     public string EventSummary { get; init; } = "";
 

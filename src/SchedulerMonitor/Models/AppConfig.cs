@@ -5,6 +5,7 @@ public sealed class AppConfig
     public List<ServerConfig> Servers { get; set; } = [];
     public List<MonitoredTaskConfig> MonitoredTasks { get; set; } = [];
     public EmailConfig Email { get; set; } = new();
+    public AlertConfig Alerts { get; set; } = new();
     public ScheduleConfig Schedule { get; set; } = new();
     public MonitoringConfig Monitoring { get; set; } = new();
 }
@@ -42,6 +43,31 @@ public sealed class EmailConfig
     public string Username { get; set; } = "";
     public string EncryptedPassword { get; set; } = "";
     public string Sender { get; set; } = "";
+    public List<string> Recipients { get; set; } = [];
+}
+
+/// <summary>
+/// Immediate email alert for a task that Task Scheduler reported as long running. Subject and body
+/// are plain templates so the wording can be changed without touching the application.
+/// </summary>
+public sealed class AlertConfig
+{
+    public bool Enabled { get; set; } = true;
+
+    public string SubjectTemplate { get; set; } =
+        "Follow {JobName} ALERT - long run ({StartTime}) - {Now}";
+
+    public string BodyTemplate { get; set; } =
+        "Task Scheduler Job: {JobName}\r\n\r\n"
+        + "Job '{JobName}' is expected to run every {Interval}, but the run that started {StartTime} "
+        + "is still going - already {ElapsedMinutes} minutes ago. Task Scheduler logged event "
+        + "{EventId} at {EventTime}: a scheduled start was skipped because the previous run had not "
+        + "finished.\r\nPlease check Task Scheduler and the server {Server} ({Host}).";
+
+    /// <summary>Minutes before the same task may alert again while it is still long running.</summary>
+    public int CooldownMinutes { get; set; } = 60;
+
+    /// <summary>Alert recipients. Empty means the recipients configured for the daily report.</summary>
     public List<string> Recipients { get; set; } = [];
 }
 

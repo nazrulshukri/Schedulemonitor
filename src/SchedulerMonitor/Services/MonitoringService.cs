@@ -197,7 +197,7 @@ public sealed class MonitoringService
             TaskPath = task.TaskPath, DisplayName = task.DisplayName,
             WindowsState = state, Status = status,
             LastRunTime = task.LastRunTime, LastResult = task.LastResult,
-            NextRunTime = task.NextRunTime, Detail = detail,
+            NextRunTime = task.NextRunTime, Detail = detail, RepeatInterval = task.RepeatInterval,
             RunningFor = runningFor, LongRunningThreshold = threshold,
             LongRunningEventId = overlapEvent?.EventId, LongRunningEventTime = overlapEvent?.TimeCreated,
             EventSummary = SummariseEvent(overlapEvent, statusEvent),

@@ -1,0 +1,84 @@
+using System.Globalization;
+using System.Net;
+using System.Text;
+using SchedulerMonitor.Models;
+
+namespace SchedulerMonitor.Services;
+
+/// <summary>
+/// Fills {Placeholder} names in the alert subject and body. Unknown placeholders are left as they
+/// are so a typo is visible in the email instead of silently deleting text.
+/// </summary>
+public static class AlertTemplate
+{
+    /// <summary>Every placeholder the templates accept, shown to the user in Configuration.</summary>
+    public static readonly string[] Placeholders =
+    [
+        "{JobName}", "{TaskPath}", "{Server}", "{Host}", "{Status}", "{Interval}", "{StartTime}",
+        "{ElapsedMinutes}", "{Elapsed}", "{EventId}", "{EventTime}", "{Events}", "{WindowsState}",
+        "{LastResult}", "{NextRun}", "{Detail}", "{Now}"
+    ];
+
+    public static string Render(string template, TaskMonitorResult task)
+    {
+        if (string.IsNullOrWhiteSpace(template)) return "";
+
+        var elapsed = task.RunningFor ?? (task.LastRunTime is { } started ? DateTime.Now - started : null);
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["JobName"] = task.DisplayName,
+            ["TaskPath"] = task.TaskPath,
+            ["Server"] = task.ServerName,
+            ["Host"] = task.Host,
+            ["Status"] = task.StatusText,
+            ["Interval"] = task.RepeatInterval is { } interval ? DescribeInterval(interval) : "its schedule",
+            ["StartTime"] = task.LastRunTime?.ToString("MM/dd/yyyy HH:mm:ss", CultureInfo.InvariantCulture) ?? "-",
+            ["ElapsedMinutes"] = elapsed is { } value
+                ? value.TotalMinutes.ToString("0.0", CultureInfo.InvariantCulture) : "-",
+            ["Elapsed"] = elapsed is { } span ? MonitoringService.Describe(span) : "-",
+            ["EventId"] = task.LongRunningEventId?.ToString(CultureInfo.InvariantCulture) ?? "-",
+            ["EventTime"] = task.LongRunningEventTime?.ToString("MM/dd/yyyy HH:mm:ss", CultureInfo.InvariantCulture) ?? "-",
+            ["Events"] = task.EventSummary,
+            ["WindowsState"] = task.WindowsState,
+            ["LastResult"] = string.IsNullOrWhiteSpace(task.LastResult) ? "-" : task.LastResult,
+            ["NextRun"] = task.NextRunTime?.ToString("MM/dd/yyyy HH:mm:ss", CultureInfo.InvariantCulture) ?? "-",
+            ["Detail"] = task.Detail,
+            ["Now"] = DateTime.Now.ToString("MM/dd/yyyy HH:mm:ss", CultureInfo.InvariantCulture)
+        };
+
+        var result = new StringBuilder(template);
+        foreach (var pair in values)
+            result.Replace("{" + pair.Key + "}", pair.Value);
+        return result.ToString();
+    }
+
+    /// <summary>Wraps the rendered plain-text body in minimal HTML, keeping the line breaks.</summary>
+    public static string ToHtml(string body)
+    {
+        var encoded = WebUtility.HtmlEncode(body).Replace("\r\n", "\n").Replace("\n", "<br>");
+        return "<html><body style=\"font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#263238\">"
+               + encoded + "</body></html>";
+    }
+
+    private static string DescribeInterval(TimeSpan value)
+    {
+        if (value.TotalMinutes < 1) return $"{(int)value.TotalSeconds} seconds";
+        if (value.TotalMinutes < 60) return $"{(int)value.TotalMinutes} minutes";
+        if (value.TotalHours < 24) return $"{(int)value.TotalHours} hours";
+        return $"{(int)value.TotalDays} days";
+    }
+
+    /// <summary>Example result used by the template preview in Configuration.</summary>
+    public static TaskMonitorResult Sample() => new()
+    {
+        ServerName = "Test", Host = "TESTSRV01",
+        TaskPath = @"\Microsoft\BE1MES\TAM_Test Task", DisplayName = "TAM_Test Task",
+        WindowsState = "Running", Status = MonitorStatus.LongRunning,
+        LastRunTime = DateTime.Now.AddMinutes(-103.6), LastResult = "267009",
+        NextRunTime = DateTime.Now.AddMinutes(2), RepeatInterval = TimeSpan.FromMinutes(2),
+        RunningFor = TimeSpan.FromMinutes(103.6),
+        LongRunningEventId = 322, LongRunningEventTime = DateTime.Now.AddMinutes(-101.6),
+        EventSummary = "322 - start skipped, already running",
+        Detail = "Windows event 322: a scheduled start was skipped because this run is still going"
+    };
+}

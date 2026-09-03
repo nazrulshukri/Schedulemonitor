@@ -140,7 +140,12 @@ public sealed class MainForm : Form
 
             _lastRun = run;
             DisplayRun(run);
-            _activity.Text = $"Completed • {Path.GetFileName(report.FilePath)}";
+
+            var alerts = new AlertService(new EmailService(_logger), new AlertStateStore(_paths, _logger), _logger);
+            var sent = await alerts.SendAsync(config, run);
+            _activity.Text = sent > 0
+                ? $"Completed • {Path.GetFileName(report.FilePath)} • {sent} alert(s) sent"
+                : $"Completed • {Path.GetFileName(report.FilePath)}";
         }
         catch (Exception ex)
         {
