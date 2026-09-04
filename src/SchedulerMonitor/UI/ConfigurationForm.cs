@@ -57,9 +57,8 @@ public sealed class ConfigurationForm : Form
     private readonly CheckBox _alertEnabled = new() { Text = "Email an alert as soon as a check finds a LONG RUNNING task", AutoSize = true };
     private readonly TextBox _alertSubject = new();
     private readonly TextBox _alertBody = new() { Multiline = true, ScrollBars = ScrollBars.Vertical, AcceptsReturn = true };
-    private readonly CheckBox _abnormalEnabled = new() { Text = "Email an alert for a task reported as ABNORMAL", AutoSize = true };
-    private readonly TextBox _abnormalSubject = new();
-    private readonly TextBox _abnormalBody = new() { Multiline = true, ScrollBars = ScrollBars.Vertical, AcceptsReturn = true };
+    private readonly ComboBox _alertType = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
+    private int _editingAlertType;
     private readonly NumericUpDown _alertCooldown = new() { Minimum = 0, Maximum = 10080, Value = 60, Width = 90 };
     private readonly TextBox _alertRecipients = new() { Multiline = true, ScrollBars = ScrollBars.Vertical };
 
@@ -185,27 +184,29 @@ public sealed class ConfigurationForm : Form
     private TabPage BuildAlertTab()
     {
         var page = NewPage("Alerts");
-        page.AutoScroll = true;
-        var panel = new TableLayoutPanel { Dock = DockStyle.Top, Height = 690, Padding = new Padding(22), ColumnCount = 2, RowCount = 10 };
+        var panel = new TableLayoutPanel { Dock = DockStyle.Top, Height = 520, Padding = new Padding(22), ColumnCount = 2, RowCount = 8 };
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        AddField(panel, 0, "", _alertEnabled);
-        AddField(panel, 1, "Long running\r\nsubject", _alertSubject);
-        AddField(panel, 2, "Long running\r\nbody", _alertBody, 130);
-        AddField(panel, 3, "", _abnormalEnabled);
-        AddField(panel, 4, "Abnormal\r\nsubject", _abnormalSubject);
-        AddField(panel, 5, "Abnormal\r\nbody", _abnormalBody, 130);
-        AddField(panel, 6, "Repeat after (min)", _alertCooldown);
-        AddField(panel, 7, "Recipients\r\n(blank = report list)", _alertRecipients, 70);
+
+        _alertType.Items.AddRange(["Long running alert", "Abnormal alert"]);
+        _alertType.SelectedIndex = 0;
+        _alertType.SelectedIndexChanged += (_, _) => SwitchAlertType();
+
+        AddField(panel, 0, "Alert", _alertType);
+        AddField(panel, 1, "", _alertEnabled);
+        AddField(panel, 2, "Subject", _alertSubject);
+        AddField(panel, 3, "Body", _alertBody, 150);
+        AddField(panel, 4, "Repeat after (min)", _alertCooldown);
+        AddField(panel, 5, "Recipients\r\n(blank = report list)", _alertRecipients, 70);
 
         var hint = new Label
         {
             AutoSize = true, MaximumSize = new Size(700, 0), ForeColor = Color.DimGray,
             Text = "Placeholders: " + string.Join("  ", AlertTemplate.Placeholders)
-                   + "\r\nOne email is sent per long running task. Repeat after controls how often the same "
-                   + "execution may alert again; 0 sends only once per execution."
+                   + "\r\nPick the alert above to edit its own subject and body. Repeat after and Recipients "
+                   + "apply to both. One email is sent per flagged task; 0 sends only once per execution."
         };
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 74));
-        panel.Controls.Add(hint, 1, 8);
+        panel.Controls.Add(hint, 1, 6);
 
         var actions = new FlowLayoutPanel { Dock = DockStyle.Fill };
         var save = UiTheme.Button("Save Alerts", true);
@@ -216,31 +217,68 @@ public sealed class ConfigurationForm : Form
         test.Click += async (_, _) => await SendSampleAlertAsync();
         actions.Controls.Add(save); actions.Controls.Add(preview); actions.Controls.Add(test);
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
-        panel.Controls.Add(actions, 1, 9);
+        panel.Controls.Add(actions, 1, 7);
 
         page.Controls.Add(panel); return page;
     }
 
+    /// <summary>
+    /// The two alerts share one editor. Switching keeps what was typed for the alert being left,
+    /// so nothing is lost by looking at the other one.
+    /// </summary>
+    private void SwitchAlertType()
+    {
+        CollectAlertEditor(_editingAlertType);
+        _editingAlertType = _alertType.SelectedIndex;
+        ShowAlertEditor(_editingAlertType);
+    }
+
+    /// <summary>Reads the editor into the alert it belongs to.</summary>
+    private void CollectAlertEditor(int type)
+    {
+        if (type == 1)
+        {
+            _config.Alerts.AbnormalEnabled = _alertEnabled.Checked;
+            _config.Alerts.AbnormalSubjectTemplate = _alertSubject.Text.Trim();
+            _config.Alerts.AbnormalBodyTemplate = _alertBody.Text;
+        }
+        else
+        {
+            _config.Alerts.Enabled = _alertEnabled.Checked;
+            _config.Alerts.SubjectTemplate = _alertSubject.Text.Trim();
+            _config.Alerts.BodyTemplate = _alertBody.Text;
+        }
+    }
+
+    private void ShowAlertEditor(int type)
+    {
+        if (type == 1)
+        {
+            _alertEnabled.Text = "Email an alert as soon as a check finds an ABNORMAL task";
+            _alertEnabled.Checked = _config.Alerts.AbnormalEnabled;
+            _alertSubject.Text = _config.Alerts.AbnormalSubjectTemplate;
+            _alertBody.Text = _config.Alerts.AbnormalBodyTemplate;
+        }
+        else
+        {
+            _alertEnabled.Text = "Email an alert as soon as a check finds a LONG RUNNING task";
+            _alertEnabled.Checked = _config.Alerts.Enabled;
+            _alertSubject.Text = _config.Alerts.SubjectTemplate;
+            _alertBody.Text = _config.Alerts.BodyTemplate;
+        }
+    }
+
     private void LoadAlerts()
     {
-        _alertEnabled.Checked = _config.Alerts.Enabled;
-        _alertSubject.Text = _config.Alerts.SubjectTemplate;
-        _alertBody.Text = _config.Alerts.BodyTemplate;
-        _abnormalEnabled.Checked = _config.Alerts.AbnormalEnabled;
-        _abnormalSubject.Text = _config.Alerts.AbnormalSubjectTemplate;
-        _abnormalBody.Text = _config.Alerts.AbnormalBodyTemplate;
+        _editingAlertType = _alertType.SelectedIndex;
+        ShowAlertEditor(_editingAlertType);
         _alertCooldown.Value = Math.Clamp(_config.Alerts.CooldownMinutes, 0, 10080);
         _alertRecipients.Lines = [.. _config.Alerts.Recipients];
     }
 
     private void SaveAlerts(bool showMessage)
     {
-        _config.Alerts.Enabled = _alertEnabled.Checked;
-        _config.Alerts.SubjectTemplate = _alertSubject.Text.Trim();
-        _config.Alerts.BodyTemplate = _alertBody.Text;
-        _config.Alerts.AbnormalEnabled = _abnormalEnabled.Checked;
-        _config.Alerts.AbnormalSubjectTemplate = _abnormalSubject.Text.Trim();
-        _config.Alerts.AbnormalBodyTemplate = _abnormalBody.Text;
+        CollectAlertEditor(_editingAlertType);
         _config.Alerts.CooldownMinutes = (int)_alertCooldown.Value;
         _config.Alerts.Recipients = _alertRecipients.Lines.Select(line => line.Trim())
             .Where(line => line.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -248,20 +286,21 @@ public sealed class ConfigurationForm : Form
         if (showMessage) MessageBox.Show("Alert templates saved.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
-    /// <summary>Shows the templates filled with example values, without sending anything.</summary>
+    /// <summary>Shows the selected alert filled with example values, without sending anything.</summary>
     private void PreviewAlert()
     {
         SaveAlerts(false);
-        var sample = AlertTemplate.Sample(_config);
-        var abnormalSample = AlertTemplate.Sample(_config, MonitorStatus.Abnormal);
-        var text = $"LONG RUNNING subject:\r\n{AlertTemplate.Render(_config.Alerts.SubjectTemplate, sample)}"
-                   + $"\r\n\r\nLONG RUNNING body:\r\n{AlertTemplate.Render(_config.Alerts.BodyTemplate, sample)}"
-                   + $"\r\n\r\n----------\r\n\r\nABNORMAL subject:\r\n{AlertTemplate.Render(_config.Alerts.AbnormalSubjectTemplate, abnormalSample)}"
-                   + $"\r\n\r\nABNORMAL body:\r\n{AlertTemplate.Render(_config.Alerts.AbnormalBodyTemplate, abnormalSample)}"
+        var abnormal = _editingAlertType == 1;
+        var sample = AlertTemplate.Sample(_config, abnormal ? MonitorStatus.Abnormal : MonitorStatus.LongRunning);
+        var subject = abnormal ? _config.Alerts.AbnormalSubjectTemplate : _config.Alerts.SubjectTemplate;
+        var body = abnormal ? _config.Alerts.AbnormalBodyTemplate : _config.Alerts.BodyTemplate;
+
+        var text = $"Subject:\r\n{AlertTemplate.Render(subject, sample)}"
+                   + $"\r\n\r\nBody:\r\n{AlertTemplate.Render(body, sample)}"
                    + $"\r\n\r\nThe job name, path and server come from '{sample.DisplayName}', the first task "
                    + "selected for monitoring. Times and the event are simulated; a real alert uses the "
                    + "values from the check.";
-        MessageBox.Show(text, "Alert preview", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        MessageBox.Show(text, $"{_alertType.Text} preview", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private async Task SendSampleAlertAsync()
@@ -270,7 +309,7 @@ public sealed class ConfigurationForm : Form
         {
             UseWaitCursor = true; SaveAlerts(false);
             var alerts = new AlertService(new EmailService(_logger), new AlertStateStore(_paths, _logger), _logger);
-            await alerts.SendPreviewAsync(_config);
+            await alerts.SendPreviewAsync(_config, _editingAlertType == 1);
             MessageBox.Show("Sample alert sent.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex) { MessageBox.Show(ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error); }

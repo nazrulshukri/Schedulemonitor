@@ -110,7 +110,10 @@ is visible instead of silently removing words.
 - **Repeat after (min)** limits how often the same execution alerts again; `0` sends once per
   execution. A new execution always alerts again. This is kept in `alertstate.json`.
 - **Recipients** can differ from the report recipients; leave it blank to reuse them.
-- **Preview** renders the templates with example values, **Send Sample Alert** emails that example.
+- **Preview** renders the selected alert with example values, **Send Sample Alert** emails that example.
+- The Alerts tab holds one editor. The **Alert** list at the top switches between the long running
+  and the abnormal wording; what you typed is kept when you switch. **Repeat after** and
+  **Recipients** apply to both.
 
 ## Requirements
 

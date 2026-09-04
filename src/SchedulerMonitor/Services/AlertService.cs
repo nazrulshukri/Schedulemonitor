@@ -77,11 +77,15 @@ public sealed class AlertService
     }
 
     /// <summary>Sends the templates filled with example values, so the wording can be checked.</summary>
-    public async Task SendPreviewAsync(AppConfig config, CancellationToken cancellationToken = default)
+    public async Task SendPreviewAsync(AppConfig config, bool abnormal = false,
+        CancellationToken cancellationToken = default)
     {
-        var sample = AlertTemplate.Sample(config);
-        var subject = AlertTemplate.Render(config.Alerts.SubjectTemplate, sample);
-        var body = AlertTemplate.Render(config.Alerts.BodyTemplate, sample);
+        var sample = AlertTemplate.Sample(config,
+            abnormal ? MonitorStatus.Abnormal : MonitorStatus.LongRunning);
+        var subject = AlertTemplate.Render(
+            abnormal ? config.Alerts.AbnormalSubjectTemplate : config.Alerts.SubjectTemplate, sample);
+        var body = AlertTemplate.Render(
+            abnormal ? config.Alerts.AbnormalBodyTemplate : config.Alerts.BodyTemplate, sample);
         await _email.SendAsync(RecipientsFor(config), subject, AlertTemplate.ToHtml(body), cancellationToken);
     }
 
