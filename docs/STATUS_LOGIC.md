@@ -6,6 +6,8 @@ Evaluation order:
 
 0. The Events column is filled from the same event log for every task, independently of the status.
 
+1. An abnormal event logged for the current execution produces `ABNORMAL`.
+
 1. A failed server query produces `UNREACHABLE` for every selected task on that server.
 2. A selected task absent from a successful scan produces `FAILED` with `Task not found`.
 3. A disabled task produces `DISABLED`.
@@ -61,6 +63,17 @@ this order:
 `Ready` with result `0`, the task reports `SUCCESS` again. What happened stays visible in the
 **Events** column, which shows the last Task Scheduler event for every task — `322` for an overrun,
 `102` for a normal completion — with the time it was logged.
+
+## Abnormal
+
+The same event-log mechanism carries a second status. Any event in the configured abnormal list
+(`101` task start failed, `103` action start failed, `203` action failed to start, `102` task
+completed, by default) that Windows logged for the current execution produces `ABNORMAL`, which is
+evaluated after the running states and before the last-result rules. `102` is Windows' normal
+completion event, so keeping it in the list marks every finished task abnormal; remove it in
+Configuration → Schedule to report only failures, and empty the list to turn the status off.
+
+`ABNORMAL` counts as a problem and raises its own email alert with its own subject and body.
 
 A `LONG RUNNING` result also raises an immediate email alert, using the templates in
 Configuration → Alerts and the repeat window kept in `alertstate.json`.

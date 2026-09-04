@@ -78,12 +78,12 @@ public sealed class MainForm : Form
     private Control BuildSummary()
     {
         var panel = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(17, 14, 10, 8), WrapContents = false, AutoScroll = true };
-        foreach (var key in new[] { "Total", "Success", "Running", "Long Running", "Pending", "Problems" })
+        foreach (var key in new[] { "Total", "Success", "Running", "Long Running", "Abnormal", "Pending", "Problems" })
         {
-            var card = new Panel { Width = 150, Height = 72, BackColor = Color.White, Margin = new Padding(4) };
+            var card = new Panel { Width = 132, Height = 72, BackColor = Color.White, Margin = new Padding(4) };
             card.Paint += (_, e) => ControlPaint.DrawBorder(e.Graphics, card.ClientRectangle, UiTheme.Border, ButtonBorderStyle.Solid);
-            var value = new Label { Text = "0", AutoSize = true, Location = new Point(14, 8), Font = new Font("Segoe UI Semibold", 20F), ForeColor = UiTheme.Petrol };
-            var label = new Label { Text = key.ToUpperInvariant(), AutoSize = true, Location = new Point(15, 45), ForeColor = Color.DimGray };
+            var value = new Label { Text = "0", AutoSize = true, Location = new Point(12, 8), Font = new Font("Segoe UI Semibold", 20F), ForeColor = UiTheme.Petrol };
+            var label = new Label { Text = key.ToUpperInvariant(), AutoSize = true, Location = new Point(13, 45), ForeColor = Color.DimGray, Font = new Font("Segoe UI", 8F) };
             card.Controls.Add(value); card.Controls.Add(label); panel.Controls.Add(card); _summary[key] = value;
         }
         return panel;
@@ -175,8 +175,9 @@ public sealed class MainForm : Form
         _summary["Success"].Text = run.Tasks.Count(task => task.Status == MonitorStatus.Success).ToString();
         _summary["Running"].Text = run.Tasks.Count(task => task.Status == MonitorStatus.Running).ToString();
         _summary["Long Running"].Text = run.Tasks.Count(task => task.Status == MonitorStatus.LongRunning).ToString();
+        _summary["Abnormal"].Text = run.Tasks.Count(task => task.Status == MonitorStatus.Abnormal).ToString();
         _summary["Pending"].Text = run.Tasks.Count(task => task.Status == MonitorStatus.Pending).ToString();
-        _summary["Problems"].Text = run.Tasks.Count(task => task.Status is MonitorStatus.Failed or MonitorStatus.Overdue or MonitorStatus.Disabled or MonitorStatus.Unreachable or MonitorStatus.LongRunning).ToString();
+        _summary["Problems"].Text = run.Tasks.Count(task => task.Status is MonitorStatus.Failed or MonitorStatus.Overdue or MonitorStatus.Disabled or MonitorStatus.Unreachable or MonitorStatus.LongRunning or MonitorStatus.Abnormal).ToString();
         _lastCheck.Text = $"Last check: {run.CompletedAt:dd-MMM-yyyy HH:mm:ss} • Servers: {run.ServerCount}";
     }
 
@@ -228,12 +229,12 @@ public sealed class MainForm : Form
 
     private static void OpenFolder(string path) => Process.Start(new ProcessStartInfo("explorer.exe", path) { UseShellExecute = true });
     private static string EmptyDash(string value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
-    private static int StatusOrder(MonitorStatus status) => status switch { MonitorStatus.Failed => 0, MonitorStatus.Unreachable => 1, MonitorStatus.Overdue => 2, MonitorStatus.Disabled => 3, MonitorStatus.LongRunning => 4, MonitorStatus.Running => 5, MonitorStatus.Pending => 6, _ => 7 };
+    private static int StatusOrder(MonitorStatus status) => status switch { MonitorStatus.Failed => 0, MonitorStatus.Unreachable => 1, MonitorStatus.Abnormal => 2, MonitorStatus.Overdue => 3, MonitorStatus.Disabled => 4, MonitorStatus.LongRunning => 5, MonitorStatus.Running => 6, MonitorStatus.Pending => 7, _ => 8 };
 
     private void InitializeComponent()
     {
 
     }
 
-    private static Color StatusColor(MonitorStatus status) => status switch { MonitorStatus.Success => Color.FromArgb(32, 114, 69), MonitorStatus.Running or MonitorStatus.Pending => Color.FromArgb(18, 97, 160), MonitorStatus.LongRunning => Color.FromArgb(198, 74, 0), MonitorStatus.Overdue or MonitorStatus.Disabled => Color.FromArgb(192, 100, 0), _ => Color.FromArgb(180, 35, 24) };
+    private static Color StatusColor(MonitorStatus status) => status switch { MonitorStatus.Success => Color.FromArgb(32, 114, 69), MonitorStatus.Running or MonitorStatus.Pending => Color.FromArgb(18, 97, 160), MonitorStatus.LongRunning => Color.FromArgb(198, 74, 0), MonitorStatus.Abnormal => Color.FromArgb(146, 43, 122), MonitorStatus.Overdue or MonitorStatus.Disabled => Color.FromArgb(192, 100, 0), _ => Color.FromArgb(180, 35, 24) };
 }

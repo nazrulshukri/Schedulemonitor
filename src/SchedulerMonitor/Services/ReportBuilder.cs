@@ -21,12 +21,14 @@ public sealed class ReportBuilder
         var unreachable = Count(run, MonitorStatus.Unreachable);
         var overdue = Count(run, MonitorStatus.Overdue);
         var longRunning = Count(run, MonitorStatus.LongRunning);
+        var abnormal = Count(run, MonitorStatus.Abnormal);
         var disabled = Count(run, MonitorStatus.Disabled);
         var problemParts = new List<string>();
         if (failed > 0) problemParts.Add($"{failed} Failed");
         if (unreachable > 0) problemParts.Add($"{unreachable} Unreachable");
         if (overdue > 0) problemParts.Add($"{overdue} Overdue");
         if (longRunning > 0) problemParts.Add($"{longRunning} Long Running");
+        if (abnormal > 0) problemParts.Add($"{abnormal} Abnormal");
         if (disabled > 0) problemParts.Add($"{disabled} Disabled");
         var subject = problemParts.Count == 0
             ? $"[Scheduler Monitor] All Jobs OK - {run.CompletedAt:dd MMM yyyy}"
@@ -42,7 +44,8 @@ public sealed class ReportBuilder
     private static string BuildHtml(MonitorRunResult run, IReadOnlyList<TaskMonitorResult> ordered)
     {
         var attention = ordered.Where(task => task.Status is MonitorStatus.Failed or MonitorStatus.Overdue
-            or MonitorStatus.Disabled or MonitorStatus.Unreachable or MonitorStatus.LongRunning).ToList();
+            or MonitorStatus.Disabled or MonitorStatus.Unreachable or MonitorStatus.LongRunning
+            or MonitorStatus.Abnormal).ToList();
         var longRunningCount = Count(run, MonitorStatus.LongRunning);
         var sb = new StringBuilder();
         sb.Append("<!doctype html><html><head><meta charset='utf-8'><style>")
@@ -54,15 +57,15 @@ public sealed class ReportBuilder
           .Append("table{width:100%;border-collapse:collapse;margin-bottom:22px}th{background:#edf3f4;text-align:left}")
           .Append("th,td{padding:9px 8px;border-bottom:1px solid #e4e9ea;font-size:13px}.status{font-weight:700}")
           .Append(".SUCCESS{color:#207245}.RUNNING,.PENDING{color:#1261a0}.OVERDUE,.DISABLED{color:#c06400}")
-          .Append(".LONGRUNNING{color:#c64a00}")
+          .Append(".LONGRUNNING{color:#c64a00}.ABNORMAL{color:#922b7a}")
           .Append(".FAILED,.UNREACHABLE{color:#b42318}.muted{color:#617177}.foot{font-size:12px;color:#617177;margin-top:18px}")
           .Append("</style></head><body><div class='wrap'><div class='head'><h1>TASK SCHEDULER DAILY STATUS</h1>")
           .Append($"<div>{run.CompletedAt:dd MMMM yyyy | HH:mm}</div></div><div class='content'>")
           .Append("<h2>Summary</h2><div class='cards'>")
           .Append(Card("Servers", run.ServerCount)).Append(Card("Tasks", run.Tasks.Count))
           .Append(Card("Success", Count(run, MonitorStatus.Success))).Append(Card("Running", Count(run, MonitorStatus.Running)))
-          .Append(Card("Long Running", longRunningCount))
-          .Append(Card("Pending", Count(run, MonitorStatus.Pending))).Append(Card("Problems", run.Tasks.Count(task => task.Status is MonitorStatus.Failed or MonitorStatus.Overdue or MonitorStatus.Disabled or MonitorStatus.Unreachable or MonitorStatus.LongRunning)))
+          .Append(Card("Long Running", longRunningCount)).Append(Card("Abnormal", Count(run, MonitorStatus.Abnormal)))
+          .Append(Card("Pending", Count(run, MonitorStatus.Pending))).Append(Card("Problems", run.Tasks.Count(task => task.Status is MonitorStatus.Failed or MonitorStatus.Overdue or MonitorStatus.Disabled or MonitorStatus.Unreachable or MonitorStatus.LongRunning or MonitorStatus.Abnormal)))
           .Append("</div>");
 
         if (attention.Count > 0)
@@ -99,8 +102,8 @@ public sealed class ReportBuilder
     private static int Count(MonitorRunResult run, MonitorStatus status) => run.Tasks.Count(task => task.Status == status);
     private static int SortOrder(MonitorStatus status) => status switch
     {
-        MonitorStatus.Failed => 0, MonitorStatus.Unreachable => 1, MonitorStatus.Overdue => 2,
-        MonitorStatus.Disabled => 3, MonitorStatus.LongRunning => 4, MonitorStatus.Running => 5,
-        MonitorStatus.Pending => 6, _ => 7
+        MonitorStatus.Failed => 0, MonitorStatus.Unreachable => 1, MonitorStatus.Abnormal => 2,
+        MonitorStatus.Overdue => 3, MonitorStatus.Disabled => 4, MonitorStatus.LongRunning => 5,
+        MonitorStatus.Running => 6, MonitorStatus.Pending => 7, _ => 8
     };
 }

@@ -12,7 +12,7 @@ The administrator scans a server, selects only the important scheduled tasks, an
 - Search the scan result and select only tasks that should appear in monitoring and email.
 - Preserve previous selections during rescans; new tasks are unselected by default.
 - Report a selected task as `FAILED – Task not found` if it was deleted or renamed.
-- Display `SUCCESS`, `RUNNING`, `LONG RUNNING`, `PENDING`, `FAILED`, `OVERDUE`, `DISABLED`, and `UNREACHABLE`.
+- Display `SUCCESS`, `RUNNING`, `LONG RUNNING`, `ABNORMAL`, `PENDING`, `FAILED`, `OVERDUE`, `DISABLED`, and `UNREACHABLE`.
 - Retain Windows state, last run, last result code, and next run for troubleshooting.
 - Generate a compact HTML report and optionally send it through SMTP.
 - Encrypt the SMTP password with Windows DPAPI for the current Windows user.
@@ -71,6 +71,18 @@ denies the event log is logged and falls back to the timing rule below.
 `LONG RUNNING` is treated as a problem: it is highlighted in the grid, counted in the Problems card,
 listed under Attention Required in the email report, and returns exit code 2 in silent runs. The
 **Running For** column shows the measured elapsed time.
+
+## Abnormal
+
+The same event log carries a second status. Events in the abnormal list — `101` task start failed,
+`103` action start failed, `203` action failed to start and `102` task completed by default — mark
+the task `ABNORMAL` when Windows logged them for the current execution. It behaves exactly like
+`LONG RUNNING`: highlighted in the grid, counted in Problems, listed under Attention Required, shown
+in the Events column, and it raises its own email alert with its own subject and body templates.
+
+`102` is the normal completion event, so leaving it in the list marks every finished task abnormal.
+Remove it in **Configuration → Schedule → Abnormal event IDs** to report only failures, or clear the
+list to switch the status off.
 
 ## Long running email alert
 

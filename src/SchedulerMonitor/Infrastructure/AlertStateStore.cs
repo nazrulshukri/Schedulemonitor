@@ -29,7 +29,8 @@ public sealed class AlertStateStore
         _logger = logger;
     }
 
-    public static string Key(string host, string taskPath) => $"{host}|{taskPath}";
+    /// <summary>Alert kinds are tracked apart, so an abnormal alert is not muted by a long running one.</summary>
+    public static string Key(string host, string taskPath, string kind) => $"{host}|{taskPath}|{kind}";
 
     /// <summary>
     /// True when this task may alert now: a different execution than the one already reported, or

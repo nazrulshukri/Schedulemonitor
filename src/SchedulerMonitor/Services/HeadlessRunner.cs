@@ -28,7 +28,7 @@ internal static class HeadlessRunner
             else
                 logger.Info("Email sending is disabled");
 
-            return run.Tasks.Any(task => task.Status is Models.MonitorStatus.Failed or Models.MonitorStatus.Unreachable or Models.MonitorStatus.LongRunning) ? 2 : 0;
+            return run.Tasks.Any(task => task.Status is Models.MonitorStatus.Failed or Models.MonitorStatus.Unreachable or Models.MonitorStatus.LongRunning or Models.MonitorStatus.Abnormal) ? 2 : 0;
         }
         catch (Exception ex)
         {

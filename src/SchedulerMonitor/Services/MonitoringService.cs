@@ -42,6 +42,8 @@ public sealed class MonitoringService
                     config.Monitoring.LongRunningEventIds, cancellationToken);
                 var statusEvents = await ReadEventsAsync(server, config.Monitoring,
                     config.Monitoring.StatusEventIds, cancellationToken);
+                var abnormalEvents = await ReadEventsAsync(server, config.Monitoring,
+                    config.Monitoring.AbnormalEventIds, cancellationToken);
 
                 foreach (var selectedTask in selected)
                 {
@@ -60,7 +62,8 @@ public sealed class MonitoringService
 
                     overlapEvents.TryGetValue(task.TaskPath, out var overlap);
                     statusEvents.TryGetValue(task.TaskPath, out var statusEvent);
-                    var item = Classify(server, task, config.Monitoring, selectedTask, overlap, statusEvent);
+                    abnormalEvents.TryGetValue(task.TaskPath, out var abnormal);
+                    var item = Classify(server, task, config.Monitoring, selectedTask, overlap, statusEvent, abnormal);
                     run.Tasks.Add(item);
                     _logger.Info($"{server}: {task.TaskPath} = {item.StatusText} ({item.Detail})");
                 }
@@ -114,11 +117,17 @@ public sealed class MonitoringService
 
     internal static TaskMonitorResult Classify(ServerConfig server, DiscoveredTask task,
         MonitoringConfig? monitoring = null, MonitoredTaskConfig? selected = null,
-        TaskEvent? overlapEvent = null, TaskEvent? statusEvent = null)
+        TaskEvent? overlapEvent = null, TaskEvent? statusEvent = null, TaskEvent? abnormalEvent = null)
     {
         monitoring ??= new MonitoringConfig();
         var state = task.WindowsState.Trim();
         var threshold = ResolveThreshold(task, monitoring, selected);
+
+        // An abnormal event counts only when Windows logged it for the execution being reported.
+        var currentAbnormal = abnormalEvent is not null
+                              && (task.LastRunTime is null || abnormalEvent.TimeCreated >= task.LastRunTime.Value)
+            ? abnormalEvent
+            : null;
         TimeSpan? runningFor = null;
         MonitorStatus status;
         string detail;
@@ -163,6 +172,12 @@ public sealed class MonitoringService
                     : task.LastRunTime is null ? "Task is running" : $"Running since {task.LastRunTime:g}";
             }
         }
+        else if (currentAbnormal is not null)
+        {
+            status = MonitorStatus.Abnormal;
+            detail = $"Windows event {currentAbnormal.EventId} at {currentAbnormal.TimeCreated:g}: "
+                     + TaskEventQuery.Describe(currentAbnormal.EventId);
+        }
         else if (state.Contains("Queued", StringComparison.OrdinalIgnoreCase))
         {
             status = MonitorStatus.Pending;
@@ -200,7 +215,8 @@ public sealed class MonitoringService
             NextRunTime = task.NextRunTime, Detail = detail, RepeatInterval = task.RepeatInterval,
             RunningFor = runningFor, LongRunningThreshold = threshold,
             LongRunningEventId = overlapEvent?.EventId, LongRunningEventTime = overlapEvent?.TimeCreated,
-            EventSummary = SummariseEvent(overlapEvent, statusEvent),
+            AbnormalEventId = currentAbnormal?.EventId, AbnormalEventTime = currentAbnormal?.TimeCreated,
+            EventSummary = SummariseEvent(currentAbnormal ?? overlapEvent, statusEvent),
             CheckedAt = DateTime.Now
         };
     }

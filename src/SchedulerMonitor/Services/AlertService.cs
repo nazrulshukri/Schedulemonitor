@@ -25,41 +25,50 @@ public sealed class AlertService
         CancellationToken cancellationToken = default)
     {
         var alerts = config.Alerts;
-        if (!alerts.Enabled) return 0;
+        var candidates = new List<(TaskMonitorResult Task, string Kind, string Subject, string Body)>();
 
-        var longRunning = run.Tasks.Where(task => task.Status == MonitorStatus.LongRunning).ToList();
-        if (longRunning.Count == 0) return 0;
+        if (alerts.Enabled)
+        {
+            candidates.AddRange(run.Tasks.Where(task => task.Status == MonitorStatus.LongRunning)
+                .Select(task => (task, "long running", alerts.SubjectTemplate, alerts.BodyTemplate)));
+        }
+        if (alerts.AbnormalEnabled)
+        {
+            candidates.AddRange(run.Tasks.Where(task => task.Status == MonitorStatus.Abnormal)
+                .Select(task => (task, "abnormal", alerts.AbnormalSubjectTemplate, alerts.AbnormalBodyTemplate)));
+        }
+        if (candidates.Count == 0) return 0;
 
         var email = RecipientsFor(config);
         if (email.Recipients.Count == 0)
         {
-            _logger.Warn("Long running alert skipped: no recipients are configured");
+            _logger.Warn("Alert skipped: no recipients are configured");
             return 0;
         }
 
         var sent = 0;
-        foreach (var task in longRunning)
+        foreach (var (task, kind, subjectTemplate, bodyTemplate) in candidates)
         {
-            var key = AlertStateStore.Key(task.Host, task.TaskPath);
+            var key = AlertStateStore.Key(task.Host, task.TaskPath, kind);
             if (!_state.ShouldAlert(key, task.LastRunTime, alerts.CooldownMinutes))
             {
-                _logger.Info($"Alert for {task.TaskPath} suppressed by the {alerts.CooldownMinutes} minute cooldown");
+                _logger.Info($"{kind} alert for {task.TaskPath} suppressed by the {alerts.CooldownMinutes} minute cooldown");
                 continue;
             }
 
-            var subject = AlertTemplate.Render(alerts.SubjectTemplate, task);
-            var body = AlertTemplate.Render(alerts.BodyTemplate, task);
+            var subject = AlertTemplate.Render(subjectTemplate, task);
+            var body = AlertTemplate.Render(bodyTemplate, task);
             try
             {
                 await _email.SendAsync(email, subject, AlertTemplate.ToHtml(body), cancellationToken);
-                _state.Record(key, task.LastRunTime, task.LongRunningEventId);
+                _state.Record(key, task.LastRunTime, task.AbnormalEventId ?? task.LongRunningEventId);
                 sent++;
-                _logger.Info($"Long running alert sent for {task.TaskPath}");
+                _logger.Info($"{kind} alert sent for {task.TaskPath}");
             }
             catch (Exception ex)
             {
                 // One unreachable mailbox must not stop the remaining alerts.
-                _logger.Error($"Unable to send the long running alert for {task.TaskPath}", ex);
+                _logger.Error($"Unable to send the {kind} alert for {task.TaskPath}", ex);
             }
         }
 

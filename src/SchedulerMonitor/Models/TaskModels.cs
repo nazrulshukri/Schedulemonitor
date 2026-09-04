@@ -19,6 +19,7 @@ public enum MonitorStatus
     Success,
     Running,
     LongRunning,
+    Abnormal,
     Pending,
     Failed,
     Overdue,
@@ -57,6 +58,12 @@ public sealed class TaskMonitorResult
 
     /// <summary>Short text for the Events column: the last relevant Task Scheduler event.</summary>
     public string EventSummary { get; init; } = "";
+
+    /// <summary>The abnormal event that flagged this task, when one was logged for this execution.</summary>
+    public int? AbnormalEventId { get; init; }
+
+    /// <summary>When that abnormal event was logged.</summary>
+    public DateTime? AbnormalEventTime { get; init; }
 
     public string StatusText => Status == MonitorStatus.LongRunning
         ? "LONG RUNNING"

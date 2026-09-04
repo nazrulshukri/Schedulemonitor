@@ -36,8 +36,9 @@ public static class AlertTemplate
             ["ElapsedMinutes"] = elapsed is { } value
                 ? value.TotalMinutes.ToString("0.0", CultureInfo.InvariantCulture) : "-",
             ["Elapsed"] = elapsed is { } span ? MonitoringService.Describe(span) : "-",
-            ["EventId"] = task.LongRunningEventId?.ToString(CultureInfo.InvariantCulture) ?? "-",
-            ["EventTime"] = task.LongRunningEventTime?.ToString("MM/dd/yyyy HH:mm:ss", CultureInfo.InvariantCulture) ?? "-",
+            ["EventId"] = (task.AbnormalEventId ?? task.LongRunningEventId)?.ToString(CultureInfo.InvariantCulture) ?? "-",
+            ["EventTime"] = (task.AbnormalEventTime ?? task.LongRunningEventTime)?
+                .ToString("MM/dd/yyyy HH:mm:ss", CultureInfo.InvariantCulture) ?? "-",
             ["Events"] = task.EventSummary,
             ["WindowsState"] = task.WindowsState,
             ["LastResult"] = string.IsNullOrWhiteSpace(task.LastResult) ? "-" : task.LastResult,
@@ -74,7 +75,8 @@ public static class AlertTemplate
     /// one; only the timings are simulated. A configuration with no selection falls back to a
     /// neutral placeholder job.
     /// </summary>
-    public static TaskMonitorResult Sample(AppConfig? config = null)
+    public static TaskMonitorResult Sample(AppConfig? config = null,
+        MonitorStatus status = MonitorStatus.LongRunning)
     {
         var selected = config?.MonitoredTasks.FirstOrDefault(task => task.Enabled);
         var server = selected is null
@@ -91,13 +93,20 @@ public static class AlertTemplate
             Host = server?.Host ?? Environment.MachineName,
             TaskPath = selected?.TaskPath ?? @"\Example Task",
             DisplayName = name,
-            WindowsState = "Running", Status = MonitorStatus.LongRunning,
+            WindowsState = status == MonitorStatus.Abnormal ? "Ready" : "Running", Status = status,
             LastRunTime = DateTime.Now.AddMinutes(-103.6), LastResult = "267009",
             NextRunTime = DateTime.Now.AddMinutes(2), RepeatInterval = TimeSpan.FromMinutes(2),
             RunningFor = TimeSpan.FromMinutes(103.6),
-            LongRunningEventId = 322, LongRunningEventTime = DateTime.Now.AddMinutes(-101.6),
-            EventSummary = "322 - start skipped, already running",
-            Detail = "Windows event 322: a scheduled start was skipped because this run is still going"
+            LongRunningEventId = status == MonitorStatus.LongRunning ? 322 : null,
+            LongRunningEventTime = status == MonitorStatus.LongRunning ? DateTime.Now.AddMinutes(-101.6) : null,
+            AbnormalEventId = status == MonitorStatus.Abnormal ? 103 : null,
+            AbnormalEventTime = status == MonitorStatus.Abnormal ? DateTime.Now.AddMinutes(-101.6) : null,
+            EventSummary = status == MonitorStatus.Abnormal
+                ? "103 - action start failed"
+                : "322 - start skipped, already running",
+            Detail = status == MonitorStatus.Abnormal
+                ? "Windows event 103: action start failed"
+                : "Windows event 322: a scheduled start was skipped because this run is still going"
         };
     }
 

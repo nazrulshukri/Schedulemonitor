@@ -42,6 +42,7 @@ public sealed class ConfigurationForm : Form
         AutoSize = true
     };
     private readonly TextBox _eventIds = new() { Width = 140 };
+    private readonly TextBox _abnormalIds = new() { Width = 140 };
     private readonly NumericUpDown _eventLookback = new() { Minimum = 5, Maximum = 20160, Value = 720, Width = 90 };
 
     private readonly CheckBox _emailEnabled = new() { Text = "Send email after automatic monitoring", AutoSize = true };
@@ -56,6 +57,9 @@ public sealed class ConfigurationForm : Form
     private readonly CheckBox _alertEnabled = new() { Text = "Email an alert as soon as a check finds a LONG RUNNING task", AutoSize = true };
     private readonly TextBox _alertSubject = new();
     private readonly TextBox _alertBody = new() { Multiline = true, ScrollBars = ScrollBars.Vertical, AcceptsReturn = true };
+    private readonly CheckBox _abnormalEnabled = new() { Text = "Email an alert for a task reported as ABNORMAL", AutoSize = true };
+    private readonly TextBox _abnormalSubject = new();
+    private readonly TextBox _abnormalBody = new() { Multiline = true, ScrollBars = ScrollBars.Vertical, AcceptsReturn = true };
     private readonly NumericUpDown _alertCooldown = new() { Minimum = 0, Maximum = 10080, Value = 60, Width = 90 };
     private readonly TextBox _alertRecipients = new() { Multiline = true, ScrollBars = ScrollBars.Vertical };
 
@@ -181,13 +185,17 @@ public sealed class ConfigurationForm : Form
     private TabPage BuildAlertTab()
     {
         var page = NewPage("Alerts");
-        var panel = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(22), ColumnCount = 2, RowCount = 7 };
+        page.AutoScroll = true;
+        var panel = new TableLayoutPanel { Dock = DockStyle.Top, Height = 690, Padding = new Padding(22), ColumnCount = 2, RowCount = 10 };
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         AddField(panel, 0, "", _alertEnabled);
-        AddField(panel, 1, "Subject", _alertSubject);
-        AddField(panel, 2, "Body", _alertBody, 150);
-        AddField(panel, 3, "Repeat after (min)", _alertCooldown);
-        AddField(panel, 4, "Recipients\r\n(blank = report list)", _alertRecipients, 70);
+        AddField(panel, 1, "Long running\r\nsubject", _alertSubject);
+        AddField(panel, 2, "Long running\r\nbody", _alertBody, 130);
+        AddField(panel, 3, "", _abnormalEnabled);
+        AddField(panel, 4, "Abnormal\r\nsubject", _abnormalSubject);
+        AddField(panel, 5, "Abnormal\r\nbody", _abnormalBody, 130);
+        AddField(panel, 6, "Repeat after (min)", _alertCooldown);
+        AddField(panel, 7, "Recipients\r\n(blank = report list)", _alertRecipients, 70);
 
         var hint = new Label
         {
@@ -197,7 +205,7 @@ public sealed class ConfigurationForm : Form
                    + "execution may alert again; 0 sends only once per execution."
         };
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 74));
-        panel.Controls.Add(hint, 1, 5);
+        panel.Controls.Add(hint, 1, 8);
 
         var actions = new FlowLayoutPanel { Dock = DockStyle.Fill };
         var save = UiTheme.Button("Save Alerts", true);
@@ -208,7 +216,7 @@ public sealed class ConfigurationForm : Form
         test.Click += async (_, _) => await SendSampleAlertAsync();
         actions.Controls.Add(save); actions.Controls.Add(preview); actions.Controls.Add(test);
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
-        panel.Controls.Add(actions, 1, 6);
+        panel.Controls.Add(actions, 1, 9);
 
         page.Controls.Add(panel); return page;
     }
@@ -218,6 +226,9 @@ public sealed class ConfigurationForm : Form
         _alertEnabled.Checked = _config.Alerts.Enabled;
         _alertSubject.Text = _config.Alerts.SubjectTemplate;
         _alertBody.Text = _config.Alerts.BodyTemplate;
+        _abnormalEnabled.Checked = _config.Alerts.AbnormalEnabled;
+        _abnormalSubject.Text = _config.Alerts.AbnormalSubjectTemplate;
+        _abnormalBody.Text = _config.Alerts.AbnormalBodyTemplate;
         _alertCooldown.Value = Math.Clamp(_config.Alerts.CooldownMinutes, 0, 10080);
         _alertRecipients.Lines = [.. _config.Alerts.Recipients];
     }
@@ -227,6 +238,9 @@ public sealed class ConfigurationForm : Form
         _config.Alerts.Enabled = _alertEnabled.Checked;
         _config.Alerts.SubjectTemplate = _alertSubject.Text.Trim();
         _config.Alerts.BodyTemplate = _alertBody.Text;
+        _config.Alerts.AbnormalEnabled = _abnormalEnabled.Checked;
+        _config.Alerts.AbnormalSubjectTemplate = _abnormalSubject.Text.Trim();
+        _config.Alerts.AbnormalBodyTemplate = _abnormalBody.Text;
         _config.Alerts.CooldownMinutes = (int)_alertCooldown.Value;
         _config.Alerts.Recipients = _alertRecipients.Lines.Select(line => line.Trim())
             .Where(line => line.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -239,8 +253,11 @@ public sealed class ConfigurationForm : Form
     {
         SaveAlerts(false);
         var sample = AlertTemplate.Sample(_config);
-        var text = $"Subject:\r\n{AlertTemplate.Render(_config.Alerts.SubjectTemplate, sample)}"
-                   + $"\r\n\r\nBody:\r\n{AlertTemplate.Render(_config.Alerts.BodyTemplate, sample)}"
+        var abnormalSample = AlertTemplate.Sample(_config, MonitorStatus.Abnormal);
+        var text = $"LONG RUNNING subject:\r\n{AlertTemplate.Render(_config.Alerts.SubjectTemplate, sample)}"
+                   + $"\r\n\r\nLONG RUNNING body:\r\n{AlertTemplate.Render(_config.Alerts.BodyTemplate, sample)}"
+                   + $"\r\n\r\n----------\r\n\r\nABNORMAL subject:\r\n{AlertTemplate.Render(_config.Alerts.AbnormalSubjectTemplate, abnormalSample)}"
+                   + $"\r\n\r\nABNORMAL body:\r\n{AlertTemplate.Render(_config.Alerts.AbnormalBodyTemplate, abnormalSample)}"
                    + $"\r\n\r\nThe job name, path and server come from '{sample.DisplayName}', the first task "
                    + "selected for monitoring. Times and the event are simulated; a real alert uses the "
                    + "values from the check.";
@@ -263,7 +280,7 @@ public sealed class ConfigurationForm : Form
     private TabPage BuildScheduleTab()
     {
         var page = NewPage("Schedule");
-        var panel = new TableLayoutPanel { Dock = DockStyle.Top, Height = 610, Padding = new Padding(25), ColumnCount = 2, RowCount = 11 };
+        var panel = new TableLayoutPanel { Dock = DockStyle.Top, Height = 680, Padding = new Padding(25), ColumnCount = 2, RowCount = 12 };
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190)); panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         AddField(panel, 0, "", _scheduleEnabled);
         AddField(panel, 1, "Daily run time", _runTime);
@@ -279,19 +296,24 @@ public sealed class ConfigurationForm : Form
             MaximumSize = new Size(650, 0),
             ForeColor = Color.DimGray,
             Text = "The tool registers SchedulerMonitor-Daily in Windows Task Scheduler. It runs this portable EXE with --run --silent. Register it while signed in with the Windows account that has permission to query the remote servers."
+                   + "\r\n\r\nLong running event IDs mark a task LONG RUNNING while it is running; abnormal event IDs mark it ABNORMAL. "
+                   + "Note that 102 is the normal completion event, so keeping it in the abnormal list marks every finished task abnormal; "
+                   + "remove it to report only failures (101, 103, 203). An empty abnormal list turns the status off."
         };
         panel.Controls.Add(note, 1, 4);
         AddField(panel, 5, "", _useEventLog);
-        AddField(panel, 6, "Event IDs", _eventIds);
-        AddField(panel, 7, "Event lookback (min)", _eventLookback);
-        AddField(panel, 8, "", _useElapsedLimit);
-        AddField(panel, 9, "Default max run (min)", _defaultLongRunning);
-        AddField(panel, 10, "", _useRepeatInterval);
+        AddField(panel, 6, "Long running\r\nevent IDs", _eventIds);
+        AddField(panel, 7, "Abnormal\r\nevent IDs", _abnormalIds);
+        AddField(panel, 8, "Event lookback (min)", _eventLookback);
+        AddField(panel, 9, "", _useElapsedLimit);
+        AddField(panel, 10, "Default max run (min)", _defaultLongRunning);
+        AddField(panel, 11, "", _useRepeatInterval);
         _defaultLongRunning.ValueChanged += (_, _) => SaveMonitoring();
         _useRepeatInterval.CheckedChanged += (_, _) => SaveMonitoring();
         _useEventLog.CheckedChanged += (_, _) => SaveMonitoring();
         _useElapsedLimit.CheckedChanged += (_, _) => SaveMonitoring();
         _eventIds.Leave += (_, _) => SaveMonitoring();
+        _abnormalIds.Leave += (_, _) => SaveMonitoring();
         _eventLookback.ValueChanged += (_, _) => SaveMonitoring();
         page.Controls.Add(panel); return page;
     }
@@ -543,6 +565,7 @@ public sealed class ConfigurationForm : Form
         _useRepeatInterval.Checked = _config.Monitoring.UseRepeatIntervalAsLimit;
         _useEventLog.Checked = _config.Monitoring.UseEventLog;
         _eventIds.Text = string.Join(", ", _config.Monitoring.LongRunningEventIds);
+        _abnormalIds.Text = string.Join(", ", _config.Monitoring.AbnormalEventIds);
         _eventLookback.Value = Math.Clamp(_config.Monitoring.EventLookbackMinutes, 5, 20160);
         _defaultLongRunning.Enabled = _useRepeatInterval.Enabled = _useElapsedLimit.Checked;
         _loadingMonitoring = false;
@@ -558,15 +581,22 @@ public sealed class ConfigurationForm : Form
         _config.Monitoring.UseEventLog = _useEventLog.Checked;
         _config.Monitoring.EventLookbackMinutes = (int)_eventLookback.Value;
 
-        var ids = _eventIds.Text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries)
-            .Select(value => int.TryParse(value.Trim(), out var id) ? id : 0)
-            .Where(id => id > 0).Distinct().ToList();
+        var ids = ParseEventIds(_eventIds.Text);
         if (ids.Count > 0) _config.Monitoring.LongRunningEventIds = ids;
         _eventIds.Text = string.Join(", ", _config.Monitoring.LongRunningEventIds);
+
+        // An empty abnormal list is meaningful: it turns the ABNORMAL status off.
+        _config.Monitoring.AbnormalEventIds = ParseEventIds(_abnormalIds.Text);
+        _abnormalIds.Text = string.Join(", ", _config.Monitoring.AbnormalEventIds);
 
         SaveConfig();
         RebuildTaskGrid();
     }
+
+    private static List<int> ParseEventIds(string text) =>
+        text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries)
+            .Select(value => int.TryParse(value.Trim(), out var id) ? id : 0)
+            .Where(id => id > 0).Distinct().ToList();
 
     private void LoadSchedule()
     {

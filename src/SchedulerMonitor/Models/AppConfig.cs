@@ -64,6 +64,18 @@ public sealed class AlertConfig
         + "{EventId} at {EventTime}: a scheduled start was skipped because the previous run had not "
         + "finished.\r\nPlease check Task Scheduler and the server {Server} ({Host}).";
 
+    /// <summary>Send an alert for a task reported as ABNORMAL as well.</summary>
+    public bool AbnormalEnabled { get; set; } = true;
+
+    public string AbnormalSubjectTemplate { get; set; } =
+        "Follow {JobName} ALERT - abnormal event {EventId} - {Now}";
+
+    public string AbnormalBodyTemplate { get; set; } =
+        "Task Scheduler Job: {JobName}\r\n\r\n"
+        + "Job '{JobName}' ended abnormally. Task Scheduler logged event {EventId} at {EventTime} "
+        + "({Events}). The last run started {StartTime} and returned {LastResult}.\r\n"
+        + "Please check Task Scheduler and the server {Server} ({Host}).";
+
     /// <summary>Minutes before the same task may alert again while it is still long running.</summary>
     public int CooldownMinutes { get; set; } = 60;
 
@@ -107,6 +119,14 @@ public sealed class MonitoringConfig
     /// instance already running"; 324 is the same refusal under the "queue" instance policy.
     /// </summary>
     public List<int> LongRunningEventIds { get; set; } = [322, 324, 329];
+
+    /// <summary>
+    /// Events that mark an execution as ABNORMAL: 101 task start failed, 103 action start failed,
+    /// 203 action failed to start, 102 task completed. Note that 102 is Windows' normal completion
+    /// event, so leaving it here marks every finished task abnormal; remove it to report only
+    /// failures.
+    /// </summary>
+    public List<int> AbnormalEventIds { get; set; } = [101, 103, 203, 102];
 
     /// <summary>
     /// Informational events shown in the Events column so a healthy task also states what Windows
