@@ -9,12 +9,17 @@ public sealed class DiscoveredTask
     public DateTime? LastRunTime { get; init; }
     public string LastResult { get; init; } = "";
     public DateTime? NextRunTime { get; init; }
+
+    /// <summary>Repetition interval declared in Task Scheduler ("Repeat: Every"), when the task has one.</summary>
+    public TimeSpan? RepeatInterval { get; init; }
 }
 
 public enum MonitorStatus
 {
     Success,
     Running,
+    LongRunning,
+    Abnormal,
     Pending,
     Failed,
     Overdue,
@@ -36,7 +41,36 @@ public sealed class TaskMonitorResult
     public DateTime CheckedAt { get; init; } = DateTime.Now;
     public string Detail { get; init; } = "";
 
-    public string StatusText => Status.ToString().ToUpperInvariant();
+    /// <summary>How long the task has been running, when Task Scheduler reports it as running.</summary>
+    public TimeSpan? RunningFor { get; init; }
+
+    /// <summary>Runtime the task is expected to stay below before it counts as long running.</summary>
+    public TimeSpan? LongRunningThreshold { get; init; }
+
+    /// <summary>The Task Scheduler event that flagged this task, when the event log was the source.</summary>
+    public int? LongRunningEventId { get; init; }
+
+    /// <summary>When that event was logged.</summary>
+    public DateTime? LongRunningEventTime { get; init; }
+
+    /// <summary>Repetition interval declared in Task Scheduler, used by the alert template.</summary>
+    public TimeSpan? RepeatInterval { get; init; }
+
+    /// <summary>Short text for the Events column: the last relevant Task Scheduler event.</summary>
+    public string EventSummary { get; init; } = "";
+
+    /// <summary>The abnormal event that flagged this task, when one was logged for this execution.</summary>
+    public int? AbnormalEventId { get; init; }
+
+    /// <summary>When that abnormal event was logged.</summary>
+    public DateTime? AbnormalEventTime { get; init; }
+
+    public string StatusText => Status == MonitorStatus.LongRunning
+        ? "LONG RUNNING"
+        : Status.ToString().ToUpperInvariant();
+
+    /// <summary>Single-word form of the status, used as an HTML class name in the report.</summary>
+    public string StatusCode => Status.ToString().ToUpperInvariant();
 }
 
 public sealed class MonitorRunResult

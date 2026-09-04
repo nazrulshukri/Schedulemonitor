@@ -68,7 +68,8 @@ public sealed class RemoteTaskQuery
                 Enabled = enabled,
                 LastRunTime = ParseDate(FirstValue(row, headers, "lastruntime")),
                 LastResult = FirstValue(row, headers, "lastresult").Trim(),
-                NextRunTime = ParseDate(FirstValue(row, headers, "nextruntime"))
+                NextRunTime = ParseDate(FirstValue(row, headers, "nextruntime")),
+                RepeatInterval = ParseInterval(FirstValue(row, headers, "repeatevery"))
             });
         }
 
@@ -110,6 +111,37 @@ public sealed class RemoteTaskQuery
         if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var invariant))
             return invariant;
         return null;
+    }
+
+    /// <summary>
+    /// Reads the "Repeat: Every" column. schtasks writes it either as a clock value (01:00:00)
+    /// or in words (1 Hour(s), 30 Minute(s)); "Disabled" and "N/A" mean the task does not repeat.
+    /// </summary>
+    internal static TimeSpan? ParseInterval(string value)
+    {
+        value = value.Trim();
+        if (string.IsNullOrWhiteSpace(value)
+            || value.Equals("N/A", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("None", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("Disabled", StringComparison.OrdinalIgnoreCase)) return null;
+
+        if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var clock) && clock > TimeSpan.Zero)
+            return clock;
+
+        var total = TimeSpan.Zero;
+        foreach (Match match in Regex.Matches(value, @"(\d+)\s*(day|hour|minute|second)", RegexOptions.IgnoreCase))
+        {
+            var amount = int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
+            total += match.Groups[2].Value.ToLowerInvariant() switch
+            {
+                "day" => TimeSpan.FromDays(amount),
+                "hour" => TimeSpan.FromHours(amount),
+                "minute" => TimeSpan.FromMinutes(amount),
+                _ => TimeSpan.FromSeconds(amount)
+            };
+        }
+
+        return total > TimeSpan.Zero ? total : null;
     }
 
     private static string EnsureLeadingSlash(string value) => value.StartsWith('\\') ? value : "\\" + value;

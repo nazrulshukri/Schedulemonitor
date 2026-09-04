@@ -18,12 +18,17 @@ internal static class HeadlessRunner
             var report = new ReportBuilder(paths).BuildAndSave(run);
             logger.Info($"Report saved: {Path.GetFileName(report.FilePath)}");
 
+            // Long running alerts go out on their own, whether or not the daily report is enabled.
+            var alerts = new AlertService(new EmailService(logger), new AlertStateStore(paths, logger), logger);
+            var sent = await alerts.SendAsync(config, run);
+            if (sent > 0) logger.Info($"{sent} long running alert(s) sent");
+
             if (config.Email.Enabled)
                 await new EmailService(logger).SendAsync(config.Email, report.Subject, report.Html);
             else
                 logger.Info("Email sending is disabled");
 
-            return run.Tasks.Any(task => task.Status is Models.MonitorStatus.Failed or Models.MonitorStatus.Unreachable) ? 2 : 0;
+            return run.Tasks.Any(task => task.Status is Models.MonitorStatus.Failed or Models.MonitorStatus.Unreachable or Models.MonitorStatus.LongRunning or Models.MonitorStatus.Abnormal) ? 2 : 0;
         }
         catch (Exception ex)
         {

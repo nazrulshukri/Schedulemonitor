@@ -12,7 +12,7 @@ The administrator scans a server, selects only the important scheduled tasks, an
 - Search the scan result and select only tasks that should appear in monitoring and email.
 - Preserve previous selections during rescans; new tasks are unselected by default.
 - Report a selected task as `FAILED – Task not found` if it was deleted or renamed.
-- Display `SUCCESS`, `RUNNING`, `PENDING`, `FAILED`, `OVERDUE`, `DISABLED`, and `UNREACHABLE`.
+- Display `SUCCESS`, `RUNNING`, `LONG RUNNING`, `ABNORMAL`, `PENDING`, `FAILED`, `OVERDUE`, `DISABLED`, and `UNREACHABLE`.
 - Retain Windows state, last run, last result code, and next run for troubleshooting.
 - Generate a compact HTML report and optionally send it through SMTP.
 - Encrypt the SMTP password with Windows DPAPI for the current Windows user.
@@ -25,7 +25,8 @@ Windows `Ready` is only a current scheduler state. Scheduler Monitor combines cu
 
 | Windows information | Monitor result |
 |---|---|
-| Running | RUNNING |
+| Running, still inside its runtime budget | RUNNING |
+| Running, past its runtime budget | LONG RUNNING |
 | Queued | PENDING |
 | Disabled | DISABLED |
 | Ready + last result `0` or `0x0` | SUCCESS |
@@ -37,12 +38,92 @@ Windows `Ready` is only a current scheduler state. Scheduler Monitor combines cu
 
 Task Scheduler does not normally expose percentage progress. A running task is shown as `RUNNING` with its available start/last-run time; application-specific progress would require the job's own log, API, file, or database.
 
+### Long running
+
+Task Scheduler reports that a task is running but never for how long, so the monitor measures
+`now - Last Run Time` itself and compares it with a runtime budget:
+
+**Source 1 — the Task Scheduler event log.** `Microsoft-Windows-TaskScheduler/Operational` is read
+with `wevtutil.exe` for event **322** (*launch request ignored, instance already running*) and
+**324** (*start blocked, instance already running*) and **329** (*terminated, time limit exceeded*).
+Windows logs these when a scheduled start is skipped because the previous run is still going — the
+exact mismatch between a 5-minute schedule and a 3-minute-plus executable. Such an event marks the
+task `LONG RUNNING` while it is still running.
+
+The status follows Windows: once the run ends and the task is `Ready` with result `0` it reports
+`SUCCESS` again. The **Events** column keeps the history visible — it shows the last Task Scheduler
+event for every task, such as `322 - start skipped, already running` or `102 - task completed`, with
+the time it was logged. The event IDs, the
+lookback window and the whole check are configurable in **Configuration → Schedule**; a server that
+denies the event log is logged and falls back to the timing rule below.
+
+**Source 2 — elapsed time.** Off by default: a run that is merely slow, with no event, stays
+`RUNNING` and then `SUCCESS`. Ticking **Also flag LONG RUNNING from elapsed time** in
+**Configuration → Schedule** compares the elapsed time with a budget:
+
+1. The per-task **Max Run (min)** value in **Configuration → Tasks**.
+2. Otherwise the task's own repetition interval (`Repeat: Every`), while
+   **Use the repeat interval** is enabled in **Configuration → Schedule**. A task that repeats every
+   5 minutes is expected to finish inside 5 minutes, so an execution still alive after that window
+   overlaps its own next start.
+3. Otherwise the global **Default max run (min)**, 5 minutes by default.
+
+`LONG RUNNING` is treated as a problem: it is highlighted in the grid, counted in the Problems card,
+listed under Attention Required in the email report, and returns exit code 2 in silent runs. The
+**Running For** column shows the measured elapsed time.
+
+## Abnormal
+
+The same event log carries a second status. Events in the abnormal list — `101` task start failed,
+`103` action start failed, `203` action failed to start and `102` task completed by default — mark
+the task `ABNORMAL` when Windows logged them for the current execution. It behaves exactly like
+`LONG RUNNING`: highlighted in the grid, counted in Problems, listed under Attention Required, shown
+in the Events column, and it raises its own email alert with its own subject and body templates.
+
+`102` is the normal completion event, so leaving it in the list marks every finished task abnormal.
+Remove it in **Configuration → Schedule → Abnormal event IDs** to report only failures, or clear the
+list to switch the status off.
+
+## Long running email alert
+
+When a check finds a task that Task Scheduler reported as long running (event 322 and friends), the
+tool emails an alert immediately, separately from the daily report. Both the subject and the body
+are templates edited in **Configuration → Alerts**, so the wording belongs to the administrator:
+
+```text
+Subject: Follow {JobName} ALERT - long run ({StartTime}) - {Now}
+
+Task Scheduler Job: {JobName}
+
+Job '{JobName}' is expected to run every {Interval}, but the run that started {StartTime} is still
+going - already {ElapsedMinutes} minutes ago. Task Scheduler logged event {EventId} at {EventTime}:
+a scheduled start was skipped because the previous run had not finished.
+Please check Task Scheduler and the server {Server} ({Host}).
+```
+
+Available placeholders: `{JobName}` `{TaskPath}` `{Server}` `{Host}` `{Status}` `{Interval}`
+`{StartTime}` `{ElapsedMinutes}` `{Elapsed}` `{EventId}` `{EventTime}` `{Events}` `{WindowsState}`
+`{LastResult}` `{NextRun}` `{Detail}` `{Now}`. An unknown placeholder is left in the text, so a typo
+is visible instead of silently removing words.
+
+- One email per long running task, sent by both **Run Check** and the daily silent run.
+- **Repeat after (min)** limits how often the same execution alerts again; `0` sends once per
+  execution. A new execution always alerts again. This is kept in `alertstate.json`.
+- **Recipients** can differ from the report recipients; leave it blank to reuse them.
+- **Preview** renders the selected alert with example values, **Send Sample Alert** emails that example.
+- The Alerts tab holds one editor. The **Alert** list at the top switches between the long running
+  and the abnormal wording; what you typed is kept when you switch. **Repeat after** and
+  **Recipients** apply to both.
+
 ## Requirements
 
 - Windows 10/11 or Windows Server 2016 or later.
 - Visual Studio 2022 with the .NET desktop development workload, or .NET 8 SDK, to build.
 - The Windows account running the tool must have permission to query Task Scheduler on each remote machine.
 - Remote Task Scheduler/RPC access and applicable Windows Firewall rules must be enabled.
+- For the event-based long running check, the **Remote Event Log Management** firewall rules must be
+  enabled on the monitored servers and the account must be able to read the Task Scheduler
+  operational log. Without it, monitoring still works using elapsed time only.
 - English Windows Task Scheduler command output. V1 parses the standard English `schtasks.exe /Query /FO CSV /V` headers.
 
 No server username or password is stored. Remote queries use the Windows identity that runs the EXE or its registered scheduled task.

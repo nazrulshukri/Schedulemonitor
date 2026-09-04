@@ -23,6 +23,27 @@ public sealed class ConfigurationForm : Form
     private readonly Label _jobMessage = new() { AutoSize = true, ForeColor = Color.DimGray };
     private List<DiscoveredTask> _scannedTasks = [];
     private HashSet<string> _workingSelection = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, int> _workingLimits = new(StringComparer.OrdinalIgnoreCase);
+    private bool _loadingMonitoring;
+    private readonly NumericUpDown _defaultLongRunning = new() { Minimum = 0, Maximum = 10080, Value = 5, Width = 90 };
+    private readonly CheckBox _useElapsedLimit = new()
+    {
+        Text = "Also flag LONG RUNNING from elapsed time, without waiting for a Task Scheduler event",
+        AutoSize = true
+    };
+    private readonly CheckBox _useRepeatInterval = new()
+    {
+        Text = "Use the repeat interval from Task Scheduler as the limit when a task has one",
+        AutoSize = true
+    };
+    private readonly CheckBox _useEventLog = new()
+    {
+        Text = "Flag LONG RUNNING from Task Scheduler events (322 / 324: a start was skipped, instance already running)",
+        AutoSize = true
+    };
+    private readonly TextBox _eventIds = new() { Width = 140 };
+    private readonly TextBox _abnormalIds = new() { Width = 140 };
+    private readonly NumericUpDown _eventLookback = new() { Minimum = 5, Maximum = 20160, Value = 720, Width = 90 };
 
     private readonly CheckBox _emailEnabled = new() { Text = "Send email after automatic monitoring", AutoSize = true };
     private readonly TextBox _smtp = new();
@@ -32,6 +53,14 @@ public sealed class ConfigurationForm : Form
     private readonly TextBox _password = new() { UseSystemPasswordChar = true };
     private readonly TextBox _sender = new();
     private readonly TextBox _recipients = new() { Multiline = true, ScrollBars = ScrollBars.Vertical };
+
+    private readonly CheckBox _alertEnabled = new() { Text = "Email an alert as soon as a check finds a LONG RUNNING task", AutoSize = true };
+    private readonly TextBox _alertSubject = new();
+    private readonly TextBox _alertBody = new() { Multiline = true, ScrollBars = ScrollBars.Vertical, AcceptsReturn = true };
+    private readonly ComboBox _alertType = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
+    private int _editingAlertType;
+    private readonly NumericUpDown _alertCooldown = new() { Minimum = 0, Maximum = 10080, Value = 60, Width = 90 };
+    private readonly TextBox _alertRecipients = new() { Multiline = true, ScrollBars = ScrollBars.Vertical };
 
     private readonly CheckBox _scheduleEnabled = new() { Text = "Daily monitoring enabled", AutoSize = true };
     private readonly DateTimePicker _runTime = new() { Format = DateTimePickerFormat.Time, ShowUpDown = true, Width = 120 };
@@ -48,10 +77,11 @@ public sealed class ConfigurationForm : Form
         tabs.TabPages.Add(BuildServersTab());
         tabs.TabPages.Add(BuildJobsTab());
         tabs.TabPages.Add(BuildEmailTab());
+        tabs.TabPages.Add(BuildAlertTab());
         tabs.TabPages.Add(BuildScheduleTab());
         Controls.Add(tabs);
 
-        LoadServers(); LoadEmail(); LoadSchedule();
+        LoadServers(); LoadEmail(); LoadAlerts(); LoadSchedule(); LoadMonitoring();
         Shown += async (_, _) => await RefreshScheduleStatusAsync();
     }
 
@@ -109,6 +139,11 @@ public sealed class ConfigurationForm : Form
         _jobGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Task", HeaderText = "Task Name", ReadOnly = true, FillWeight = 130 });
         _jobGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Path", HeaderText = "Task Path", ReadOnly = true, FillWeight = 210 });
         _jobGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "State", HeaderText = "Current State", ReadOnly = true, FillWeight = 75 });
+        _jobGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "Limit", HeaderText = "Max Run (min)", FillWeight = 70,
+            ToolTipText = "Runtime budget for this task. 0 or empty uses the schedule interval, otherwise the default limit."
+        });
         _jobGrid.CurrentCellDirtyStateChanged += (_, _) =>
         {
             if (_jobGrid.IsCurrentCellDirty) _jobGrid.CommitEdit(DataGridViewDataErrorContexts.Commit);
@@ -118,7 +153,7 @@ public sealed class ConfigurationForm : Form
         var bottom = ActionBar();
         var save = UiTheme.Button("Save Selection", true); save.Click += (_, _) => SaveTaskSelection();
         bottom.Controls.Add(save);
-        bottom.Controls.Add(new Label { Text = "Only selected tasks appear in monitoring and email.", AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(10, 9, 3, 3) });
+        bottom.Controls.Add(new Label { Text = "Only selected tasks appear in monitoring and email. Max Run flags a task as LONG RUNNING once it exceeds that many minutes.", AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(10, 9, 3, 3) });
 
         top.Dock = DockStyle.Fill; bottom.Dock = DockStyle.Fill;
         layout.Controls.Add(top, 0, 0); layout.Controls.Add(_jobGrid, 0, 1); layout.Controls.Add(bottom, 0, 2);
@@ -146,10 +181,145 @@ public sealed class ConfigurationForm : Form
         page.Controls.Add(panel); return page;
     }
 
+    private TabPage BuildAlertTab()
+    {
+        var page = NewPage("Alerts");
+        var panel = new TableLayoutPanel { Dock = DockStyle.Top, Height = 520, Padding = new Padding(22), ColumnCount = 2, RowCount = 8 };
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+        _alertType.Items.AddRange(["Long running alert", "Abnormal alert"]);
+        _alertType.SelectedIndex = 0;
+        _alertType.SelectedIndexChanged += (_, _) => SwitchAlertType();
+
+        AddField(panel, 0, "Alert", _alertType);
+        AddField(panel, 1, "", _alertEnabled);
+        AddField(panel, 2, "Subject", _alertSubject);
+        AddField(panel, 3, "Body", _alertBody, 150);
+        AddField(panel, 4, "Repeat after (min)", _alertCooldown);
+        AddField(panel, 5, "Recipients\r\n(blank = report list)", _alertRecipients, 70);
+
+        var hint = new Label
+        {
+            AutoSize = true, MaximumSize = new Size(700, 0), ForeColor = Color.DimGray,
+            Text = "Placeholders: " + string.Join("  ", AlertTemplate.Placeholders)
+                   + "\r\nPick the alert above to edit its own subject and body. Repeat after and Recipients "
+                   + "apply to both. One email is sent per flagged task; 0 sends only once per execution."
+        };
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 74));
+        panel.Controls.Add(hint, 1, 6);
+
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Fill };
+        var save = UiTheme.Button("Save Alerts", true);
+        var preview = UiTheme.Button("Preview");
+        var test = UiTheme.Button("Send Sample Alert");
+        save.Click += (_, _) => SaveAlerts(true);
+        preview.Click += (_, _) => PreviewAlert();
+        test.Click += async (_, _) => await SendSampleAlertAsync();
+        actions.Controls.Add(save); actions.Controls.Add(preview); actions.Controls.Add(test);
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
+        panel.Controls.Add(actions, 1, 7);
+
+        page.Controls.Add(panel); return page;
+    }
+
+    /// <summary>
+    /// The two alerts share one editor. Switching keeps what was typed for the alert being left,
+    /// so nothing is lost by looking at the other one.
+    /// </summary>
+    private void SwitchAlertType()
+    {
+        CollectAlertEditor(_editingAlertType);
+        _editingAlertType = _alertType.SelectedIndex;
+        ShowAlertEditor(_editingAlertType);
+    }
+
+    /// <summary>Reads the editor into the alert it belongs to.</summary>
+    private void CollectAlertEditor(int type)
+    {
+        if (type == 1)
+        {
+            _config.Alerts.AbnormalEnabled = _alertEnabled.Checked;
+            _config.Alerts.AbnormalSubjectTemplate = _alertSubject.Text.Trim();
+            _config.Alerts.AbnormalBodyTemplate = _alertBody.Text;
+        }
+        else
+        {
+            _config.Alerts.Enabled = _alertEnabled.Checked;
+            _config.Alerts.SubjectTemplate = _alertSubject.Text.Trim();
+            _config.Alerts.BodyTemplate = _alertBody.Text;
+        }
+    }
+
+    private void ShowAlertEditor(int type)
+    {
+        if (type == 1)
+        {
+            _alertEnabled.Text = "Email an alert as soon as a check finds an ABNORMAL task";
+            _alertEnabled.Checked = _config.Alerts.AbnormalEnabled;
+            _alertSubject.Text = _config.Alerts.AbnormalSubjectTemplate;
+            _alertBody.Text = _config.Alerts.AbnormalBodyTemplate;
+        }
+        else
+        {
+            _alertEnabled.Text = "Email an alert as soon as a check finds a LONG RUNNING task";
+            _alertEnabled.Checked = _config.Alerts.Enabled;
+            _alertSubject.Text = _config.Alerts.SubjectTemplate;
+            _alertBody.Text = _config.Alerts.BodyTemplate;
+        }
+    }
+
+    private void LoadAlerts()
+    {
+        _editingAlertType = _alertType.SelectedIndex;
+        ShowAlertEditor(_editingAlertType);
+        _alertCooldown.Value = Math.Clamp(_config.Alerts.CooldownMinutes, 0, 10080);
+        _alertRecipients.Lines = [.. _config.Alerts.Recipients];
+    }
+
+    private void SaveAlerts(bool showMessage)
+    {
+        CollectAlertEditor(_editingAlertType);
+        _config.Alerts.CooldownMinutes = (int)_alertCooldown.Value;
+        _config.Alerts.Recipients = _alertRecipients.Lines.Select(line => line.Trim())
+            .Where(line => line.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        SaveConfig();
+        if (showMessage) MessageBox.Show("Alert templates saved.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    /// <summary>Shows the selected alert filled with example values, without sending anything.</summary>
+    private void PreviewAlert()
+    {
+        SaveAlerts(false);
+        var abnormal = _editingAlertType == 1;
+        var sample = AlertTemplate.Sample(_config, abnormal ? MonitorStatus.Abnormal : MonitorStatus.LongRunning);
+        var subject = abnormal ? _config.Alerts.AbnormalSubjectTemplate : _config.Alerts.SubjectTemplate;
+        var body = abnormal ? _config.Alerts.AbnormalBodyTemplate : _config.Alerts.BodyTemplate;
+
+        var text = $"Subject:\r\n{AlertTemplate.Render(subject, sample)}"
+                   + $"\r\n\r\nBody:\r\n{AlertTemplate.Render(body, sample)}"
+                   + $"\r\n\r\nThe job name, path and server come from '{sample.DisplayName}', the first task "
+                   + "selected for monitoring. Times and the event are simulated; a real alert uses the "
+                   + "values from the check.";
+        MessageBox.Show(text, $"{_alertType.Text} preview", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private async Task SendSampleAlertAsync()
+    {
+        try
+        {
+            UseWaitCursor = true; SaveAlerts(false);
+            var alerts = new AlertService(new EmailService(_logger), new AlertStateStore(_paths, _logger), _logger);
+            await alerts.SendPreviewAsync(_config, _editingAlertType == 1);
+            MessageBox.Show("Sample alert sent.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex) { MessageBox.Show(ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        finally { UseWaitCursor = false; }
+    }
+
     private TabPage BuildScheduleTab()
     {
         var page = NewPage("Schedule");
-        var panel = new TableLayoutPanel { Dock = DockStyle.Top, Height = 300, Padding = new Padding(25), ColumnCount = 2, RowCount = 5 };
+        var panel = new TableLayoutPanel { Dock = DockStyle.Top, Height = 680, Padding = new Padding(25), ColumnCount = 2, RowCount = 12 };
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190)); panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         AddField(panel, 0, "", _scheduleEnabled);
         AddField(panel, 1, "Daily run time", _runTime);
@@ -165,8 +335,26 @@ public sealed class ConfigurationForm : Form
             MaximumSize = new Size(650, 0),
             ForeColor = Color.DimGray,
             Text = "The tool registers SchedulerMonitor-Daily in Windows Task Scheduler. It runs this portable EXE with --run --silent. Register it while signed in with the Windows account that has permission to query the remote servers."
+                   + "\r\n\r\nLong running event IDs mark a task LONG RUNNING while it is running; abnormal event IDs mark it ABNORMAL. "
+                   + "Note that 102 is the normal completion event, so keeping it in the abnormal list marks every finished task abnormal; "
+                   + "remove it to report only failures (101, 103, 203). An empty abnormal list turns the status off."
         };
-        panel.Controls.Add(note, 1, 4); page.Controls.Add(panel); return page;
+        panel.Controls.Add(note, 1, 4);
+        AddField(panel, 5, "", _useEventLog);
+        AddField(panel, 6, "Long running\r\nevent IDs", _eventIds);
+        AddField(panel, 7, "Abnormal\r\nevent IDs", _abnormalIds);
+        AddField(panel, 8, "Event lookback (min)", _eventLookback);
+        AddField(panel, 9, "", _useElapsedLimit);
+        AddField(panel, 10, "Default max run (min)", _defaultLongRunning);
+        AddField(panel, 11, "", _useRepeatInterval);
+        _defaultLongRunning.ValueChanged += (_, _) => SaveMonitoring();
+        _useRepeatInterval.CheckedChanged += (_, _) => SaveMonitoring();
+        _useEventLog.CheckedChanged += (_, _) => SaveMonitoring();
+        _useElapsedLimit.CheckedChanged += (_, _) => SaveMonitoring();
+        _eventIds.Leave += (_, _) => SaveMonitoring();
+        _abnormalIds.Leave += (_, _) => SaveMonitoring();
+        _eventLookback.ValueChanged += (_, _) => SaveMonitoring();
+        page.Controls.Add(panel); return page;
     }
 
     private void LoadServers()
@@ -226,9 +414,13 @@ public sealed class ConfigurationForm : Form
         try
         {
             UseWaitCursor = true; _jobMessage.Text = $"Scanning {server}...";
-            var scanned = (await new RemoteTaskQuery(_logger).ScanAsync(server.Host, _config.Monitoring.TimeoutSeconds)).ToList();
+            var query = new RemoteTaskQuery(_logger);
+            var timeout = _config.Monitoring.TimeoutSeconds;
+            var scanned = (await Task.Run(() => query.ScanAsync(server.Host, timeout))).ToList();
             var saved = _config.MonitoredTasks.Where(task => task.ServerId == server.Id && task.Enabled).ToList();
             _workingSelection = new HashSet<string>(saved.Select(task => task.TaskPath), StringComparer.OrdinalIgnoreCase);
+            _workingLimits = saved.Where(task => task.LongRunningMinutes > 0)
+                .ToDictionary(task => task.TaskPath, task => task.LongRunningMinutes, StringComparer.OrdinalIgnoreCase);
 
             foreach (var missing in saved.Where(savedTask => scanned.All(task => !task.TaskPath.Equals(savedTask.TaskPath, StringComparison.OrdinalIgnoreCase))))
             {
@@ -250,11 +442,13 @@ public sealed class ConfigurationForm : Form
 
     private void ResetTaskView()
     {
-        _scannedTasks = []; _workingSelection.Clear(); _jobGrid.Rows.Clear();
+        _scannedTasks = []; _workingSelection.Clear(); _workingLimits.Clear(); _jobGrid.Rows.Clear();
         if (_jobServer.SelectedItem is ServerConfig server)
         {
-            _workingSelection = new HashSet<string>(_config.MonitoredTasks
-                .Where(task => task.ServerId == server.Id && task.Enabled).Select(task => task.TaskPath), StringComparer.OrdinalIgnoreCase);
+            var saved = _config.MonitoredTasks.Where(task => task.ServerId == server.Id && task.Enabled).ToList();
+            _workingSelection = new HashSet<string>(saved.Select(task => task.TaskPath), StringComparer.OrdinalIgnoreCase);
+            _workingLimits = saved.Where(task => task.LongRunningMinutes > 0)
+                .ToDictionary(task => task.TaskPath, task => task.LongRunningMinutes, StringComparer.OrdinalIgnoreCase);
             _jobMessage.Text = $"{_workingSelection.Count} saved • Click Scan Tasks";
         }
     }
@@ -288,7 +482,7 @@ public sealed class ConfigurationForm : Form
                      && (!_selectedOnly.Checked || _workingSelection.Contains(task.TaskPath))))
         {
             var row = _jobGrid.Rows[_jobGrid.Rows.Add(_workingSelection.Contains(task.TaskPath), task.DisplayName,
-                task.TaskPath, task.WindowsState)];
+                task.TaskPath, task.WindowsState, LimitText(task))];
             row.Tag = task;
             if (task.WindowsState.Equals("Not Found", StringComparison.OrdinalIgnoreCase)) row.DefaultCellStyle.ForeColor = Color.FromArgb(180, 35, 24);
         }
@@ -296,10 +490,45 @@ public sealed class ConfigurationForm : Form
 
     private void JobGridCellValueChanged(object? sender, DataGridViewCellEventArgs eventArgs)
     {
-        if (eventArgs.RowIndex < 0 || eventArgs.ColumnIndex != 0 || _jobGrid.Rows[eventArgs.RowIndex].Tag is not DiscoveredTask task) return;
-        var selected = Convert.ToBoolean(_jobGrid.Rows[eventArgs.RowIndex].Cells[0].Value);
+        if (eventArgs.RowIndex < 0 || _jobGrid.Rows[eventArgs.RowIndex].Tag is not DiscoveredTask task) return;
+        var row = _jobGrid.Rows[eventArgs.RowIndex];
+
+        if (eventArgs.ColumnIndex == 4)
+        {
+            var text = Convert.ToString(row.Cells[4].Value)?.Trim() ?? "";
+            if (text.Length == 0 || (int.TryParse(text, out var minutes) && minutes == 0))
+            {
+                _workingLimits.Remove(task.TaskPath);
+                row.Cells[4].Value = AutomaticLimitText(task);
+            }
+            else if (int.TryParse(text, out minutes) && minutes > 0)
+            {
+                _workingLimits[task.TaskPath] = minutes;
+                row.Cells[4].Value = minutes.ToString();
+            }
+            else
+            {
+                row.Cells[4].Value = LimitText(task);
+            }
+            return;
+        }
+
+        if (eventArgs.ColumnIndex != 0) return;
+        var selected = Convert.ToBoolean(row.Cells[0].Value);
         if (selected) _workingSelection.Add(task.TaskPath); else _workingSelection.Remove(task.TaskPath);
         _jobMessage.Text = $"{_scannedTasks.Count} found • {_workingSelection.Count} selected";
+    }
+
+    /// <summary>Cell text for the per-task runtime budget: an explicit value, or the automatic one.</summary>
+    private string LimitText(DiscoveredTask task) =>
+        _workingLimits.TryGetValue(task.TaskPath, out var minutes) && minutes > 0
+            ? minutes.ToString()
+            : AutomaticLimitText(task);
+
+    private string AutomaticLimitText(DiscoveredTask task)
+    {
+        var resolved = MonitoringService.ResolveThreshold(task, _config.Monitoring, null);
+        return resolved is null ? "-" : $"auto ({(int)Math.Max(1, resolved.Value.TotalMinutes)})";
     }
 
     private void SetAllVisible(bool selected)
@@ -325,7 +554,11 @@ public sealed class ConfigurationForm : Form
         {
             var found = _scannedTasks.FirstOrDefault(task => task.TaskPath.Equals(path, StringComparison.OrdinalIgnoreCase));
             if (found is null) continue;
-            _config.MonitoredTasks.Add(new MonitoredTaskConfig { ServerId = server.Id, TaskPath = path, DisplayName = found.DisplayName, Enabled = true });
+            _config.MonitoredTasks.Add(new MonitoredTaskConfig
+            {
+                ServerId = server.Id, TaskPath = path, DisplayName = found.DisplayName, Enabled = true,
+                LongRunningMinutes = _workingLimits.TryGetValue(path, out var minutes) ? minutes : 0
+            });
         }
         SaveConfig(); MessageBox.Show($"{_workingSelection.Count} task(s) selected for {server}.", Text,
             MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -362,6 +595,47 @@ public sealed class ConfigurationForm : Form
         catch (Exception ex) { MessageBox.Show(ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error); }
         finally { UseWaitCursor = false; }
     }
+
+    private void LoadMonitoring()
+    {
+        _loadingMonitoring = true;
+        _defaultLongRunning.Value = Math.Clamp(_config.Monitoring.LongRunningMinutes, 0, 10080);
+        _useElapsedLimit.Checked = _config.Monitoring.UseElapsedTimeLimit;
+        _useRepeatInterval.Checked = _config.Monitoring.UseRepeatIntervalAsLimit;
+        _useEventLog.Checked = _config.Monitoring.UseEventLog;
+        _eventIds.Text = string.Join(", ", _config.Monitoring.LongRunningEventIds);
+        _abnormalIds.Text = string.Join(", ", _config.Monitoring.AbnormalEventIds);
+        _eventLookback.Value = Math.Clamp(_config.Monitoring.EventLookbackMinutes, 5, 20160);
+        _defaultLongRunning.Enabled = _useRepeatInterval.Enabled = _useElapsedLimit.Checked;
+        _loadingMonitoring = false;
+    }
+
+    private void SaveMonitoring()
+    {
+        if (_loadingMonitoring) return;
+        _config.Monitoring.LongRunningMinutes = (int)_defaultLongRunning.Value;
+        _config.Monitoring.UseElapsedTimeLimit = _useElapsedLimit.Checked;
+        _config.Monitoring.UseRepeatIntervalAsLimit = _useRepeatInterval.Checked;
+        _defaultLongRunning.Enabled = _useRepeatInterval.Enabled = _useElapsedLimit.Checked;
+        _config.Monitoring.UseEventLog = _useEventLog.Checked;
+        _config.Monitoring.EventLookbackMinutes = (int)_eventLookback.Value;
+
+        var ids = ParseEventIds(_eventIds.Text);
+        if (ids.Count > 0) _config.Monitoring.LongRunningEventIds = ids;
+        _eventIds.Text = string.Join(", ", _config.Monitoring.LongRunningEventIds);
+
+        // An empty abnormal list is meaningful: it turns the ABNORMAL status off.
+        _config.Monitoring.AbnormalEventIds = ParseEventIds(_abnormalIds.Text);
+        _abnormalIds.Text = string.Join(", ", _config.Monitoring.AbnormalEventIds);
+
+        SaveConfig();
+        RebuildTaskGrid();
+    }
+
+    private static List<int> ParseEventIds(string text) =>
+        text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries)
+            .Select(value => int.TryParse(value.Trim(), out var id) ? id : 0)
+            .Where(id => id > 0).Distinct().ToList();
 
     private void LoadSchedule()
     {
