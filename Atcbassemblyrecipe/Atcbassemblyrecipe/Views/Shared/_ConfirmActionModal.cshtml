@@ -1,0 +1,34 @@
+@*
+    Type-the-word confirmation used by Trash and Change History. The button that
+    opens it says which form to submit and what word to type:
+
+        data-confirm-form="restoreForm-12"
+        data-confirm-label="Restore ... back into AWACSRECIPEBYWSTYPE?"
+        data-confirm-phrase="RESTORE"
+
+    Driven by wwwroot/js/confirm-action.js.
+*@
+<div class="modal fade" id="confirmActionModal" tabindex="-1" aria-labelledby="confirmActionTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content modern-modal delete-confirm-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="eyebrow">Validation</span>
+                    <h5 class="modal-title" id="confirmActionTitle">Confirm this action</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2" id="confirmActionMessage"></p>
+                <label for="confirmActionPhrase" class="form-label">
+                    Type <strong id="confirmActionPhraseLabel">CONFIRM</strong> to continue
+                </label>
+                <input id="confirmActionPhrase" class="form-control" autocomplete="off" />
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><partial name="_Icon" model="@("cancel")" /> Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmActionButton" disabled><partial name="_Icon" model="@("check")" /> Continue</button>
+            </div>
+        </div>
+    </div>
+</div>
