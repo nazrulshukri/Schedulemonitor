@@ -18,10 +18,6 @@
         <h1>@Model.PageTitle</h1>
         <p>@Model.PageDescription</p>
     </div>
-    @if (canAdd)
-    {
-        <button type="button" class="btn btn-primary" id="showAddRow"><partial name="_Icon" model="@("plus")" /> Add Recipe</button>
-    }
 </div>
 
 <section class="data-panel excel-toolbar-panel">
@@ -45,6 +41,10 @@
     </form>
 
     <div class="excel-actions">
+        @if (canAdd)
+        {
+            <button type="button" class="btn btn-primary" id="showAddRow"><partial name="_Icon" model="@("plus")" /> Add Recipe</button>
+        }
         <button type="button" class="btn btn-outline-secondary" data-template-modal><partial name="_Icon" model="@("template")" /> Template</button>
         <a class="btn btn-outline-secondary" asp-controller="Awacs" asp-action="ExportRecipeRows" asp-route-wsType="@Model.WsType" asp-route-search="@Model.Search" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection"><partial name="_Icon" model="@("export")" /> Export CSV</a>
         @if (canAdd)

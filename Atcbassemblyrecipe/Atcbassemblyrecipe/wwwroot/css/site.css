@@ -3833,26 +3833,9 @@ html[data-theme="dark"] .combo-menu {
 }
 
 .excel-panel {
-    /* Overrides the overflow-y: hidden further up: the vertical scroll is
-       the thing the sticky header sticks to. site.js sets the custom
-       property; the calc() is the pre-script fallback - the sticky topbar,
-       the pagination bar and the bottom gap, roughly. Scroll chaining is
-       deliberately left on, so a wheel that runs off the end of the grid
-       carries on down the page to the pagination bar. */
-    max-height: var(--grid-max-height, calc(100vh - 220px));
-    overflow: auto;
-    /* Sticky offsets are measured from the padding box, so padding here
-       would leave a strip of rows scrolling past above the header. */
+    /* Nothing here scrolls: the whole page does. See the "table is the page"
+       block at the end of this file for why. */
     padding: 0;
-}
-
-.excel-table thead th {
-    /* Collapsed borders do not travel with a sticky cell, so the header's
-       bottom rule is drawn as an inset shadow instead. */
-    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.24);
-    position: sticky;
-    top: 0;
-    z-index: 6;
 }
 
 .app-shell,
@@ -4068,4 +4051,119 @@ body.modal-open .back-to-top:not(.is-inline) {
 
 .auth-body .auth-stage > .auth-display-menu {
     position: absolute;
+}
+
+
+/* ---------------------------------------------------------------------
+   The table is the page (2026-09 pass, part 3)
+
+   Capping .excel-panel's height and scrolling inside it did freeze the
+   header, but it also meant Rows = 50 or 100 only ever showed eight or so
+   of them through a letterbox. The page scrolls now and the panel is just
+   a wrapper, so all 25, 50 or 100 rows are laid out and reachable by
+   scrolling normally, with:
+
+     - the header sticky against the *window* instead, pinned directly
+       under the topbar (site.js measures the topbar; the zoom is divided
+       back out because everything in .app-shell is laid out pre-zoom), and
+     - the pagination bar sticky to the bottom of the window, so the pager
+       and the Top button stay in reach without scrolling to the end.
+
+   The one cost: sticky needs .excel-panel to have visible overflow, and
+   `overflow-x: auto` with `overflow-y: visible` is not a thing in CSS. So
+   below 1200px, where the table can no longer fit the content column, the
+   panel goes back to scrolling sideways and the header stops freezing.
+
+   The heading panel is also trimmed here and its Add button has moved to
+   the toolbar row, which buys the table about 80px of height.
+   --------------------------------------------------------------------- */
+
+.page-heading {
+    margin-bottom: 12px;
+    padding: 12px 18px;
+}
+
+    .page-heading h1 {
+        font-size: clamp(1.25rem, 1.3vw, 1.5rem);
+    }
+
+    .page-heading p {
+        font-size: 0.86rem;
+        margin: 2px 0 0;
+    }
+
+    .page-heading .eyebrow {
+        font-size: 0.68rem;
+        margin-bottom: 0;
+    }
+
+.excel-toolbar-panel {
+    margin-bottom: 12px;
+    padding: 12px 14px;
+}
+
+.app-main {
+    padding-top: 16px;
+}
+
+.app-breadcrumb {
+    margin-bottom: 10px;
+}
+
+/* The table draws its own border, so the wrapper stops being a panel: with
+   visible overflow it could not clip its rounded corners anyway.
+
+   Matched on all three classes because the overflow rule further up reads
+   `.data-panel.table-responsive, .excel-panel { ... }` - the element matches
+   the two-class half of that list, which outranks a bare `.excel-panel` here
+   however far down the file it sits. */
+.data-panel.table-responsive.excel-panel {
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+}
+
+    .excel-panel::before {
+        display: none;
+    }
+
+.excel-table thead th {
+    /* Collapsed borders do not travel with a sticky cell, so the header's
+       bottom rule is drawn as an inset shadow instead. */
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.24);
+    position: sticky;
+    top: calc(var(--topbar-height, 108px) / var(--app-zoom, 1));
+    /* Under the topbar's own z-index of 20, over the rows and the resizers. */
+    z-index: 6;
+}
+
+.pagination-bar {
+    /* Sticky over the rows now, so it needs an opaque backing - the themed
+       --surface-soft it had is translucent and the table read straight
+       through it - and a lip so it reads as sitting above them. */
+    background: var(--surface);
+    border-radius: 8px;
+    bottom: 0;
+    box-shadow: 0 -6px 16px rgba(16, 24, 40, 0.08);
+    position: sticky;
+    z-index: 5;
+}
+
+html[data-theme="dark"] .pagination-bar {
+    box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.34);
+}
+
+/* Narrow content column: the table cannot fit, so it scrolls sideways again
+   and the header goes back to scrolling with it. */
+@media (max-width: 1200px) {
+    .data-panel.table-responsive.excel-panel {
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+
+    .excel-table thead th {
+        position: static;
+    }
 }

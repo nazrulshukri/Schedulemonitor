@@ -64,10 +64,11 @@
         const cancelAddRow = document.getElementById('cancelAddRow');
         const focusFirst = () => addRow?.querySelector(focusSelector)?.focus();
 
-        // The add row is the first row of the table and the table scrolls inside
-        // its own panel, so with the grid scrolled down the row would open out
-        // of sight and the button would look like it had done nothing.
-        const revealAddRow = () => addRow?.closest('.excel-panel')?.scrollTo({ top: 0, behavior: 'smooth' });
+        // The add row is the first row of the table, so from anywhere down a
+        // long page it opens out of sight and the button looks like it did
+        // nothing. Centring it clears the sticky header and the sticky
+        // pagination bar without either being measured here.
+        const revealAddRow = () => addRow?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
         showAddRow?.addEventListener('click', () => {
             addRow?.classList.remove('d-none');

@@ -17,10 +17,6 @@
         <h1>AWACSWSTYPE</h1>
         <p>SAWING workstation type records with validation controls.</p>
     </div>
-    @if (canAdd)
-    {
-        <button type="button" class="btn btn-primary" id="showAddRow"><partial name="_Icon" model="@("plus")" /> Add Row</button>
-    }
 </div>
 
 <section class="data-panel excel-toolbar-panel">
@@ -44,6 +40,10 @@
     </form>
 
     <div class="excel-actions">
+        @if (canAdd)
+        {
+            <button type="button" class="btn btn-primary" id="showAddRow"><partial name="_Icon" model="@("plus")" /> Add Row</button>
+        }
         <button type="button" class="btn btn-outline-secondary" data-template-modal><partial name="_Icon" model="@("template")" /> Template</button>
         <a class="btn btn-outline-secondary" asp-controller="Home" asp-action="ExportAwacsWstype" asp-route-search="@Model.Search" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection"><partial name="_Icon" model="@("export")" /> Export CSV</a>
         @if (canAdd)

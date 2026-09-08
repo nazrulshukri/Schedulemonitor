@@ -91,28 +91,15 @@
             <strong>@ui[SettingModules.Layout, "BrandText"]</strong>
         </a>
         <div class="topbar-actions">
-            <div class="display-controls">
-                <button type="button" id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">
-                    <span class="theme-toggle-track">
-                        <span class="theme-toggle-knob"></span>
-                    </span>
-                    <span class="theme-icon" aria-hidden="true"></span>
-                </button>
-                <div class="zoom-control topbar-zoom" role="group" aria-label="Page zoom controls">
-                    <button type="button" class="zoom-button" data-zoom-out aria-label="Zoom out" title="Zoom out">-</button>
-                    <output class="zoom-value" data-zoom-value>100%</output>
-                    <button type="button" class="zoom-button" data-zoom-in aria-label="Zoom in" title="Zoom in">+</button>
-                    <button type="button" class="zoom-button zoom-reset" data-zoom-reset aria-label="Reset zoom" title="Reset zoom">100</button>
-                </div>
-            </div>
             @if (User.Identity?.IsAuthenticated == true)
             {
                 @* The chip opens a menu rather than just naming the signed-in
-                   user: the table sizing controls used to sit in every grid's
-                   own toolbar, where they crowded out Search and the CSV
-                   buttons. They are rendered once here instead, and only on
-                   the pages that carry a resizable grid - excel-grid.js finds
-                   them by id wherever they are in the page. *@
+                   user. Every display control lives in it: dark mode and page
+                   zoom, which used to take up a third of the topbar, and the
+                   table sizing controls, which used to sit in every grid's own
+                   toolbar and crowd out Search and the CSV buttons. theme.js,
+                   site.js and excel-grid.js all bind by id or selector, so the
+                   markup works wherever it is rendered. *@
                 <div class="dropdown user-menu">
                     <button type="button" class="user-chip" id="userMenuToggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-label="Account and display options">
                         @if (headerAvatarUrl is not null)
@@ -144,6 +131,25 @@
                                 <strong>@headerDisplayName</strong>
                                 <small>@headerUserId &middot; @userRoleName</small>
                             </span>
+                        </div>
+
+                        <div class="user-menu-section">
+                            <span class="user-menu-label">Mode</span>
+                            <button type="button" id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">
+                                <span class="theme-toggle-track">
+                                    <span class="theme-toggle-knob"></span>
+                                </span>
+                                <span class="theme-icon" aria-hidden="true"></span>
+                            </button>
+                        </div>
+                        <div class="user-menu-section">
+                            <span class="user-menu-label">Zoom</span>
+                            <div class="zoom-control topbar-zoom" role="group" aria-label="Page zoom controls">
+                                <button type="button" class="zoom-button" data-zoom-out aria-label="Zoom out" title="Zoom out">-</button>
+                                <output class="zoom-value" data-zoom-value>100%</output>
+                                <button type="button" class="zoom-button" data-zoom-in aria-label="Zoom in" title="Zoom in">+</button>
+                                <button type="button" class="zoom-button zoom-reset" data-zoom-reset aria-label="Reset zoom" title="Reset zoom">100</button>
+                            </div>
                         </div>
 
                         @if (hasGridControls)

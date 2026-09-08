@@ -33,37 +33,16 @@
     return Number.isFinite(stored) ? clampZoom(stored) : 1;
   };
 
-  // The spreadsheet grids scroll inside their own panel so the sticky header
-  // has something to stick to (see the frozen-header block in site.css). The
-  // height that makes that work is "whatever is left of the window below the
-  // panel", which only JavaScript can measure.
-  const gridPanels = Array.from(document.querySelectorAll(".excel-panel"));
-
-  const sizeGridPanels = () => {
-    if (!gridPanels.length) {
-      return;
-    }
-
-    const zoom = readZoom();
-
-    // The panel is measured against the topbar rather than against its own
-    // position on the page. Sizing it to "what is left below me" would leave
-    // a five-row window once the heading and the toolbar have had their share
-    // of a laptop screen; this way the page scrolls the heading away first and
-    // the panel then fills the window, its header pinned clear of the topbar.
+  // The grid header is sticky against the window, pinned under the topbar,
+  // so the CSS needs the topbar's real height - it is 108px at desktop
+  // widths but collapses to its content below 780px. The topbar is outside
+  // .app-shell and so outside the zoom, which is why this is written raw and
+  // the stylesheet divides the zoom back out.
+  const measureTopbar = () => {
     const topbar = document.querySelector(".topbar");
-    const topbarHeight = topbar ? topbar.getBoundingClientRect().height : 108;
-
-    gridPanels.forEach((panel) => {
-      const pagination = panel.parentElement?.querySelector(".pagination-bar");
-      const reserved = topbarHeight + (pagination?.getBoundingClientRect().height ?? 0) + 42;
-      // getBoundingClientRect and innerHeight are on-screen pixels while the
-      // panel lays itself out inside the zoomed shell, so the zoom has to come
-      // back out before this is written as a CSS length.
-      const available = (window.innerHeight - reserved) / zoom;
-
-      panel.style.setProperty("--grid-max-height", `${Math.max(260, Math.round(available))}px`);
-    });
+    if (topbar) {
+      document.documentElement.style.setProperty("--topbar-height", `${Math.round(topbar.getBoundingClientRect().height)}px`);
+    }
   };
 
   const zoomOutButtons = document.querySelectorAll("[data-zoom-out]");
@@ -80,9 +59,7 @@
         zoomValue.value = `${Math.round(nextZoom * 100)}%`;
         zoomValue.textContent = zoomValue.value;
       });
-      // The grid height is measured against the window, so it is stale the
-      // moment the zoom changes.
-      sizeGridPanels();
+      measureTopbar();
     };
 
     applyZoom(readZoom());
@@ -92,19 +69,17 @@
     zoomResetButtons.forEach((button) => button.addEventListener("click", () => applyZoom(1)));
   }
 
-  if (gridPanels.length) {
-    sizeGridPanels();
+  measureTopbar();
 
-    let resizeFrame = 0;
-    window.addEventListener("resize", () => {
-      window.cancelAnimationFrame(resizeFrame);
-      resizeFrame = window.requestAnimationFrame(sizeGridPanels);
-    });
+  let resizeFrame = 0;
+  window.addEventListener("resize", () => {
+    window.cancelAnimationFrame(resizeFrame);
+    resizeFrame = window.requestAnimationFrame(measureTopbar);
+  });
 
-    // Re-measured once everything above the panel has settled: the logo and
-    // the web fonts both land after this script runs.
-    window.addEventListener("load", sizeGridPanels);
-  }
+  // Re-measured once the logo and the web fonts have landed, both of which
+  // arrive after this script runs and can change the topbar's height.
+  window.addEventListener("load", measureTopbar);
 
   const backToTop = document.getElementById("backToTop");
 
@@ -121,10 +96,7 @@
       backToTop.classList.add("is-inline", "is-visible");
     }
 
-    // Two things can be scrolled on a grid page: the window, and the grid
-    // panel itself. The button watches and rewinds both.
-    const scrolledAway = () =>
-      window.scrollY > 200 || gridPanels.some((panel) => panel.scrollTop > 200);
+    const scrolledAway = () => window.scrollY > 200;
 
     const syncBackToTop = () => {
       if (backToTop.classList.contains("is-inline")) {
@@ -135,12 +107,12 @@
     };
 
     window.addEventListener("scroll", syncBackToTop, { passive: true });
-    gridPanels.forEach((panel) => panel.addEventListener("scroll", syncBackToTop, { passive: true }));
 
     backToTop.addEventListener("click", () => {
-      const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-      gridPanels.forEach((panel) => panel.scrollTo({ top: 0, behavior }));
-      window.scrollTo({ top: 0, behavior });
+      window.scrollTo({
+        top: 0,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"
+      });
     });
 
     syncBackToTop();
