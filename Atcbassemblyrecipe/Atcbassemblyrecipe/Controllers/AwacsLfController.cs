@@ -1,11 +1,11 @@
 using Atcbassemblyrecipe.Authorization;
 using Atcbassemblyrecipe.Data;
+using Atcbassemblyrecipe.Infrastructure;
 using Atcbassemblyrecipe.Models;
 using Atcbassemblyrecipe.Services;
 using Atcbassemblyrecipe.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.VisualBasic.FileIO;
 using Oracle.ManagedDataAccess.Client;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
@@ -24,6 +24,18 @@ namespace Atcbassemblyrecipe.Controllers
         {
             _awacsLfService = awacsLfService;
         }
+
+        // The CSV columns this grid understands, in the order the downloaded
+        // template writes them - which is also the order a file with no header
+        // row is read in.
+        private static readonly CsvColumn[] AwacsLfCsvColumns =
+        [
+            new CsvColumn("LF12NC", true, "LF 12NC", "LEADFRAME12NC", "LEADFRAME 12NC", "LEADFRAME", "12NC"),
+            new CsvColumn("LFSIZE", true, "LF SIZE", "LEADFRAME SIZE"),
+            new CsvColumn("DEFAULTWOQTY", false, "DEFAULT WO QTY", "DEFAULT QTY", "WOQTY"),
+            new CsvColumn("PACKAGE", false, "PKG", "PACKAGE NAME"),
+            new CsvColumn("DEVICE", false, "DEVICE NAME", "PRODUCT")
+        ];
 
         [ModuleAccess(ModuleNames.AwacsLf, ModuleAction.View)]
         public async Task<IActionResult> Index(string? search, int page = 1, int pageSize = 25, string? sortBy = "lastupdate", string? sortDirection = "desc", bool promptAdd = false)
@@ -105,88 +117,69 @@ namespace Atcbassemblyrecipe.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            if (!string.Equals(Path.GetExtension(csvFile.FileName), ".csv", StringComparison.OrdinalIgnoreCase))
+            if (!CsvImportReader.IsSupportedFileName(csvFile.FileName))
             {
                 TempData["PopupType"] = "danger";
-                TempData["PopupMessage"] = "Upload a real .csv file only. If Excel changed it to .xlsx, use Save As > CSV (Comma delimited) before uploading.";
+                TempData["PopupMessage"] = "Upload a text file only (.csv, .txt or .tsv). If Excel changed it to .xlsx, use Save As > CSV (Comma delimited) before uploading.";
                 return RedirectToAction(nameof(Index));
             }
 
-            var lineNumber = 1;
+            CsvImportResult read;
+            using (var stream = csvFile.OpenReadStream())
+            {
+                read = CsvImportReader.Read(stream, AwacsLfCsvColumns);
+            }
+
+            if (!read.Success)
+            {
+                TempData["PopupType"] = "danger";
+                TempData["PopupMessage"] = $"CSV import cancelled. Inserted: 0. {read.Error}";
+                return RedirectToAction(nameof(Index));
+            }
+
             var importErrors = new List<string>();
             var pendingRows = new List<AwacsLfInputModel>();
 
-            try
+            foreach (var row in read.Rows)
             {
-                using var stream = csvFile.OpenReadStream();
-                using var parser = new TextFieldParser(stream);
-                parser.TextFieldType = FieldType.Delimited;
-                parser.HasFieldsEnclosedInQuotes = true;
-                parser.TrimWhiteSpace = true;
-                // LFSIZE itself contains a comma, so a quoted "20,5" has to survive
-                // the split - HasFieldsEnclosedInQuotes above is what does that.
-                parser.SetDelimiters(",", "\t", ";");
-
-                if (!parser.EndOfData)
+                var lf12Nc = row["LF12NC"];
+                if (CsvImportReader.LooksLikeExcelScientificNumber(lf12Nc))
                 {
-                    var headers = parser.ReadFields() ?? [];
-                    var fieldMap = BuildCsvFieldMap(headers);
-                    var missingHeaders = MissingCsvHeaders(fieldMap, "LF12NC", "LFSIZE");
-                    if (missingHeaders.Count > 0)
-                    {
-                        TempData["PopupType"] = "danger";
-                        TempData["PopupMessage"] = $"CSV import cancelled. Inserted: 0. Missing required header(s): {string.Join(", ", missingHeaders)}.";
-                        return RedirectToAction(nameof(Index));
-                    }
-
-                    while (!parser.EndOfData)
-                    {
-                        lineNumber++;
-                        var fields = parser.ReadFields() ?? [];
-                        if (fields.Length == 0 || fields.All(string.IsNullOrWhiteSpace))
-                        {
-                            continue;
-                        }
-
-                        var quantityText = GetCsvField(fields, fieldMap, "DEFAULTWOQTY");
-                        decimal? quantity = null;
-                        if (!string.IsNullOrWhiteSpace(quantityText))
-                        {
-                            if (!decimal.TryParse(quantityText, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
-                            {
-                                importErrors.Add($"Line {lineNumber}: DEFAULTWOQTY '{quantityText}' is not a number.");
-                                continue;
-                            }
-
-                            quantity = parsed;
-                        }
-
-                        var model = new AwacsLfInputModel
-                        {
-                            Lf12Nc = GetCsvField(fields, fieldMap, "LF12NC"),
-                            LfSize = GetCsvField(fields, fieldMap, "LFSIZE"),
-                            DefaultWoQty = quantity,
-                            Package = GetCsvField(fields, fieldMap, "PACKAGE"),
-                            Device = GetCsvField(fields, fieldMap, "DEVICE"),
-                            Confirmed = true
-                        };
-
-                        var validationResults = new List<ValidationResult>();
-                        if (!Validator.TryValidateObject(model, new ValidationContext(model), validationResults, true))
-                        {
-                            importErrors.Add($"Line {lineNumber}: {string.Join("; ", validationResults.Select(result => result.ErrorMessage))}");
-                            continue;
-                        }
-
-                        pendingRows.Add(model);
-                    }
+                    importErrors.Add($"Line {row.LineNumber}: LF12NC reads '{lf12Nc}'. Excel rounded the 12NC away - format that column as Text and save the file again.");
+                    continue;
                 }
-            }
-            catch (MalformedLineException)
-            {
-                TempData["PopupType"] = "danger";
-                TempData["PopupMessage"] = $"CSV import cancelled. Inserted: 0. Line {lineNumber} is not valid CSV. No rows were uploaded.";
-                return RedirectToAction(nameof(Index));
+
+                var quantityText = row["DEFAULTWOQTY"];
+                decimal? quantity = null;
+                if (!string.IsNullOrWhiteSpace(quantityText))
+                {
+                    if (!decimal.TryParse(quantityText, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
+                    {
+                        importErrors.Add($"Line {row.LineNumber}: DEFAULTWOQTY '{quantityText}' is not a number.");
+                        continue;
+                    }
+
+                    quantity = parsed;
+                }
+
+                var model = new AwacsLfInputModel
+                {
+                    Lf12Nc = lf12Nc,
+                    LfSize = row["LFSIZE"],
+                    DefaultWoQty = quantity,
+                    Package = row["PACKAGE"],
+                    Device = row["DEVICE"],
+                    Confirmed = true
+                };
+
+                var validationResults = new List<ValidationResult>();
+                if (!Validator.TryValidateObject(model, new ValidationContext(model), validationResults, true))
+                {
+                    importErrors.Add($"Line {row.LineNumber}: {string.Join("; ", validationResults.Select(result => result.ErrorMessage))}");
+                    continue;
+                }
+
+                pendingRows.Add(model);
             }
 
             if (importErrors.Count > 0)
@@ -207,7 +200,9 @@ namespace Atcbassemblyrecipe.Controllers
             {
                 var result = await _awacsLfService.CreateManyAsync(pendingRows, User.Identity?.Name ?? "unknown");
                 TempData["PopupType"] = result.Success ? "success" : "danger";
-                TempData["PopupMessage"] = result.Success ? result.Message : $"{result.Message} Inserted: 0.";
+                TempData["PopupMessage"] = result.Success
+                    ? $"{result.Message}{HeaderlessNote(read)}"
+                    : $"{result.Message} Inserted: 0.";
             }
             catch (Exception ex) when (ex is OracleException or InvalidOperationException)
             {
@@ -308,6 +303,15 @@ namespace Atcbassemblyrecipe.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        // A file with no header row was mapped by column position. Say so, because
+        // it is the one thing about the import the popup would otherwise hide.
+        private static string HeaderlessNote(CsvImportResult read)
+        {
+            return read.HadHeaderRow
+                ? string.Empty
+                : " The file had no header row, so the columns were read in template order.";
+        }
+
         private static string NormalizeSortDirection(string? sortDirection)
         {
             return string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
@@ -321,40 +325,6 @@ namespace Atcbassemblyrecipe.Controllers
             }
 
             return value;
-        }
-
-        private static Dictionary<string, int> BuildCsvFieldMap(string[] headers)
-        {
-            var fieldMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            for (var index = 0; index < headers.Length; index++)
-            {
-                var key = NormalizeCsvHeader(headers[index]);
-                if (!string.IsNullOrWhiteSpace(key) && !fieldMap.ContainsKey(key))
-                {
-                    fieldMap[key] = index;
-                }
-            }
-
-            return fieldMap;
-        }
-
-        private static List<string> MissingCsvHeaders(IReadOnlyDictionary<string, int> fieldMap, params string[] requiredHeaders)
-        {
-            return requiredHeaders
-                .Where(header => !fieldMap.ContainsKey(NormalizeCsvHeader(header)))
-                .ToList();
-        }
-
-        private static string GetCsvField(string[] fields, IReadOnlyDictionary<string, int> fieldMap, string key)
-        {
-            return fieldMap.TryGetValue(NormalizeCsvHeader(key), out var index) && index >= 0 && index < fields.Length
-                ? fields[index]?.Trim() ?? string.Empty
-                : string.Empty;
-        }
-
-        private static string NormalizeCsvHeader(string header)
-        {
-            return new string(header.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant();
         }
 
         private string BuildModelStateMessage()

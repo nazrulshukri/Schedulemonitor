@@ -50,7 +50,7 @@
         {
             <form asp-controller="Home" asp-action="ImportAwacsWstype" method="post" enctype="multipart/form-data" class="csv-import-form">
                 <label class="btn btn-outline-secondary mb-0" for="csvFile"><partial name="_Icon" model="@("import")" /> Import CSV</label>
-                <input id="csvFile" name="csvFile" type="file" accept=".csv" />
+                <input id="csvFile" name="csvFile" type="file" accept=".csv,.txt,.tsv" />
                 <button type="submit" class="btn btn-primary"><partial name="_Icon" model="@("upload")" /> Upload</button>
                 <span class="csv-file-error" data-csv-file-error aria-live="polite"></span>
             </form>
@@ -269,7 +269,7 @@
             <div class="modal-body">
                 <ol class="template-steps">
                     <li>Download the template below.</li>
-                    <li>Key in the values under the same headers exactly as shown.</li>
+                    <li>Key in the values under the same headers - or delete the header row and key in the values only, in the same left-to-right order.</li>
                     <li>In Excel, use Save As and choose CSV (Comma delimited) (*.csv).</li>
                 </ol>
 
@@ -292,6 +292,8 @@
 
                 <div class="template-note">
                     Required columns: WSID, WSTYPE. WSTYPE must be SAWING.
+                    The header row itself is optional: a file that starts straight at the values is read
+                    in the column order above.
                 </div>
             </div>
             <div class="modal-footer">

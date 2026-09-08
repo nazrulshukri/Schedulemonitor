@@ -34,13 +34,17 @@
             }
 
             const fileError = document.querySelector('[data-csv-file-error]');
-            if (!file.name.toLowerCase().endsWith('.csv')) {
+            // Matches CsvImportReader.IsSupportedFileName on the server: Excel
+            // writes .txt for tab-delimited saves and .tsv on some locales.
+            const allowedExtensions = ['.csv', '.txt', '.tsv'];
+            const name = file.name.toLowerCase();
+            if (!allowedExtensions.some((extension) => name.endsWith(extension))) {
                 csvFile.value = '';
                 if (label) {
                     label.textContent = 'Import CSV';
                 }
                 if (fileError) {
-                    fileError.textContent = 'Only .csv files can be uploaded.';
+                    fileError.textContent = 'Only .csv, .txt or .tsv files can be uploaded.';
                 }
                 return;
             }

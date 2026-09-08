@@ -238,6 +238,13 @@
         </main>
     </div>
 
+    @* Outside .app-shell on purpose: the shell carries the page zoom, and a
+       fixed element inside a zoomed box is scaled and shifted with it. *@
+    <button type="button" id="backToTop" class="back-to-top" aria-label="Back to top" title="Back to top">
+        <span class="back-to-top-arrow" aria-hidden="true"></span>
+        <span class="back-to-top-text">Top</span>
+    </button>
+
     @if (TempData["PopupMessage"] is string popupMessage)
     {
         var popupType = TempData["PopupType"] as string ?? "info";

@@ -51,7 +51,7 @@
         {
             <form asp-controller="AwacsLf" asp-action="Import" method="post" enctype="multipart/form-data" class="csv-import-form">
                 <label class="btn btn-outline-secondary mb-0" for="awacsLfCsvFile"><partial name="_Icon" model="@("import")" /> Import CSV</label>
-                <input id="awacsLfCsvFile" name="csvFile" type="file" accept=".csv" />
+                <input id="awacsLfCsvFile" name="csvFile" type="file" accept=".csv,.txt,.tsv" />
                 <button type="submit" class="btn btn-primary"><partial name="_Icon" model="@("upload")" /> Upload</button>
                 <span class="csv-file-error" data-csv-file-error aria-live="polite"></span>
             </form>
@@ -300,7 +300,7 @@
             <div class="modal-body">
                 <ol class="template-steps">
                     <li>Download the template below.</li>
-                    <li>Key in the values under the same headers exactly as shown.</li>
+                    <li>Key in the values under the same headers - or delete the header row and key in the values only, in the same left-to-right order.</li>
                     <li>Keep LFSIZE inside quotes - <code>"20,5"</code> - so Excel does not split it into two columns.</li>
                     <li>In Excel, use Save As and choose CSV (Comma delimited) (*.csv).</li>
                 </ol>
@@ -333,6 +333,9 @@
 
                 <div class="template-note">
                     Required columns: LF12NC, LFSIZE. LFSIZE must be two numbers separated by a comma.
+                    The header row itself is optional: a file that starts straight at the values is read
+                    in the column order above. Format LF12NC as Text in Excel, otherwise it is saved as
+                    9.3E+11 and the upload is rejected.
                 </div>
             </div>
             <div class="modal-footer">

@@ -3753,3 +3753,192 @@ html[data-theme="dark"] .combo-menu {
         display: none;
     }
 }
+
+
+/* ---------------------------------------------------------------------
+   Grid toolbar, frozen header, working zoom and back-to-top (2026-09 pass)
+
+   1. .excel-toolbar-panel and .excel-search were CSS grids with fixed
+      tracks - minmax(0, 1fr) auto, and minmax(260px, 1fr) 150px auto auto.
+      The search form's own minimum width is wider than the 1fr track it
+      sits in, so the form overflowed its own grid cell and painted Search
+      and Clear straight on top of Template / Export / Import / Upload.
+      Both are plain flex rows now: each control carries its own
+      flex-basis and the row wraps instead of overlapping, at any window
+      width and any zoom level, with no breakpoint left to keep in sync.
+      (The grid-template-columns declarations in the media queries above
+      are inert once the containers are flex, so they are left alone.)
+
+   2. .excel-panel was overflow-x: auto with overflow-y: hidden, which
+      still makes it a scroll container - one that never scrolls
+      vertically. So the `position: sticky; top: 0` already carried by
+      .table thead th had nothing to stick to and the header scrolled out
+      of sight with the rows. The panel scrolls on both axes here, with a
+      height measured in site.js that ends just above the pagination bar,
+      which is what freezes the header.
+
+   3. The zoom control in the topbar wrote --app-zoom, but the one rule
+      that consumed it was commented out, so the buttons did nothing at
+      all. It is applied to the shell here. Heights that are measured
+      against the window - .app-shell's min-height and the grid height in
+      site.js - divide it back out, because everything inside the shell
+      is laid out in pre-zoom pixels.
+   --------------------------------------------------------------------- */
+
+.excel-toolbar-panel {
+    align-items: flex-end;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 18px;
+    justify-content: space-between;
+}
+
+.excel-search {
+    align-items: flex-end;
+    display: flex;
+    flex: 1 1 460px;
+    flex-wrap: wrap;
+    gap: 10px;
+    min-width: 0;
+}
+
+    .excel-search > div {
+        min-width: 0;
+    }
+
+    /* The search box absorbs the slack; Rows keeps its own narrow width. */
+    .excel-search > div:first-of-type {
+        flex: 1 1 240px;
+    }
+
+    .excel-search > div + div {
+        flex: 0 1 120px;
+    }
+
+    .excel-search > .btn {
+        flex: 0 0 auto;
+    }
+
+.excel-actions {
+    flex: 0 1 auto;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+/* The divider only reads as a divider while the controls share a line. */
+.table-view-controls {
+    border-left: 0;
+    margin-left: 0;
+    padding-left: 0;
+}
+
+.excel-panel {
+    /* Overrides the overflow-y: hidden further up: the vertical scroll is
+       the thing the sticky header sticks to. site.js sets the custom
+       property; the calc() is the pre-script fallback - the sticky topbar,
+       the pagination bar and the bottom gap, roughly. Scroll chaining is
+       deliberately left on, so a wheel that runs off the end of the grid
+       carries on down the page to the pagination bar. */
+    max-height: var(--grid-max-height, calc(100vh - 220px));
+    overflow: auto;
+    /* Sticky offsets are measured from the padding box, so padding here
+       would leave a strip of rows scrolling past above the header. */
+    padding: 0;
+}
+
+.excel-table thead th {
+    /* Collapsed borders do not travel with a sticky cell, so the header's
+       bottom rule is drawn as an inset shadow instead. */
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.24);
+    position: sticky;
+    top: 0;
+    z-index: 6;
+}
+
+.app-shell,
+.auth-frame {
+    zoom: var(--app-zoom, 1);
+}
+
+.app-shell {
+    min-height: calc((100vh - 108px) / var(--app-zoom, 1));
+}
+
+/* ---------------------------------------------------------------------
+   Back to top. Rendered once in _Layout.cshtml, outside .app-shell so the
+   zoom above never moves it, and shown by site.js once the window or a
+   grid panel has been scrolled.
+   --------------------------------------------------------------------- */
+.back-to-top {
+    align-items: center;
+    background: var(--nxp-orange);
+    border: 1px solid rgba(255, 255, 255, 0.38);
+    border-radius: 999px;
+    bottom: 26px;
+    box-shadow: 0 14px 30px rgba(255, 79, 38, 0.32);
+    color: #fff;
+    display: inline-flex;
+    font-size: 0.74rem;
+    font-weight: 900;
+    gap: 7px;
+    height: 44px;
+    justify-content: center;
+    letter-spacing: 0.06rem;
+    opacity: 0;
+    padding: 0 17px;
+    pointer-events: none;
+    position: fixed;
+    right: 26px;
+    text-transform: uppercase;
+    transform: translateY(12px);
+    transition: opacity 180ms ease, transform 180ms ease, background 160ms ease;
+    z-index: 25;
+}
+
+    .back-to-top:hover {
+        background: var(--nxp-orange-dark);
+        color: #fff;
+    }
+
+    .back-to-top.is-visible {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+    }
+
+    .back-to-top .back-to-top-arrow {
+        border-bottom: 7px solid #fff;
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        height: 0;
+        width: 0;
+    }
+
+/* The button floats over the bottom-right corner, which is exactly where the
+   Next page link ends up once the page is scrolled to the bottom. */
+.pagination-bar {
+    padding-right: 92px;
+}
+
+/* A modal owns the screen while it is open. */
+body.modal-open .back-to-top {
+    opacity: 0;
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .back-to-top {
+        transition: none;
+    }
+}
+
+@media (max-width: 780px) {
+    .back-to-top {
+        bottom: 18px;
+        right: 18px;
+    }
+
+    .back-to-top .back-to-top-text {
+        display: none;
+    }
+}

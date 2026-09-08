@@ -1,11 +1,11 @@
 using Atcbassemblyrecipe.Authorization;
 using Atcbassemblyrecipe.Models;
 using Atcbassemblyrecipe.Data;
+using Atcbassemblyrecipe.Infrastructure;
 using Atcbassemblyrecipe.Services;
 using Atcbassemblyrecipe.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.VisualBasic.FileIO;
 using Oracle.ManagedDataAccess.Client;
 using System.ComponentModel.DataAnnotations;
 using System.Text;
@@ -40,6 +40,21 @@ namespace Atcbassemblyrecipe.Controllers
             _configuration = configuration;
             _appSettings = appSettings;
         }
+
+        // The CSV columns this grid understands, in the order the downloaded
+        // template writes them - which is also the order a file with no header
+        // row is read in.
+        private static readonly CsvColumn[] RecipeCsvColumns =
+        [
+            new CsvColumn("WSTYPE", false, "WS TYPE", "WORKSTATION TYPE"),
+            new CsvColumn("PACKAGE", false, "PKG", "PACKAGE NAME"),
+            new CsvColumn("PRODUCT", true, "PRODUCT NAME", "PRODUCT ID"),
+            new CsvColumn("LEADFRAME12NC", true, "LEADFRAME 12NC", "LF12NC", "LF 12NC", "LEADFRAME", "12NC"),
+            new CsvColumn("RECIPE", true, "RECIPE NAME"),
+            // Accepted in a header row, but not a template column: a file with no
+            // header row is the five columns above and nothing else.
+            new CsvColumn("CEPTDESCRIPTION", false, "CEPT DESCRIPTION") { InTemplate = false }
+        ];
 
         [ModuleAccess(ModuleNames.AwacsWstype, ModuleAction.Add)]
         public IActionResult Create()
@@ -152,86 +167,67 @@ namespace Atcbassemblyrecipe.Controllers
                 return RedirectToGrid(normalized);
             }
 
-            var extension = Path.GetExtension(csvFile.FileName);
-            if (!string.Equals(extension, ".csv", StringComparison.OrdinalIgnoreCase))
+            if (!CsvImportReader.IsSupportedFileName(csvFile.FileName))
             {
                 TempData["PopupType"] = "danger";
-                TempData["PopupMessage"] = "Upload a real .csv file only. If Excel changed it to .xlsx, use Save As > CSV (Comma delimited) before uploading.";
+                TempData["PopupMessage"] = "Upload a text file only (.csv, .txt or .tsv). If Excel changed it to .xlsx, use Save As > CSV (Comma delimited) before uploading.";
                 return RedirectToGrid(normalized);
             }
 
-            var lineNumber = 1;
+            CsvImportResult read;
+            using (var stream = csvFile.OpenReadStream())
+            {
+                read = CsvImportReader.Read(stream, RecipeCsvColumns);
+            }
+
+            if (!read.Success)
+            {
+                TempData["PopupType"] = "danger";
+                TempData["PopupMessage"] = $"CSV import cancelled. Inserted: 0. {read.Error}";
+                return RedirectToGrid(normalized);
+            }
+
             var importErrors = new List<string>();
             var pendingRows = new List<RecipeRowInputModel>();
 
-            try
+            foreach (var row in read.Rows)
             {
-                using var stream = csvFile.OpenReadStream();
-                using var parser = new TextFieldParser(stream);
-                parser.TextFieldType = FieldType.Delimited;
-                parser.HasFieldsEnclosedInQuotes = true;
-                parser.TrimWhiteSpace = true;
-                parser.SetDelimiters(",", "\t", ";");
+                var product = row["PRODUCT"];
+                var ceptDescription = row["CEPTDESCRIPTION"];
 
-                if (!parser.EndOfData)
+                if (string.IsNullOrWhiteSpace(product) && !string.IsNullOrWhiteSpace(ceptDescription))
                 {
-                    var headers = parser.ReadFields() ?? [];
-                    var fieldMap = BuildCsvFieldMap(headers);
-                    var missingHeaders = MissingCsvHeaders(fieldMap, "PRODUCT", "LEADFRAME12NC", "RECIPE");
-                    if (missingHeaders.Count > 0)
-                    {
-                        TempData["PopupType"] = "danger";
-                        TempData["PopupMessage"] = $"CSV import cancelled. Inserted: 0. Missing required header(s): {string.Join(", ", missingHeaders)}.";
-                        return RedirectToGrid(normalized);
-                    }
-
-                    while (!parser.EndOfData)
-                    {
-                        lineNumber++;
-                        var fields = parser.ReadFields() ?? [];
-                        if (fields.Length == 0 || fields.All(string.IsNullOrWhiteSpace))
-                        {
-                            continue;
-                        }
-
-                        var product = GetCsvField(fields, fieldMap, "PRODUCT", -1);
-                        var recipe = GetCsvField(fields, fieldMap, "RECIPE", -1);
-                        var ceptDescription = GetCsvField(fields, fieldMap, "CEPTDESCRIPTION", -1);
-
-                        if (string.IsNullOrWhiteSpace(product) && !string.IsNullOrWhiteSpace(ceptDescription))
-                        {
-                            product = SawingRecipeInputModel.ExtractProduct(ceptDescription);
-                        }
-
-                        var model = new RecipeRowInputModel
-                        {
-                            // A file exported from one grid must never land in the
-                            // other, so the page's WSTYPE wins over the column.
-                            WsType = normalized,
-                            Package = GetCsvField(fields, fieldMap, "PACKAGE", -1),
-                            Product = product,
-                            Leadframe12Nc = GetCsvField(fields, fieldMap, "LEADFRAME12NC", -1),
-                            Recipe = recipe,
-                            Confirmed = true
-                        };
-
-                        var validationResults = new List<ValidationResult>();
-                        var validationContext = new ValidationContext(model);
-                        if (!Validator.TryValidateObject(model, validationContext, validationResults, true))
-                        {
-                            importErrors.Add($"Line {lineNumber}: {string.Join("; ", validationResults.Select(result => result.ErrorMessage))}");
-                            continue;
-                        }
-
-                        pendingRows.Add(model);
-                    }
+                    product = SawingRecipeInputModel.ExtractProduct(ceptDescription);
                 }
-            }
-            catch (MalformedLineException)
-            {
-                TempData["PopupType"] = "danger";
-                TempData["PopupMessage"] = $"CSV import cancelled. Inserted: 0. Line {lineNumber} is not valid CSV. No rows were uploaded.";
-                return RedirectToGrid(normalized);
+
+                var leadframe12Nc = row["LEADFRAME12NC"];
+                if (CsvImportReader.LooksLikeExcelScientificNumber(leadframe12Nc))
+                {
+                    importErrors.Add($"Line {row.LineNumber}: LEADFRAME12NC reads '{leadframe12Nc}'. Excel rounded the 12NC away - format that column as Text and save the file again.");
+                    continue;
+                }
+
+                var model = new RecipeRowInputModel
+                {
+                    // A file exported from one grid must never land in the
+                    // other, so the page's WSTYPE wins over the column.
+                    WsType = normalized,
+                    Package = row["PACKAGE"],
+                    Product = product,
+                    Leadframe12Nc = leadframe12Nc,
+                    Recipe = row["RECIPE"],
+                    Confirmed = true
+                };
+
+                var validationResults = new List<ValidationResult>();
+                var validationContext = new ValidationContext(model);
+                if (!Validator.TryValidateObject(model, validationContext, validationResults, true))
+                {
+                    importErrors.Add($"Line {row.LineNumber}: {string.Join("; ", validationResults.Select(result => result.ErrorMessage))}");
+                    continue;
+                }
+
+                pendingRows.Add(model);
             }
 
             if (importErrors.Count > 0)
@@ -252,7 +248,9 @@ namespace Atcbassemblyrecipe.Controllers
             {
                 var result = await _awacsWstypeService.CreateManyRecipeRowsAsync(pendingRows, User.Identity?.Name ?? "unknown");
                 TempData["PopupType"] = result.Success ? "success" : "danger";
-                TempData["PopupMessage"] = result.Success ? result.Message : $"{result.Message} Inserted: 0.";
+                TempData["PopupMessage"] = result.Success
+                    ? $"{result.Message}{HeaderlessNote(read)}"
+                    : $"{result.Message} Inserted: 0.";
             }
             catch (Exception ex) when (ex is OracleException or InvalidOperationException)
             {
@@ -805,48 +803,18 @@ namespace Atcbassemblyrecipe.Controllers
             };
         }
 
+        // A file with no header row was mapped by column position. Say so, because
+        // it is the one thing about the import the popup would otherwise hide.
+        private static string HeaderlessNote(CsvImportResult read)
+        {
+            return read.HadHeaderRow
+                ? string.Empty
+                : " The file had no header row, so the columns were read in template order.";
+        }
+
         private static string NormalizeSortDirection(string? sortDirection)
         {
             return string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
-        }
-
-        private static Dictionary<string, int> BuildCsvFieldMap(string[] headers)
-        {
-            var fieldMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            for (var index = 0; index < headers.Length; index++)
-            {
-                var key = NormalizeCsvHeader(headers[index]);
-                if (!string.IsNullOrWhiteSpace(key) && !fieldMap.ContainsKey(key))
-                {
-                    fieldMap[key] = index;
-                }
-            }
-
-            return fieldMap;
-        }
-
-        private static List<string> MissingCsvHeaders(IReadOnlyDictionary<string, int> fieldMap, params string[] requiredHeaders)
-        {
-            return requiredHeaders
-                .Where(header => !fieldMap.ContainsKey(NormalizeCsvHeader(header)))
-                .ToList();
-        }
-
-        private static string GetCsvField(string[] fields, IReadOnlyDictionary<string, int> fieldMap, string key, int fallbackIndex)
-        {
-            if (fieldMap.TryGetValue(NormalizeCsvHeader(key), out var mappedIndex) && mappedIndex >= 0 && mappedIndex < fields.Length)
-            {
-                return fields[mappedIndex]?.Trim() ?? string.Empty;
-            }
-
-            return fallbackIndex >= 0 && fallbackIndex < fields.Length
-                ? fields[fallbackIndex]?.Trim() ?? string.Empty
-                : string.Empty;
-        }
-
-        private static string NormalizeCsvHeader(string header)
-        {
-            return new string(header.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant();
         }
 
         private string BuildModelStateMessage()
