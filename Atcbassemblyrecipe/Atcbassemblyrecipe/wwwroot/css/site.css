@@ -3743,7 +3743,7 @@ html[data-theme="dark"] .combo-menu {
     pointer-events: none;
 }
 
-.auth-body .auth-stage > *:not(.auth-backdrop-video) {
+.auth-body .auth-stage > *:not(.auth-backdrop-video):not(.auth-display-menu) {
     position: relative;
     z-index: 1;
 }
@@ -3914,14 +3914,9 @@ html[data-theme="dark"] .combo-menu {
         width: 0;
     }
 
-/* The button floats over the bottom-right corner, which is exactly where the
-   Next page link ends up once the page is scrolled to the bottom. */
-.pagination-bar {
-    padding-right: 92px;
-}
-
-/* A modal owns the screen while it is open. */
-body.modal-open .back-to-top {
+/* A modal owns the screen while it is open - but only the floating variant is
+   in the way; the inline one is part of the page behind the backdrop. */
+body.modal-open .back-to-top:not(.is-inline) {
     opacity: 0;
     pointer-events: none;
 }
@@ -3941,4 +3936,136 @@ body.modal-open .back-to-top {
     .back-to-top .back-to-top-text {
         display: none;
     }
+}
+
+
+/* ---------------------------------------------------------------------
+   Account menu, seated back-to-top, login toggle (2026-09 pass, part 2)
+
+   1. The identity chip in the topbar is a dropdown now, and the table
+      sizing controls (A- / A+ / Reset Widths) live inside it. They used
+      to sit in every grid's own toolbar, where four more buttons fought
+      Search, Rows and the four CSV buttons for the same row.
+
+   2. The back-to-top button is moved into the pagination bar by site.js
+      whenever a page has one. Floating at bottom-right put it straight on
+      top of the Next link, because a grid page's pagination bar sits at
+      the bottom of the window by design. Inside the bar it cannot cover
+      anything and it is always in the same place, at every row count.
+
+   3. .auth-display-menu is absolutely positioned in the stage's top-right
+      corner, but the backdrop-video block near the end of this file sets
+      `position: relative` on every .auth-stage child - so the toggle fell
+      into the flex flow and .auth-stage centres its children, leaving it
+      halfway down the left edge. The rule there now skips this element;
+      the declaration below is the belt to that braces.
+   --------------------------------------------------------------------- */
+
+.user-menu .user-chip {
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+}
+
+    .user-menu .user-chip:hover,
+    .user-menu .user-chip[aria-expanded="true"] {
+        border-color: var(--nxp-teal);
+    }
+
+.user-chip-caret {
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--muted);
+    flex: 0 0 auto;
+    height: 0;
+    margin-left: 2px;
+    transition: transform 160ms ease;
+    width: 0;
+}
+
+.user-chip[aria-expanded="true"] .user-chip-caret {
+    transform: rotate(180deg);
+}
+
+.user-menu-panel {
+    background: var(--surface-strong);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 0 24px 60px rgba(0, 22, 27, 0.26);
+    display: none;
+    gap: 12px;
+    margin-top: 8px;
+    min-width: 300px;
+    padding: 14px;
+}
+
+    /* Bootstrap toggles .show; grid only once it is actually open, so the
+       menu does not paint over the page while it is closed. */
+    .user-menu-panel.show {
+        display: grid;
+    }
+
+.user-menu-head {
+    align-items: center;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink);
+    display: flex;
+    gap: 12px;
+    padding-bottom: 12px;
+}
+
+    .user-menu-head strong,
+    .user-menu-head small {
+        display: block;
+        line-height: 1.2;
+    }
+
+    .user-menu-head small {
+        color: var(--muted);
+    }
+
+.user-menu-section {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+}
+
+.user-menu-label {
+    color: var(--muted);
+    font-size: 0.74rem;
+    font-weight: 900;
+    letter-spacing: 0.06rem;
+    text-transform: uppercase;
+}
+
+/* Inside the menu the group is a plain row: no divider, no left padding. */
+.user-menu-panel .table-view-controls {
+    border-left: 0;
+    flex-wrap: nowrap;
+    margin-left: 0;
+    padding-left: 0;
+}
+
+.back-to-top.is-inline {
+    bottom: auto;
+    box-shadow: none;
+    flex: 0 0 auto;
+    height: 38px;
+    opacity: 1;
+    padding: 0 15px;
+    pointer-events: auto;
+    position: static;
+    right: auto;
+    transform: none;
+}
+
+/* Two items were spread by space-between; with the button making three, the
+   pager and the button are pinned to the right together instead. */
+.pagination-bar nav {
+    margin-left: auto;
+}
+
+.auth-body .auth-stage > .auth-display-menu {
+    position: absolute;
 }

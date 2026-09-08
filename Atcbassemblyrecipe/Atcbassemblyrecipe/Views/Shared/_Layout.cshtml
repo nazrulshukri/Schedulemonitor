@@ -49,10 +49,14 @@
         var headerUserId = User.Identity?.Name ?? string.Empty;
         var headerDisplayName = await Directory.GetDisplayNameAsync(headerUserId);
         userInitial = string.IsNullOrWhiteSpace(headerDisplayName) ? "U" : headerDisplayName[..1].ToUpperInvariant();
+        var userRoleName = User.IsInRole(AppRole.SuperAdmin) ? "Super Admin" : User.IsInRole(AppRole.Admin) ? "Admin" : "User";
         var pageTitle = ViewData["Title"]?.ToString() ?? "Mainpage";
         var isSettingsPage = isAccessActive || isValidationActive || isRecycleBinActive;
         var breadcrumbLayer = isSettingsPage ? "Settings" : "Operations";
         var operationsOpen = isTableActive || isSawingActive || isMarkerActive || isAwacsLfActive;
+        // The pages whose grid is resizable, and so the pages whose account
+        // menu carries the table sizing controls.
+        var hasGridControls = isTableActive || isSawingActive || isMarkerActive || isAwacsLfActive;
         var settingsOpen = isSettingsPage;
 
         // Sidebar links follow the same TBLACCESS grants that gate the pages themselves,
@@ -103,19 +107,61 @@
             </div>
             @if (User.Identity?.IsAuthenticated == true)
             {
-                <div class="user-chip">
-                    @if (headerAvatarUrl is not null)
-                    {
-                        <img class="user-avatar user-avatar-img" src="@Url.Content(headerAvatarUrl)" alt="" />
-                    }
-                    else
-                    {
-                        <span class="user-avatar">@userInitial</span>
-                    }
-                    <span>
-                        <strong title="@headerUserId">@headerDisplayName</strong>
-                        <small>@headerUserId &middot; @(User.IsInRole(AppRole.SuperAdmin) ? "Super Admin" : User.IsInRole(AppRole.Admin) ? "Admin" : "User")</small>
-                    </span>
+                @* The chip opens a menu rather than just naming the signed-in
+                   user: the table sizing controls used to sit in every grid's
+                   own toolbar, where they crowded out Search and the CSV
+                   buttons. They are rendered once here instead, and only on
+                   the pages that carry a resizable grid - excel-grid.js finds
+                   them by id wherever they are in the page. *@
+                <div class="dropdown user-menu">
+                    <button type="button" class="user-chip" id="userMenuToggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-label="Account and display options">
+                        @if (headerAvatarUrl is not null)
+                        {
+                            <img class="user-avatar user-avatar-img" src="@Url.Content(headerAvatarUrl)" alt="" />
+                        }
+                        else
+                        {
+                            <span class="user-avatar">@userInitial</span>
+                        }
+                        <span class="user-chip-text">
+                            <strong title="@headerUserId">@headerDisplayName</strong>
+                            <small>@headerUserId &middot; @userRoleName</small>
+                        </span>
+                        <span class="user-chip-caret" aria-hidden="true"></span>
+                    </button>
+
+                    <div class="dropdown-menu dropdown-menu-end user-menu-panel" aria-labelledby="userMenuToggle">
+                        <div class="user-menu-head">
+                            @if (headerAvatarUrl is not null)
+                            {
+                                <img class="user-avatar user-avatar-img" src="@Url.Content(headerAvatarUrl)" alt="" />
+                            }
+                            else
+                            {
+                                <span class="user-avatar">@userInitial</span>
+                            }
+                            <span>
+                                <strong>@headerDisplayName</strong>
+                                <small>@headerUserId &middot; @userRoleName</small>
+                            </span>
+                        </div>
+
+                        @if (hasGridControls)
+                        {
+                            <div class="user-menu-section">
+                                <span class="user-menu-label">Table text size</span>
+                                <div class="table-view-controls" role="group" aria-label="Table sizing controls">
+                                    <button type="button" class="btn btn-outline-secondary table-font-btn" id="tableFontDown" title="Make table font smaller"><partial name="_Icon" model="@("font-down")" /> A-</button>
+                                    <output id="tableFontValue" class="table-font-value">100%</output>
+                                    <button type="button" class="btn btn-outline-secondary table-font-btn" id="tableFontUp" title="Make table font bigger"><partial name="_Icon" model="@("font-up")" /> A+</button>
+                                </div>
+                            </div>
+                            <div class="user-menu-section">
+                                <span class="user-menu-label">Columns</span>
+                                <button type="button" class="btn btn-outline-secondary" id="resetColumnWidths"><partial name="_Icon" model="@("reset")" /> Reset Widths</button>
+                            </div>
+                        }
+                    </div>
                 </div>
                 <form asp-controller="Account" asp-action="Logout" method="post" class="m-0">
                     <button type="submit" class="btn btn-nxp-orange"><partial name="_Icon" model="@("logout")" /> Logout</button>

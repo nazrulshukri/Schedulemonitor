@@ -64,8 +64,14 @@
         const cancelAddRow = document.getElementById('cancelAddRow');
         const focusFirst = () => addRow?.querySelector(focusSelector)?.focus();
 
+        // The add row is the first row of the table and the table scrolls inside
+        // its own panel, so with the grid scrolled down the row would open out
+        // of sight and the button would look like it had done nothing.
+        const revealAddRow = () => addRow?.closest('.excel-panel')?.scrollTo({ top: 0, behavior: 'smooth' });
+
         showAddRow?.addEventListener('click', () => {
             addRow?.classList.remove('d-none');
+            revealAddRow();
             focusFirst();
         });
 
@@ -74,6 +80,7 @@
         });
 
         if (addRow && !addRow.classList.contains('d-none')) {
+            revealAddRow();
             setTimeout(focusFirst, 220);
         }
     };

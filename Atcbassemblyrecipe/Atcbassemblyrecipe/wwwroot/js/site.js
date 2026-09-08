@@ -109,12 +109,30 @@
   const backToTop = document.getElementById("backToTop");
 
   if (backToTop) {
+    // A page with a pagination bar keeps the button inside it. Floating at the
+    // bottom-right corner put it straight on top of the Next link, because on
+    // a grid page the pagination bar is pinned to the bottom of the window at
+    // every row count. Seated in the bar it covers nothing, and it stays in
+    // one place for the user to aim at rather than fading in and out.
+    const paginationBar = document.querySelector(".pagination-bar");
+
+    if (paginationBar) {
+      paginationBar.appendChild(backToTop);
+      backToTop.classList.add("is-inline", "is-visible");
+    }
+
     // Two things can be scrolled on a grid page: the window, and the grid
     // panel itself. The button watches and rewinds both.
     const scrolledAway = () =>
       window.scrollY > 200 || gridPanels.some((panel) => panel.scrollTop > 200);
 
-    const syncBackToTop = () => backToTop.classList.toggle("is-visible", scrolledAway());
+    const syncBackToTop = () => {
+      if (backToTop.classList.contains("is-inline")) {
+        return;
+      }
+
+      backToTop.classList.toggle("is-visible", scrolledAway());
+    };
 
     window.addEventListener("scroll", syncBackToTop, { passive: true });
     gridPanels.forEach((panel) => panel.addEventListener("scroll", syncBackToTop, { passive: true }));
