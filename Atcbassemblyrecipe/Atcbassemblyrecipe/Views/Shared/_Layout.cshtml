@@ -1,0 +1,344 @@
+@{
+    var ui = await Settings.GetAsync();
+    var shellBackground = ui[SettingModules.Layout, "BackgroundImageUrl"];
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - @ui[SettingModules.App, "TitleSuffix"]</title>
+    <script>
+        document.documentElement.dataset.theme = localStorage.getItem("assemblyRecipeTheme") || "light";
+        // Applied before first paint so the sidebar never flashes in and out.
+        // No stored choice yet: open on desktop, closed on anything narrower.
+        var storedSidebar = localStorage.getItem("assemblyRecipeSidebar");
+        var sidebarOpen = storedSidebar === null
+            ? window.matchMedia("(min-width: 1401px)").matches
+            : storedSidebar === "open";
+        if (sidebarOpen) {
+            document.documentElement.classList.add("sidebar-open");
+        }
+        document.documentElement.style.setProperty("--app-zoom", localStorage.getItem("assemblyRecipeZoom") || "1");
+    </script>
+    <script type="importmap"></script>
+    <link rel="icon" type="image/png" href="@Url.Content(ui[SettingModules.App, "FaviconUrl"])" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/Atcbassemblyrecipe.styles.css" asp-append-version="true" />
+    @* Colours, animation timings and the backdrop come from TBLAPPSETTING and are
+       written here as CSS variables, so site.css keeps them as its defaults. *@
+    <style>@Html.Raw(ui.ThemeCss(Url.Content(shellBackground)))</style>
+</head>
+<body>
+    @{
+        var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+        var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+        var isTableActive = currentController == "Home" && currentAction == "Index";
+        var isSawingActive = currentController == "Awacs" && currentAction == "TableSawing";
+        var isMarkerActive = currentController == "Awacs" && currentAction == "TableMarker";
+        var isAwacsLfActive = currentController == "AwacsLf";
+        var isRecycleBinActive = currentController == "RecycleBin";
+        var isAccessActive = currentController == "Access";
+        var isValidationActive = currentController == "Awacs" && currentAction == "RequestDatabaseChange";
+        var userInitial = "U";
+        // set after the display name is known
+        var headerAvatarUrl = string.IsNullOrWhiteSpace(User.Identity?.Name) ? null : Avatars.GetUrl(User.Identity.Name);
+        // The chip used to print the raw login id (NX487878). TBLACCESS carries the
+        // person's name, so show that and keep the id underneath for support.
+        var headerUserId = User.Identity?.Name ?? string.Empty;
+        var headerDisplayName = await Directory.GetDisplayNameAsync(headerUserId);
+        userInitial = string.IsNullOrWhiteSpace(headerDisplayName) ? "U" : headerDisplayName[..1].ToUpperInvariant();
+        var userRoleName = User.IsInRole(AppRole.SuperAdmin) ? "Super Admin" : User.IsInRole(AppRole.Admin) ? "Admin" : "User";
+        var pageTitle = ViewData["Title"]?.ToString() ?? "Mainpage";
+        var isSettingsPage = isAccessActive || isValidationActive || isRecycleBinActive;
+        var breadcrumbLayer = isSettingsPage ? "Settings" : "Operations";
+        var operationsOpen = isTableActive || isSawingActive || isMarkerActive || isAwacsLfActive;
+        // The pages whose grid is resizable, and so the pages whose account
+        // menu carries the table sizing controls.
+        var hasGridControls = isTableActive || isSawingActive || isMarkerActive || isAwacsLfActive;
+        var settingsOpen = isSettingsPage;
+
+        // Sidebar links follow the same TBLACCESS grants that gate the pages themselves,
+        // so a user only sees what they can actually open. Access Management stays
+        // Super Admin only - it is the page that hands out permissions.
+        var isAuthenticated = User.Identity?.IsAuthenticated == true;
+        var canSeeAwacs = isAuthenticated && (await Access.GetAsync(ModuleNames.AwacsWstype)).CanView;
+        var canSeeSawing = isAuthenticated && (await Access.GetAsync(ModuleNames.TableSawing)).CanView;
+        var canSeeMarker = isAuthenticated && (await Access.GetAsync(ModuleNames.TableMarker)).CanView;
+        var canSeeAwacsLf = isAuthenticated && (await Access.GetAsync(ModuleNames.AwacsLf)).CanView;
+        var canSeeRecycleBin = isAuthenticated && (await Access.GetAsync(ModuleNames.RecycleBin)).CanView;
+        var canSeeDbValidation = isAuthenticated && (await Access.GetAsync(ModuleNames.DbValidation)).CanView;
+        var canSeeAccessManagement = User.IsInRole(AppRole.SuperAdmin);
+    }
+
+    <header class="topbar">
+        @if (isAuthenticated)
+        {
+            @* Lives in the topbar, not inside the sidebar, so it survives the
+               sidebar being taken off screen entirely when collapsed. *@
+            <button type="button" id="sidebarToggle" class="sidebar-toggle" aria-label="Collapse sidebar" title="Collapse sidebar">
+                <span class="sidebar-toggle-bars" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </span>
+            </button>
+        }
+        <a class="brand-lockup" asp-controller="Home" asp-action="Index">
+            <img src="@Url.Content(ui[SettingModules.Layout, "LogoUrl"])" alt="@ui[SettingModules.App, "CompanyName"]" />
+            <span></span>
+            <strong>@ui[SettingModules.Layout, "BrandText"]</strong>
+        </a>
+        <div class="topbar-actions">
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                @* The chip opens a menu rather than just naming the signed-in
+                   user. Every display control lives in it: dark mode and page
+                   zoom, which used to take up a third of the topbar, and the
+                   table sizing controls, which used to sit in every grid's own
+                   toolbar and crowd out Search and the CSV buttons. theme.js,
+                   site.js and excel-grid.js all bind by id or selector, so the
+                   markup works wherever it is rendered. *@
+                <div class="dropdown user-menu">
+                    <button type="button" class="user-chip" id="userMenuToggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-label="Account and display options">
+                        @if (headerAvatarUrl is not null)
+                        {
+                            <img class="user-avatar user-avatar-img" src="@Url.Content(headerAvatarUrl)" alt="" />
+                        }
+                        else
+                        {
+                            <span class="user-avatar">@userInitial</span>
+                        }
+                        <span class="user-chip-text">
+                            <strong title="@headerUserId">@headerDisplayName</strong>
+                            <small>@headerUserId &middot; @userRoleName</small>
+                        </span>
+                        <span class="user-chip-caret" aria-hidden="true"></span>
+                    </button>
+
+                    <div class="dropdown-menu dropdown-menu-end user-menu-panel" aria-labelledby="userMenuToggle">
+                        <div class="user-menu-head">
+                            @if (headerAvatarUrl is not null)
+                            {
+                                <img class="user-avatar user-avatar-img" src="@Url.Content(headerAvatarUrl)" alt="" />
+                            }
+                            else
+                            {
+                                <span class="user-avatar">@userInitial</span>
+                            }
+                            <span>
+                                <strong>@headerDisplayName</strong>
+                                <small>@headerUserId &middot; @userRoleName</small>
+                            </span>
+                        </div>
+
+                        <div class="user-menu-section">
+                            <span class="user-menu-label">Mode</span>
+                            <button type="button" id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">
+                                <span class="theme-toggle-track">
+                                    <span class="theme-toggle-knob"></span>
+                                </span>
+                                <span class="theme-icon" aria-hidden="true"></span>
+                            </button>
+                        </div>
+                        <div class="user-menu-section">
+                            <span class="user-menu-label">Zoom</span>
+                            <div class="zoom-control topbar-zoom" role="group" aria-label="Page zoom controls">
+                                <button type="button" class="zoom-button" data-zoom-out aria-label="Zoom out" title="Zoom out">-</button>
+                                <output class="zoom-value" data-zoom-value>100%</output>
+                                <button type="button" class="zoom-button" data-zoom-in aria-label="Zoom in" title="Zoom in">+</button>
+                                <button type="button" class="zoom-button zoom-reset" data-zoom-reset aria-label="Reset zoom" title="Reset zoom">100</button>
+                            </div>
+                        </div>
+
+                        @if (hasGridControls)
+                        {
+                            <div class="user-menu-section">
+                                <span class="user-menu-label">Table text size</span>
+                                <div class="table-view-controls" role="group" aria-label="Table sizing controls">
+                                    <button type="button" class="btn btn-outline-secondary table-font-btn" id="tableFontDown" title="Make table font smaller"><partial name="_Icon" model="@("font-down")" /> A-</button>
+                                    <output id="tableFontValue" class="table-font-value">100%</output>
+                                    <button type="button" class="btn btn-outline-secondary table-font-btn" id="tableFontUp" title="Make table font bigger"><partial name="_Icon" model="@("font-up")" /> A+</button>
+                                </div>
+                            </div>
+                            <div class="user-menu-section">
+                                <span class="user-menu-label">Columns</span>
+                                <button type="button" class="btn btn-outline-secondary" id="resetColumnWidths"><partial name="_Icon" model="@("reset")" /> Reset Widths</button>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <form asp-controller="Account" asp-action="Logout" method="post" class="m-0">
+                    <button type="submit" class="btn btn-nxp-orange"><partial name="_Icon" model="@("logout")" /> Logout</button>
+                </form>
+            }
+            else
+            {
+                <a class="btn btn-nxp-orange" asp-controller="Account" asp-action="Login"><partial name="_Icon" model="@("login")" /> Login</a>
+            }
+        </div>
+    </header>
+
+    <div class="app-shell">
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <aside class="app-sidebar">
+                <div class="sidebar-head">
+                    <span class="sidebar-status"></span>
+                    <div>
+                        <strong>Recipe Console</strong>
+                        <small>OCAP guarded workspace</small>
+                    </div>
+                </div>
+
+                <nav class="sidebar-nav">
+                    @if (canSeeAwacs || canSeeSawing || canSeeMarker || canSeeAwacsLf)
+                    {
+                        <details class="nav-group" @(operationsOpen ? "open" : "")>
+                            <summary title="Operations">
+                                <span class="group-icon operations"></span>
+                                <span class="group-title">Operations</span>
+                                <span class="group-caret"></span>
+                            </summary>
+                            <div class="nav-layer">
+                                @if (canSeeAwacs)
+                                {
+                                    <a asp-controller="Home" asp-action="Index" class="sidebar-link @(isTableActive ? "active" : "")" title="AWACSWSTYPE">
+                                        <span class="sidebar-icon icon-table"></span>
+                                        <span class="link-text">AWACSWSTYPE</span>
+                                    </a>
+                                }
+                                @if (canSeeSawing)
+                                {
+                                    <a asp-controller="Awacs" asp-action="TableSawing" class="sidebar-link @(isSawingActive ? "active" : "")" title="Sawing">
+                                        <span class="sidebar-icon icon-recipe"></span>
+                                        <span class="link-text">Sawing</span>
+                                    </a>
+                                }
+                                @if (canSeeMarker)
+                                {
+                                    <a asp-controller="Awacs" asp-action="TableMarker" class="sidebar-link @(isMarkerActive ? "active" : "")" title="Marker">
+                                        <span class="sidebar-icon icon-recipe"></span>
+                                        <span class="link-text">Marker</span>
+                                    </a>
+                                }
+                                @if (canSeeAwacsLf)
+                                {
+                                    <a asp-controller="AwacsLf" asp-action="Index" class="sidebar-link @(isAwacsLfActive ? "active" : "")" title="AWACSLF">
+                                        <span class="sidebar-icon icon-table"></span>
+                                        <span class="link-text">AWACSLF</span>
+                                    </a>
+                                }
+                            </div>
+                        </details>
+                    }
+
+                    @if (canSeeAccessManagement || canSeeDbValidation || canSeeRecycleBin)
+                    {
+                        <details class="nav-group settings-group" @(settingsOpen ? "open" : "")>
+                            <summary title="Settings">
+                                <span class="group-icon settings"></span>
+                                <span class="group-title">Settings</span>
+                                <span class="group-caret"></span>
+                            </summary>
+                            <div class="nav-layer">
+                                @if (canSeeAccessManagement)
+                                {
+                                    <a asp-controller="Access" asp-action="Index" class="sidebar-link @(isAccessActive ? "active" : "")" title="Access Management">
+                                        <span class="sidebar-icon icon-access"></span>
+                                        <span class="link-text">Access Management</span>
+                                    </a>
+                                }
+                                @if (canSeeDbValidation)
+                                {
+                                    <a asp-controller="Awacs" asp-action="RequestDatabaseChange" class="sidebar-link @(isValidationActive ? "active" : "")" title="DB Validation">
+                                        <span class="sidebar-icon icon-db"></span>
+                                        <span class="link-text">DB Validation</span>
+                                    </a>
+                                }
+                                @if (canSeeRecycleBin)
+                                {
+                                    <a asp-controller="RecycleBin" asp-action="Index" class="sidebar-link @(isRecycleBinActive && currentAction != "History" ? "active" : "")" title="Trash">
+                                        <span class="sidebar-icon icon-trash"></span>
+                                        <span class="link-text">Trash</span>
+                                    </a>
+                                    <a asp-controller="RecycleBin" asp-action="History" class="sidebar-link @(isRecycleBinActive && currentAction == "History" ? "active" : "")" title="Change History">
+                                        <span class="sidebar-icon icon-history"></span>
+                                        <span class="link-text">Change History</span>
+                                    </a>
+                                }
+                            </div>
+                        </details>
+                    }
+                </nav>
+            </aside>
+        }
+
+        <main role="main" class="app-main">
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <nav class="app-breadcrumb" aria-label="breadcrumb">
+                    <a asp-controller="Home" asp-action="Index">@ui[SettingModules.Layout, "BrandText"]</a>
+                    <span></span>
+                    <strong>@breadcrumbLayer</strong>
+                    <span></span>
+                    <strong>@pageTitle</strong>
+                </nav>
+            }
+            @RenderBody()
+        </main>
+    </div>
+
+    @* Outside .app-shell on purpose: the shell carries the page zoom, and a
+       fixed element inside a zoomed box is scaled and shifted with it. *@
+    <button type="button" id="backToTop" class="back-to-top" aria-label="Back to top" title="Back to top">
+        <span class="back-to-top-arrow" aria-hidden="true"></span>
+        <span class="back-to-top-text">Top</span>
+    </button>
+
+    @if (TempData["PopupMessage"] is string popupMessage)
+    {
+        var popupType = TempData["PopupType"] as string ?? "info";
+        var popupIconClass = popupType switch
+        {
+            "success" => "popup-icon-success",
+            "danger" => "popup-icon-danger",
+            "warning" => "popup-icon-warning",
+            _ => "popup-icon-info"
+        };
+        <div class="modal fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content modern-modal popup-modal popup-@popupType">
+                    <div class="modal-header bg-@popupType text-white">
+                        <div class="popup-title">
+                            <span class="popup-icon @popupIconClass" aria-hidden="true"></span>
+                            <h5 class="modal-title" id="feedbackModalLabel">System Message</h5>
+                        </div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="popup-message">@popupMessage</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><partial name="_Icon" model="@("close")" /> Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/theme.js" asp-append-version="true"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @if (TempData["PopupMessage"] is not null)
+    {
+        <script>
+            const feedbackModal = new bootstrap.Modal(document.getElementById('feedbackModal'));
+            feedbackModal.show();
+        </script>
+    }
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

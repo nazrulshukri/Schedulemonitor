@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="Lead frame strip">
+  <circle cx="48" cy="48" r="48" fill="#12a17a"/>
+  <rect x="14" y="30" width="68" height="36" rx="5" fill="#e4f3f4"/>
+  <g fill="#12a17a">
+    <circle cx="23" cy="36" r="3"/><circle cx="23" cy="60" r="3"/>
+    <circle cx="73" cy="36" r="3"/><circle cx="73" cy="60" r="3"/>
+  </g>
+  <g fill="#0b7f60">
+    <rect x="33" y="41" width="13" height="14" rx="2"/>
+    <rect x="50" y="41" width="13" height="14" rx="2" fill="#ff4f26"/>
+  </g>
+</svg>

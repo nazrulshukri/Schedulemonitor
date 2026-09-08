@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="Cleanroom operator">
+  <circle cx="48" cy="48" r="48" fill="#f2a33a"/>
+  <path d="M48 58c-15 0-27 9.5-27 21.5V96h54V79.5C75 67.5 63 58 48 58z" fill="#e4f3f4"/>
+  <circle cx="48" cy="36" r="17" fill="#e4f3f4"/>
+  <path d="M31 38a17 17 0 0 1 34 0z" fill="#0d6971"/>
+  <rect x="33" y="40" width="30" height="13" rx="6" fill="#c9dde0"/>
+  <circle cx="48" cy="79" r="6" fill="#ff4f26"/>
+</svg>

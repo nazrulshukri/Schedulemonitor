@@ -1,0 +1,26 @@
+<partial name="_ValidationScriptsPartial" />
+<script>
+    const preview = document.getElementById('referencePreview');
+
+    document.getElementById('validateWsDb').addEventListener('click', async () => {
+        preview.classList.remove('d-none', 'alert-success', 'alert-danger');
+        preview.classList.add('alert', 'alert-info');
+        preview.textContent = 'Validating against TBLSAWING...';
+
+        // Url.Action resolves against the app's base path; a literal '/Awacs/...'
+        // pointed at the site root and 404'd wherever the app is not deployed there.
+        const url = '@Url.Action("ValidateWsDb", "Awacs")';
+        const response = await fetch(url);
+        const data = await response.json();
+
+        preview.classList.remove('alert-info');
+        if (!response.ok || !data.success) {
+            preview.classList.add('alert-danger');
+            preview.textContent = data.message || 'Reference validation failed.';
+            return;
+        }
+
+        preview.classList.add('alert-success');
+        preview.textContent = data.message;
+    });
+</script>

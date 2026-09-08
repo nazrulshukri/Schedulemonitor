@@ -1,0 +1,570 @@
+@model AccessManagementViewModel
+
+@{
+    ViewData["Title"] = "Access Management";
+}
+
+<div class="page-heading access-heading">
+    <div>
+        <span class="eyebrow">Security Console</span>
+        <h1>Access Management</h1>
+        <p>Review user roles, module permissions, and guarded database capabilities.</p>
+    </div>
+    @if (Model.SelectedUser is not null)
+    {
+        <button type="submit" form="accessSaveForm" id="saveValidationButton" class="btn btn-primary"><partial name="_Icon" model="@("save")" /> Save Validation</button>
+    }
+</div>
+
+<section class="access-console">
+    <aside class="access-users data-panel">
+        <div class="section-title">
+            <div>
+                <h2>Search Users</h2>
+                <p>Users are loaded from TBLACCESS on their first LDAP login.</p>
+            </div>
+            <div class="section-title-actions">
+                <span class="count-pill">@Model.Users.Count</span>
+                <button type="button" class="btn btn-primary btn-sm" id="toggleAddUser" aria-expanded="false" aria-controls="addUserPanel">
+                    <span class="btn-plus" aria-hidden="true"></span> Add User
+                </button>
+            </div>
+        </div>
+
+        <form asp-controller="Access" asp-action="Index" method="get" class="access-search">
+            <input name="search" value="@Model.Search" class="form-control" placeholder="Search username, name, email, or role" />
+            <button type="submit" class="btn btn-primary"><partial name="_Icon" model="@("search")" /> Search</button>
+            <a asp-controller="Access" asp-action="Index" class="btn btn-outline-secondary"><partial name="_Icon" model="@("clear")" /> Clear</a>
+        </form>
+
+        <div class="access-filter-row">
+            <span>Data source</span>
+            <strong>TBLACCESS live</strong>
+        </div>
+
+        <div class="access-user-list">
+            @if (Model.Users.Count == 0)
+            {
+                <div class="empty-state">No users found.</div>
+            }
+            else
+            {
+                foreach (var user in Model.Users)
+                {
+                    var selected = string.Equals(user.UserId, Model.SelectedUserId, StringComparison.OrdinalIgnoreCase);
+                    <a class="access-user-card @(selected ? "active" : "")"
+                       asp-controller="Access"
+                       asp-action="Index"
+                       asp-route-search="@Model.Search"
+                       asp-route-userId="@user.UserId">
+                        @if (user.AvatarUrl is not null)
+                        {
+                            <img class="mini-avatar mini-avatar-img" src="@Url.Content(user.AvatarUrl)" alt="" />
+                        }
+                        else
+                        {
+                            <span class="mini-avatar">@user.UserId[..1].ToUpperInvariant()</span>
+                        }
+                        <span>
+                            <strong>@user.UserId</strong>
+                            <small>@user.UserName</small>
+                        </span>
+                        @if (!user.IsActive)
+                        {
+                            <em class="is-blocked">Blocked</em>
+                        }
+                        else if (user.Role == AppRole.SuperAdmin)
+                        {
+                            <em>Full</em>
+                        }
+                    </a>
+                }
+            }
+        </div>
+    </aside>
+
+    <div class="access-workspace">
+        <section id="newUserPanel" class="data-panel access-detail d-none">
+            <div class="section-title">
+                <div>
+                    <h2>New User</h2>
+                    <p>Create a user profile. Module access is assigned after the user exists.</p>
+                </div>
+            </div>
+
+            <form asp-controller="Access" asp-action="AddUser" method="post" class="new-user-form">
+                <div class="new-user-grid">
+                    <div>
+                        <label class="form-label" for="newUserId">Username (LDAP ID) <span class="req">*</span></label>
+                        <input id="newUserId" name="UserId" class="form-control" placeholder="e.g. NX123456" maxlength="50" required />
+                        <small class="text-muted">Must match the account they sign in to Nexperia with.</small>
+                    </div>
+                    <div>
+                        <label class="form-label" for="newUserFullName">Full name</label>
+                        <input id="newUserFullName" name="UserName" class="form-control" placeholder="Optional" maxlength="100" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="newUserRole">Role <span class="req">*</span></label>
+                        <select id="newUserRole" name="RoleName" class="form-select">
+                            <option value="@AppRole.User">User</option>
+                            <option value="@AppRole.Admin">Admin</option>
+                            <option value="@AppRole.SuperAdmin">Super Admin</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="new-user-permissions">
+                    <div class="section-title">
+                        <div>
+                            <h2>Module Access</h2>
+                            <p>Tick what this user may do. You can change it later from the permission grid.</p>
+                        </div>
+                        <div class="matrix-actions">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-new-select-all><partial name="_Icon" model="@("select-all")" /> Select All</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-new-clear-all><partial name="_Icon" model="@("clear-all")" /> Clear All</button>
+                        </div>
+                    </div>
+
+                    <div class="permission-table-wrap">
+                        <table class="table permission-table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Module</th>
+                                    <th>Description</th>
+                                    <th title="Tick every permission on this row">All</th>
+                                    <th>View</th>
+                                    <th>Add</th>
+                                    <th>Update</th>
+                                    <th>Delete</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (var i = 0; i < Model.NewUserAccess.Count; i++)
+                                {
+                                    <tr>
+                                        <td>
+                                            <input type="hidden" name="TableAccess[@i].Module" value="@Model.NewUserAccess[i].Module" />
+                                            <strong>@Model.NewUserAccess[i].Module</strong>
+                                        </td>
+                                        <td>@Model.NewUserAccess[i].Description</td>
+                                        <td>
+                                            <input type="checkbox" class="form-check-input" data-row-all
+                                                   aria-label="All permissions for @Model.NewUserAccess[i].Module" />
+                                        </td>
+                                        <td><input type="checkbox" class="form-check-input" data-row-perm name="TableAccess[@i].CanView" value="true" /><input type="hidden" name="TableAccess[@i].CanView" value="false" /></td>
+                                        <td><input type="checkbox" class="form-check-input" data-row-perm name="TableAccess[@i].CanAdd" value="true" /><input type="hidden" name="TableAccess[@i].CanAdd" value="false" /></td>
+                                        <td><input type="checkbox" class="form-check-input" data-row-perm name="TableAccess[@i].CanUpdate" value="true" /><input type="hidden" name="TableAccess[@i].CanUpdate" value="false" /></td>
+                                        <td><input type="checkbox" class="form-check-input" data-row-perm name="TableAccess[@i].CanDelete" value="true" /><input type="hidden" name="TableAccess[@i].CanDelete" value="false" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="new-user-actions">
+                    <button type="button" class="btn btn-outline-secondary" id="cancelAddUser"><partial name="_Icon" model="@("cancel")" /> Cancel</button>
+                    <button type="submit" class="btn btn-primary"><partial name="_Icon" model="@("user-plus")" /> Create User</button>
+                </div>
+            </form>
+        </section>
+
+        <form id="accessSaveForm" asp-controller="Access" asp-action="Save" method="post" class="access-workspace-stack m-0">
+        <input type="hidden" name="UserId" value="@Model.SelectedUser?.UserId" />
+
+        <section class="data-panel access-detail">
+            <div class="section-title">
+                <div>
+                    <h2>User Details</h2>
+                    <p>Select a user to review permission scope.</p>
+                </div>
+                @if (Model.SelectedUser is not null)
+                {
+                    <span class="status-pill @(Model.SelectedUser.IsActive ? "" : "is-blocked")">
+                        <span></span> @(Model.SelectedUser.IsActive ? "Active" : "Blocked")
+                    </span>
+                }
+            </div>
+
+            @if (Model.SelectedUser is null)
+            {
+                <div class="empty-state tall">No user selected. Use Add User, or wait for their first LDAP login.</div>
+            }
+            else
+            {
+                <div class="identity-card-head">
+                    <div class="identity-card">
+                        <div class="identity-avatar-wrap">
+                            @if (Model.SelectedUser.AvatarUrl is not null)
+                            {
+                                <img class="identity-avatar identity-avatar-img" src="@Url.Content(Model.SelectedUser.AvatarUrl)" alt="@Model.SelectedUser.UserId photo" />
+                            }
+                            else
+                            {
+                                <span class="identity-avatar">@Model.SelectedUser.UserId[..1].ToUpperInvariant()</span>
+                            }
+                            <button type="button" class="avatar-upload-btn" data-avatar-modal>Change</button>
+                        </div>
+                        <dl>
+                            <div>
+                                <dt>Username</dt>
+                                <dd>
+                                    @Model.SelectedUser.UserId
+                                    <small class="d-block text-muted fw-normal">Set at creation - matches the LDAP login id.</small>
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>Full Name</dt>
+                                <dd>
+                                    @Model.SelectedUser.UserName
+                                    <small class="d-block text-muted fw-normal">Set at creation and cannot be changed.</small>
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>Email</dt>
+                                <dd>@Model.SelectedUser.Email</dd>
+                            </div>
+                            <div>
+                                <dt>Role</dt>
+                                <dd>
+                                    <select name="RoleName" class="form-select access-role-select">
+                                        <option value="@AppRole.User" selected="@(Model.SelectedUser.Role == AppRole.User)">User</option>
+                                        <option value="@AppRole.Admin" selected="@(Model.SelectedUser.Role == AppRole.Admin)">Admin</option>
+                                        <option value="@AppRole.SuperAdmin" selected="@(Model.SelectedUser.Role == AppRole.SuperAdmin)">Super Admin</option>
+                                    </select>
+                                </dd>
+                            </div>
+                        </dl>
+                    </div>
+
+                    <div class="identity-actions">
+                        @if (Model.SelectedUser.IsActive)
+                        {
+                            <button type="submit" form="blockUserForm" class="btn btn-outline-secondary"><partial name="_Icon" model="@("block")" /> Block User</button>
+                        }
+                        else
+                        {
+                            <button type="submit" form="unblockUserForm" class="btn btn-outline-secondary"><partial name="_Icon" model="@("unblock")" /> Unblock User</button>
+                        }
+                        <button type="button" class="btn btn-nxp-orange" data-delete-user-trigger><partial name="_Icon" model="@("delete")" /> Delete User</button>
+                    </div>
+                </div>
+            }
+        </section>
+
+        <section class="data-panel access-matrix">
+            <div class="section-title">
+                <div>
+                    <h2>Table Access / Role Assignment</h2>
+                    <p>Validated modules only. No direct truncate, alter table, or unapproved schema actions.</p>
+                </div>
+                <div class="matrix-actions">
+                    <button type="button" class="btn btn-outline-secondary" data-select-all-modules disabled="@(Model.SelectedUser is null)"><partial name="_Icon" model="@("select-all")" /> Select All</button>
+                    <button type="button" class="btn btn-outline-secondary" data-clear-all-modules disabled="@(Model.SelectedUser is null)"><partial name="_Icon" model="@("clear-all")" /> Clear All</button>
+                </div>
+            </div>
+
+            <div class="metric-grid">
+                <div class="metric-tile">
+                    <span>Total Modules</span>
+                    <strong>@Model.TotalTables</strong>
+                </div>
+                <div class="metric-tile">
+                    <span>With Access</span>
+                    <strong>@Model.WithAccess</strong>
+                </div>
+                <div class="metric-tile">
+                    <span>Can Update</span>
+                    <strong>@Model.CanUpdateCount</strong>
+                </div>
+                <div class="metric-tile">
+                    <span>Can Delete</span>
+                    <strong>@Model.CanDeleteCount</strong>
+                </div>
+            </div>
+
+            <div class="access-tabs">
+                <span class="active">All Tables</span>
+                <span>Has Access</span>
+                <span>Can Update</span>
+                <span>Can Delete</span>
+            </div>
+
+            <div class="permission-table-wrap">
+                <table class="table permission-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Module</th>
+                            <th>Description</th>
+                            <th title="Tick every permission on this row">All</th>
+                            <th>View</th>
+                            <th>Add</th>
+                            <th>Update</th>
+                            <th>Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.TableAccess.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">No user selected.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            for (var i = 0; i < Model.TableAccess.Count; i++)
+                            {
+                                <tr>
+                                    <td>
+                                        <input type="hidden" asp-for="TableAccess[i].Module" />
+                                        <strong>@Model.TableAccess[i].Module</strong>
+                                    </td>
+                                    <td>@Model.TableAccess[i].Description</td>
+                                    @* Row toggle only - not posted back. It ticks the four real
+                                       boxes beside it and reflects their state. *@
+                                    <td>
+                                        <input type="checkbox" class="form-check-input" data-row-all
+                                               aria-label="All permissions for @Model.TableAccess[i].Module" />
+                                    </td>
+                                    <td><input asp-for="TableAccess[i].CanView" class="form-check-input" data-row-perm /></td>
+                                    <td><input asp-for="TableAccess[i].CanAdd" class="form-check-input" data-row-perm /></td>
+                                    <td><input asp-for="TableAccess[i].CanUpdate" class="form-check-input" data-row-perm /></td>
+                                    <td><input asp-for="TableAccess[i].CanDelete" class="form-check-input" data-row-perm /></td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        </form>
+    </div>
+</section>
+
+@if (Model.SelectedUser is not null)
+{
+    <form id="uploadAvatarForm" asp-controller="Access" asp-action="UploadAvatar" method="post" enctype="multipart/form-data" class="d-none">
+        <input type="hidden" name="userId" value="@Model.SelectedUser.UserId" />
+        <input type="file" id="avatarFileInput" name="photo" accept="image/png,image/jpeg,image/gif,image/webp" />
+    </form>
+    <form id="chooseAvatarForm" asp-controller="Access" asp-action="ChooseAvatar" method="post" class="d-none">
+        <input type="hidden" name="userId" value="@Model.SelectedUser.UserId" />
+        <input type="hidden" name="presetId" id="chosenPresetId" />
+    </form>
+
+    <div class="modal fade" id="avatarPickerModal" tabindex="-1" aria-labelledby="avatarPickerTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modern-modal template-modal">
+                <div class="modal-header">
+                    <div>
+                        <span class="eyebrow">Profile Photo</span>
+                        <h5 class="modal-title" id="avatarPickerTitle">Change photo for @Model.SelectedUser.UserId</h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="avatar-picker-label">Pick an avatar</p>
+                    <div class="avatar-preset-grid">
+                        @foreach (var preset in PresetAvatars.All)
+                        {
+                            <button type="button" class="avatar-preset" data-preset-id="@preset" title="@PresetAvatars.Label(preset)">
+                                <img src="@Url.Content(PresetAvatars.Url(preset))" alt="@PresetAvatars.Label(preset)" />
+                            </button>
+                        }
+                    </div>
+
+                    <p class="avatar-picker-label mt-4">Or upload your own</p>
+                    <button type="button" class="btn btn-outline-secondary w-100" id="pickAvatarFile"><partial name="_Icon" model="@("avatar")" /> 
+                        Choose image from this computer
+                    </button>
+                    <small class="text-muted d-block mt-2">PNG, JPG, GIF, or WEBP. Maximum 2 MB.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <form id="blockUserForm" asp-controller="Access" asp-action="BlockUser" method="post" class="d-none">
+        <input type="hidden" name="userId" value="@Model.SelectedUser.UserId" />
+    </form>
+    <form id="unblockUserForm" asp-controller="Access" asp-action="UnblockUser" method="post" class="d-none">
+        <input type="hidden" name="userId" value="@Model.SelectedUser.UserId" />
+    </form>
+    <form id="deleteUserForm" asp-controller="Access" asp-action="DeleteUser" method="post" class="d-none">
+        <input type="hidden" name="userId" value="@Model.SelectedUser.UserId" />
+    </form>
+
+    <div class="modal fade" id="deleteUserConfirmModal" tabindex="-1" aria-labelledby="deleteUserConfirmTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modern-modal delete-confirm-modal">
+                <div class="modal-header">
+                    <div>
+                        <span class="eyebrow">Delete Validation</span>
+                        <h5 class="modal-title" id="deleteUserConfirmTitle">Confirm access delete</h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">This removes <strong>@Model.SelectedUser.UserId</strong> from TBLACCESS entirely (all role and module grants). They will re-appear with default User access on their next LDAP login.</p>
+                    <label for="deleteUserPhrase" class="form-label">Type DELETE to continue</label>
+                    <input id="deleteUserPhrase" class="form-control" autocomplete="off" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><partial name="_Icon" model="@("cancel")" /> Cancel</button>
+                    <button type="button" class="btn btn-nxp-orange" id="confirmDeleteUserButton" disabled><partial name="_Icon" model="@("delete")" /> Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        (() => {
+            // "Add User" swaps the right-hand User Details container over to a New User
+            // form; Cancel swaps it back. Nothing navigates away from this page.
+            const toggleAddUser = document.getElementById('toggleAddUser');
+            const cancelAddUser = document.getElementById('cancelAddUser');
+            const newUserPanel = document.getElementById('newUserPanel');
+            const existingUserView = document.getElementById('accessSaveForm');
+            const saveValidationButton = document.getElementById('saveValidationButton');
+
+            const showNewUser = (show) => {
+                newUserPanel?.classList.toggle('d-none', !show);
+                existingUserView?.classList.toggle('d-none', show);
+                saveValidationButton?.classList.toggle('d-none', show);
+                toggleAddUser?.classList.toggle('is-active', show);
+                toggleAddUser?.setAttribute('aria-expanded', show.toString());
+
+                if (show) {
+                    setTimeout(() => document.getElementById('newUserId')?.focus(), 180);
+                }
+            };
+
+            toggleAddUser?.addEventListener('click', () => {
+                showNewUser(newUserPanel?.classList.contains('d-none') ?? false);
+            });
+
+            cancelAddUser?.addEventListener('click', () => showNewUser(false));
+
+            // Per-module "All" box. It is display-only - the four real checkboxes
+            // are what the form posts - so it both drives them and follows them.
+            const permissionRows = () => Array.from(document.querySelectorAll('.permission-table tbody tr'))
+                .map((row) => ({
+                    all: row.querySelector('[data-row-all]'),
+                    perms: Array.from(row.querySelectorAll('[data-row-perm]'))
+                }))
+                .filter((row) => row.all && row.perms.length > 0);
+
+            const syncRow = (row) => {
+                const ticked = row.perms.filter((perm) => perm.checked).length;
+                row.all.checked = ticked === row.perms.length;
+                row.all.indeterminate = ticked > 0 && ticked < row.perms.length;
+            };
+
+            permissionRows().forEach((row) => {
+                syncRow(row);
+                row.all.addEventListener('change', () => {
+                    row.perms.forEach((perm) => { perm.checked = row.all.checked; });
+                    row.all.indeterminate = false;
+                });
+                row.perms.forEach((perm) => perm.addEventListener('change', () => syncRow(row)));
+            });
+
+            const newUserCheckboxes = () =>
+                Array.from(document.querySelectorAll('#newUserPanel .permission-table input[type="checkbox"]'));
+
+            document.querySelector('[data-new-select-all]')?.addEventListener('click', () => {
+                newUserCheckboxes().forEach((checkbox) => { checkbox.checked = true; });
+            });
+
+            document.querySelector('[data-new-clear-all]')?.addEventListener('click', () => {
+                newUserCheckboxes().forEach((checkbox) => { checkbox.checked = false; });
+            });
+
+            ['[data-new-select-all]', '[data-new-clear-all]'].forEach((selector) =>
+                document.querySelector(selector)?.addEventListener('click', () => {
+                    // permissionRows() covers both grids.
+                    window.requestAnimationFrame(() => permissionRows().forEach(syncRow));
+                }));
+
+            const selectAll = document.querySelector('[data-select-all-modules]');
+            const clearAll = document.querySelector('[data-clear-all-modules]');
+            const moduleCheckboxes = () => Array.from(document.querySelectorAll('.permission-table input[type="checkbox"]'));
+
+            selectAll?.addEventListener('click', () => {
+                moduleCheckboxes().forEach((checkbox) => { checkbox.checked = true; });
+            });
+
+            clearAll?.addEventListener('click', () => {
+                moduleCheckboxes().forEach((checkbox) => { checkbox.checked = false; });
+            });
+
+            // Keep the row boxes honest when the whole-table buttons are used.
+            [selectAll, clearAll].forEach((button) =>
+                button?.addEventListener('click', () => permissionRows().forEach(syncRow)));
+
+            // Photo picker: choose a built-in avatar, or upload a file from this computer.
+            const avatarInput = document.getElementById('avatarFileInput');
+            avatarInput?.addEventListener('change', () => {
+                if (avatarInput.files && avatarInput.files.length > 0) {
+                    document.getElementById('uploadAvatarForm')?.submit();
+                }
+            });
+
+            const avatarModalElement = document.getElementById('avatarPickerModal');
+            if (avatarModalElement && window.bootstrap) {
+                if (avatarModalElement.parentElement !== document.body) {
+                    document.body.appendChild(avatarModalElement);
+                }
+
+                const avatarModal = new bootstrap.Modal(avatarModalElement);
+
+                document.querySelectorAll('[data-avatar-modal]').forEach((button) => {
+                    button.addEventListener('click', () => avatarModal.show());
+                });
+
+                avatarModalElement.querySelectorAll('[data-preset-id]').forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const chosen = document.getElementById('chosenPresetId');
+                        if (chosen) {
+                            chosen.value = button.getAttribute('data-preset-id') || '';
+                            document.getElementById('chooseAvatarForm')?.submit();
+                        }
+                    });
+                });
+
+                document.getElementById('pickAvatarFile')?.addEventListener('click', () => avatarInput?.click());
+            }
+
+            const deleteModalElement = document.getElementById('deleteUserConfirmModal');
+            if (!deleteModalElement || !window.bootstrap) {
+                return;
+            }
+
+            if (deleteModalElement.parentElement !== document.body) {
+                document.body.appendChild(deleteModalElement);
+            }
+
+            const deleteModal = new bootstrap.Modal(deleteModalElement);
+            const deletePhrase = document.getElementById('deleteUserPhrase');
+            const confirmDeleteButton = document.getElementById('confirmDeleteUserButton');
+            const deleteTrigger = document.querySelector('[data-delete-user-trigger]');
+
+            deleteTrigger?.addEventListener('click', () => {
+                deletePhrase.value = '';
+                confirmDeleteButton.disabled = true;
+                deleteModal.show();
+                setTimeout(() => deletePhrase.focus(), 180);
+            });
+
+            deletePhrase?.addEventListener('input', () => {
+                confirmDeleteButton.disabled = deletePhrase.value.trim().toUpperCase() !== 'DELETE';
+            });
+
+            confirmDeleteButton?.addEventListener('click', () => {
+                if (deletePhrase.value.trim().toUpperCase() === 'DELETE') {
+                    document.getElementById('deleteUserForm')?.submit();
+                }
+            });
+        })();
+    </script>
+}
