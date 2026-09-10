@@ -1531,12 +1531,11 @@
              new(AuditedTableNames.WireBond, "ROWID = CHARTOROWID(:row_key)");
 --- a/Database/tblwirebond.sql
 +++ b/Database/tblwirebond.sql
-@@ -1,50 +1,39 @@
- -- =====================================================================
+@@ -1,113 +1,122 @@
+--- =====================================================================
 --- OCAPSYS.TBLWIREBOND - table + work-week trigger.
-+-- OCAPSYS.TBLWIREBOND - the wirebond recipe table.
- -- RUN THIS ONCE against the OCAPSYS schema.
- --
+--- RUN THIS ONCE against the OCAPSYS schema.
+---
 --- One row = one wire bond OCAP record: who raised it, the machine and
 --- package it was raised against, the defect, the 4M1E difference that
 --- caused it, and the disposition/action taken to close it.
@@ -1544,31 +1543,13 @@
 --- The DROP below is destructive. On a database that already holds
 --- production rows, skip straight to the CREATE OR REPLACE TRIGGER part,
 --- or export the rows first:
-+-- One row = one wirebond recipe: package, product, leadframe 12NC and
-+-- the recipe name. Same shape as AWACSRECIPEBYWSTYPE minus WSTYPE -
-+-- every row in this table is wirebond, so there is nothing to filter on.
-+--
-+-- THE DROP BELOW IS DESTRUCTIVE and this script REPLACES the old OCAP
-+-- shape of the table (WBOCAPNO, WBOCAPWWK, WBDATE and the rest). Keep a
-+-- copy of whatever is in there first:
- --   CREATE TABLE tblwirebond_bak AS SELECT * FROM tblwirebond;
-+--
-+-- Run section 4 as well, or Edit and Delete on the page will fail.
- -- =====================================================================
- 
-+
-+-- ---------------------------------------------------------------------
-+-- 1. The table
-+--
-+-- PACKAGE is a RESERVED WORD in Oracle. It must be double-quoted and
-+-- uppercase - "PACKAGE" - everywhere it appears, here and in every
-+-- query. Unquoted or lowercase raises ORA-00904. This is the same thing
-+-- AWACSRECIPEBYWSTYPE does.
-+-- ---------------------------------------------------------------------
- DROP TABLE OCAPSYS.TBLWIREBOND CASCADE CONSTRAINTS;
- 
- CREATE TABLE OCAPSYS.TBLWIREBOND
- (
+---   CREATE TABLE tblwirebond_bak AS SELECT * FROM tblwirebond;
+--- =====================================================================
+-
+-DROP TABLE OCAPSYS.TBLWIREBOND CASCADE CONSTRAINTS;
+-
+-CREATE TABLE OCAPSYS.TBLWIREBOND
+-(
 -  TBLROWID           VARCHAR2(50 BYTE),    -- row key: RAWTOHEX(SYS_GUID()), same as AWACSWSTYPE
 -  LASTUPDATE         DATE,                 -- SYSDATE on every write
 -  LASTUPDATEDBY      VARCHAR2(50 BYTE),    -- sAMAccountName, e.g. NX487878
@@ -1598,25 +1579,26 @@
 -  WBREMARKS          VARCHAR2(500 BYTE),
 -  WBRCMACHINEERROR   VARCHAR2(1000 BYTE),
 -  WBMACHINEERROR     VARCHAR2(100 BYTE)
-+  TBLROWID       VARCHAR2(50 BYTE),   -- row key: RAWTOHEX(SYS_GUID()), same as AWACSWSTYPE
-+  LASTUPDATE     DATE,                -- SYSDATE on every write
-+  LASTUPDATEDBY  VARCHAR2(50 BYTE),   -- sAMAccountName, e.g. NX487878
-+  "PACKAGE"      VARCHAR2(64 BYTE),   -- optional
-+  PRODUCT        VARCHAR2(64 BYTE),
-+  LEADFRAME12NC  VARCHAR2(16 BYTE),
-+  RECIPE         VARCHAR2(120 BYTE)
- )
- TABLESPACE OCAPSYS_DAT
- PCTFREE    10
-@@ -62,52 +51,65 @@
- NOCOMPRESS
- NOCACHE;
- 
-+
- -- ---------------------------------------------------------------------
+-)
+-TABLESPACE OCAPSYS_DAT
+-PCTFREE    10
+-INITRANS   1
+-MAXTRANS   255
+-STORAGE    (
+-            INITIAL          64K
+-            NEXT             1M
+-            MINEXTENTS       1
+-            MAXEXTENTS       UNLIMITED
+-            PCTINCREASE      0
+-            BUFFER_POOL      DEFAULT
+-           )
+-LOGGING
+-NOCOMPRESS
+-NOCACHE;
+-
+--- ---------------------------------------------------------------------
 --- Work-week trigger
-+-- 2. The old work-week trigger is gone with the old columns
- --
+---
 --- Fixed against the original version, which called
 ---   get_wwk_app_cutoff(to_date(sysdate, 'DD-MM-YYYY-HH24:MI:SS'))
 --- SYSDATE is already a DATE. TO_DATE wants a string, so Oracle first
@@ -1663,6 +1645,70 @@
 --- SELECT table_name FROM all_tables WHERE table_name = 'TBLWIREBOND';
 --- SELECT trigger_name, status FROM all_triggers
 ---  WHERE trigger_name = 'OCAP_WIREBOND_WORKWEEK';
++-- =====================================================================
++-- OCAPSYS.TBLWIREBOND - the wirebond recipe table.
++-- RUN THIS ONCE against the OCAPSYS schema.
++--
++-- One row = one wirebond recipe: package, product, leadframe 12NC and
++-- the recipe name. Same shape as AWACSRECIPEBYWSTYPE minus WSTYPE -
++-- every row in this table is wirebond, so there is nothing to filter on.
++--
++-- PREFER Database/tblwirebond-migrate.sql IF THE TABLE ALREADY EXISTS.
++-- That one converts the table in place with ALTER: it keeps the grants,
++-- the synonyms and the privileges, and it cannot fail because your
++-- tablespace is named something else. Use THIS script only for a table
++-- that does not exist yet, or one you are happy to lose.
++--
++-- THE DROP BELOW IS DESTRUCTIVE and this script REPLACES the old OCAP
++-- shape of the table (WBOCAPNO, WBOCAPWWK, WBDATE and the rest). Keep a
++-- copy of whatever is in there first:
++--   CREATE TABLE tblwirebond_bak AS SELECT * FROM tblwirebond;
++--
++-- Run section 4 as well, or Edit and Delete on the page will fail.
++-- =====================================================================
++
++
++-- ---------------------------------------------------------------------
++-- 1. The table
++--
++-- PACKAGE is a RESERVED WORD in Oracle. It must be double-quoted and
++-- uppercase - "PACKAGE" - everywhere it appears, here and in every
++-- query. Unquoted or lowercase raises ORA-00904. This is the same thing
++-- AWACSRECIPEBYWSTYPE does.
++-- ---------------------------------------------------------------------
++DROP TABLE OCAPSYS.TBLWIREBOND CASCADE CONSTRAINTS;
++
++CREATE TABLE OCAPSYS.TBLWIREBOND
++(
++  TBLROWID       VARCHAR2(50 BYTE),   -- row key: RAWTOHEX(SYS_GUID()), same as AWACSWSTYPE
++  LASTUPDATE     DATE,                -- SYSDATE on every write
++  LASTUPDATEDBY  VARCHAR2(50 BYTE),   -- sAMAccountName, e.g. NX487878
++  "PACKAGE"      VARCHAR2(64 BYTE),   -- optional
++  PRODUCT        VARCHAR2(64 BYTE),
++  LEADFRAME12NC  VARCHAR2(16 BYTE),
++  RECIPE         VARCHAR2(120 BYTE)
++);
++
++-- The storage clause the old table carried. Left out above on purpose:
++-- TABLESPACE OCAPSYS_DAT fails with ORA-00959 on any database where that
++-- tablespace is named something else, and it takes the CREATE TABLE down
++-- with it - which leaves you with no table at all and a DROP that already
++-- succeeded. Without it Oracle uses the schema's default tablespace,
++-- which is what you want in almost every case. Add it back if your DBA
++-- says the table must live in a specific tablespace:
++--
++-- TABLESPACE OCAPSYS_DAT
++-- PCTFREE    10
++-- INITRANS   1
++-- MAXTRANS   255
++-- STORAGE    (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED
++--             PCTINCREASE 0 BUFFER_POOL DEFAULT)
++-- LOGGING NOCOMPRESS NOCACHE
++
++
++-- ---------------------------------------------------------------------
++-- 2. The old work-week trigger is gone with the old columns
++--
 +-- OCAP_WIREBOND_WORKWEEK filled WBOCAPWWK from WBDATE. Neither column
 +-- exists any more, so the trigger cannot compile and would fail every
 +-- insert with ORA-04098. The DROP TABLE above already removed it; this
@@ -1723,17 +1769,16 @@
 +WHERE  constraint_name IN ('CK_TBLRECIPEHISTORY_TABLE', 'CK_TBLRECIPETRASH_TABLE');
 --- a/Database/tblwirebond-insert.sql
 +++ b/Database/tblwirebond-insert.sql
-@@ -1,26 +1,19 @@
- -- =====================================================================
+@@ -1,269 +1,86 @@
+--- =====================================================================
 --- OCAPSYS.TBLWIREBOND - how to insert values.
 ---
 --- Copy the pattern you need. Every example is complete and runnable in
 --- SQL Developer / SQL*Plus as the OCAPSYS user (drop the OCAPSYS.
 --- prefix if you connect as OCAPSYS; keep it if you connect as someone
 --- else who has INSERT granted).
-+-- OCAPSYS.TBLWIREBOND - how to insert values by hand.
- --
- -- Three rules for this table:
+---
+--- Three rules for this table:
 ---   1. TBLROWID is a normal VARCHAR2(50) column, NOT the Oracle ROWID
 ---      pseudo-column. Fill it with RAWTOHEX(SYS_GUID()) - the same thing
 ---      the web app does for AWACSWSTYPE. Never write ROWID in an INSERT.
@@ -1741,51 +1786,38 @@
 ---      OCAP_WIREBOND_WORKWEEK computes it from the date on the row. Anything
 ---      you pass is replaced (or, with the NVL variant in
 ---      tblwirebond.sql, only kept if you deliberately set it).
-+--   1. PACKAGE is a reserved word in Oracle. Write it "PACKAGE" -
-+--      double-quoted and uppercase - or you get ORA-00904.
-+--   2. TBLROWID is a normal VARCHAR2(50) column, NOT the Oracle ROWID
-+--      pseudo-column. Fill it with RAWTOHEX(SYS_GUID()), the same thing
-+--      the web app does. Never write ROWID in an INSERT.
- --   3. Nothing is committed until you say COMMIT. Until then only your
- --      own session can see the row.
- --
+---   3. Nothing is committed until you say COMMIT. Until then only your
+---      own session can see the row.
+---
 --- HOW TO RUN THESE: each numbered block below is one statement followed
 --- by its own COMMIT. Most clients only accept ONE statement at a time,
 --- so highlight the INSERT by itself (WITHOUT the trailing COMMIT), run
 --- it, then run COMMIT on its own. Sending both together gives
-+-- HOW TO RUN THESE: each block is one statement followed by its own
-+-- COMMIT. Most clients only accept ONE statement at a time, so highlight
-+-- the INSERT by itself (WITHOUT the trailing COMMIT), run it, then run
-+-- COMMIT on its own. Sending both together gives
- --   ORA-00933: SQL command not properly ended
- -- pointing at the COMMIT line. In SQL Developer, Run Script (F5) runs a
- -- whole ;-separated batch; Run Statement (Ctrl+Enter) does not.
-@@ -28,242 +21,66 @@
- 
- 
- -- ---------------------------------------------------------------------
+---   ORA-00933: SQL command not properly ended
+--- pointing at the COMMIT line. In SQL Developer, Run Script (F5) runs a
+--- whole ;-separated batch; Run Statement (Ctrl+Enter) does not.
+--- =====================================================================
+-
+-
+--- ---------------------------------------------------------------------
 --- 1. The everyday insert - only the columns actually keyed in
-+-- 1. One row
- -- ---------------------------------------------------------------------
- INSERT INTO OCAPSYS.TBLWIREBOND
+--- ---------------------------------------------------------------------
+-INSERT INTO OCAPSYS.TBLWIREBOND
 -    (TBLROWID, LASTUPDATE, LASTUPDATEDBY,
 -     WBOCAPNO, WBISSUEDBY, WBBFG, WBDATE,
 -     WBOPERATORID, WBPROCESS, WBMACHINE, WBPACKAGE, WBSOQTY,
 -     WBDEFECT, WBDEFECTCAT)
-+    (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT, LEADFRAME12NC, RECIPE)
- VALUES
+-VALUES
 -    (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878',
 -     'OCAP-WB-2026-001', 'NX487878', 'BFG1',
 -     TO_DATE('2026-09-10 14:30', 'YYYY-MM-DD HH24:MI'),
 -     'OP1023', 'WIREBOND', 'WB-07', 'SOT669', 3000,
 -     'NON STICK ON PAD', 'PROCESS');
-+    (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', 'SOT669',
-+     'BUK9K6-40E', '934123456789', 'WB_SOT669_STD');
- 
- COMMIT;
- 
- 
- -- ---------------------------------------------------------------------
+-
+-COMMIT;
+-
+-
+--- ---------------------------------------------------------------------
 --- 2. The full insert - every column, so nothing is forgotten on a
 ---    record that goes all the way through to disposition
 --- ---------------------------------------------------------------------
@@ -1855,10 +1887,9 @@
 --- 3. Several rows in one statement - INSERT ALL
 ---    (Oracle has no multi-row VALUES (...),(...) syntax.)
 ---    All rows commit or none do, and the trigger still fires per row.
-+-- 2. Several at once
- -- ---------------------------------------------------------------------
- INSERT ALL
-     INTO OCAPSYS.TBLWIREBOND
+--- ---------------------------------------------------------------------
+-INSERT ALL
+-    INTO OCAPSYS.TBLWIREBOND
 -        (TBLROWID, LASTUPDATE, LASTUPDATEDBY, WBOCAPNO, WBDATE,
 -         WBMACHINE, WBPACKAGE, WBSOQTY, WBDEFECT, WBDEFECTCAT)
 -    VALUES
@@ -1868,29 +1899,23 @@
 -    INTO OCAPSYS.TBLWIREBOND
 -        (TBLROWID, LASTUPDATE, LASTUPDATEDBY, WBOCAPNO, WBDATE,
 -         WBMACHINE, WBPACKAGE, WBSOQTY, WBDEFECT, WBDEFECTCAT)
-+        (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT, LEADFRAME12NC, RECIPE)
-     VALUES
+-    VALUES
 -        (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', 'OCAP-WB-2026-004',
 -         TO_DATE('2026-09-09', 'YYYY-MM-DD'), 'WB-05', 'SOT1235', 4500,
 -         'WIRE SAG', 'MACHINE')
-+        (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', 'SOT1210',
-+         'PSMN012-30YLD', '934198765432', 'WB_SOT1210_STD')
-     INTO OCAPSYS.TBLWIREBOND
+-    INTO OCAPSYS.TBLWIREBOND
 -        (TBLROWID, LASTUPDATE, LASTUPDATEDBY, WBOCAPNO, WBDATE,
 -         WBMACHINE, WBPACKAGE, WBSOQTY, WBDEFECT, WBDEFECTCAT)
-+        (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT, LEADFRAME12NC, RECIPE)
-     VALUES
+-    VALUES
 -        (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', 'OCAP-WB-2026-005',
 -         TO_DATE('2026-09-09', 'YYYY-MM-DD'), 'WB-05', 'SOT1235', 4500,
 -         'BALL SHEAR LOW', 'MATERIAL')
-+        (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', 'SOT1235',
-+         'PSMN4R0-40YS', '934111222333', 'WB_SOT1235_STD')
- SELECT 1 FROM dual;
- 
- COMMIT;
- 
- 
- -- ---------------------------------------------------------------------
+-SELECT 1 FROM dual;
+-
+-COMMIT;
+-
+-
+--- ---------------------------------------------------------------------
 --- 4. Bind variables - the form the web app and any parameterized client
 ---    should use. Never build an INSERT by pasting user text into the
 ---    string; a name with an apostrophe breaks it and it is an injection
@@ -1921,13 +1946,8 @@
 --- 5. Bulk load from a staging table (an uploaded spreadsheet landed in
 ---    TBLWIREBOND_STG with matching column names). The trigger fills
 ---    WBOCAPWWK for each row, so it is not selected here either.
-+-- 3. Copy the existing WIREBOND recipes out of AWACSRECIPEBYWSTYPE
-+--
-+-- If the wirebond recipes are already on the old recipe grid, this moves
-+-- them across instead of keying them in again. Skips anything already in
-+-- TBLWIREBOND, so it is safe to re-run.
- -- ---------------------------------------------------------------------
- -- INSERT INTO OCAPSYS.TBLWIREBOND
+--- ---------------------------------------------------------------------
+--- INSERT INTO OCAPSYS.TBLWIREBOND
 ---     (TBLROWID, LASTUPDATE, LASTUPDATEDBY, WBOCAPNO, WBISSUEDBY, WBBFG,
 ---      WBDATE, WBOPERATORID, WBPROCESS, WBMACHINE, WBPACKAGE, WBSOQTY,
 ---      WBDEFECT, WBDEFECTCAT)
@@ -1941,23 +1961,12 @@
 --- WHERE  s.wbocapno IS NOT NULL
 ---   AND  NOT EXISTS (SELECT 1 FROM OCAPSYS.TBLWIREBOND t
 ---                    WHERE t.wbocapno = s.wbocapno);
-+--     (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT, LEADFRAME12NC, RECIPE)
-+-- SELECT RAWTOHEX(SYS_GUID()), NVL(a.lastupdate, SYSDATE), a.lastupdatedby,
-+--        a."PACKAGE", a.product, a.leadframe12nc, a.recipe
-+-- FROM   OCAPSYS.AWACSRECIPEBYWSTYPE a
-+-- WHERE  a.wstype = 'WIREBOND'
-+--   AND  NOT EXISTS (SELECT 1
-+--                    FROM   OCAPSYS.TBLWIREBOND w
-+--                    WHERE  UPPER(w.product)       = UPPER(a.product)
-+--                      AND  UPPER(w.leadframe12nc) = UPPER(a.leadframe12nc)
-+--                      AND  UPPER(w.recipe)        = UPPER(a.recipe));
- -- COMMIT;
- 
- 
- -- ---------------------------------------------------------------------
+--- COMMIT;
+-
+-
+--- ---------------------------------------------------------------------
 --- 6. Check what landed, before and after COMMIT
-+-- 4. What the page will show
- -- ---------------------------------------------------------------------
+--- ---------------------------------------------------------------------
 -SELECT tblrowid,
 -       wbocapno,
 -       wbocapwwk,          -- filled by the trigger
@@ -1967,14 +1976,9 @@
 -       wbsoqty,
 -       wbdefect,
 -       wbdefectcat,
-+SELECT ROWIDTOCHAR(ROWID) AS row_handle,
-+       "PACKAGE",
-+       product,
-+       leadframe12nc,
-+       recipe,
-        lastupdatedby,
-        TO_CHAR(lastupdate, 'YYYY-MM-DD HH24:MI:SS') AS lastupdate
- FROM   OCAPSYS.TBLWIREBOND
+-       lastupdatedby,
+-       TO_CHAR(lastupdate, 'YYYY-MM-DD HH24:MI:SS') AS lastupdate
+-FROM   OCAPSYS.TBLWIREBOND
 -ORDER  BY lastupdate DESC NULLS LAST
 -FETCH FIRST 20 ROWS ONLY;
 -
@@ -2035,20 +2039,104 @@
 ---                 schema. SELECT object_name, status FROM all_objects
 ---                 WHERE object_name = 'GET_WWK_APP_CUTOFF';
 --- ---------------------------------------------------------------------
++-- =====================================================================
++-- OCAPSYS.TBLWIREBOND - how to insert values by hand.
++--
++-- Three rules for this table:
++--   1. PACKAGE is a reserved word in Oracle. Write it "PACKAGE" -
++--      double-quoted and uppercase - or you get ORA-00904.
++--   2. TBLROWID is a normal VARCHAR2(50) column, NOT the Oracle ROWID
++--      pseudo-column. Fill it with RAWTOHEX(SYS_GUID()), the same thing
++--      the web app does. Never write ROWID in an INSERT.
++--   3. Nothing is committed until you say COMMIT. Until then only your
++--      own session can see the row.
++--
++-- HOW TO RUN THESE: each block is one statement followed by its own
++-- COMMIT. Most clients only accept ONE statement at a time, so highlight
++-- the INSERT by itself (WITHOUT the trailing COMMIT), run it, then run
++-- COMMIT on its own. Sending both together gives
++--   ORA-00933: SQL command not properly ended
++-- pointing at the COMMIT line. In SQL Developer, Run Script (F5) runs a
++-- whole ;-separated batch; Run Statement (Ctrl+Enter) does not.
++-- =====================================================================
++
++
++-- ---------------------------------------------------------------------
++-- 1. One row
++-- ---------------------------------------------------------------------
++INSERT INTO OCAPSYS.TBLWIREBOND
++    (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT, LEADFRAME12NC, RECIPE)
++VALUES
++    (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', 'SOT669',
++     'BUK9K6-40E', '934123456789', 'WB_SOT669_STD');
++
++COMMIT;
++
++
++-- ---------------------------------------------------------------------
++-- 2. Several at once
++-- ---------------------------------------------------------------------
++INSERT ALL
++    INTO OCAPSYS.TBLWIREBOND
++        (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT, LEADFRAME12NC, RECIPE)
++    VALUES
++        (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', 'SOT1210',
++         'PSMN012-30YLD', '934198765432', 'WB_SOT1210_STD')
++    INTO OCAPSYS.TBLWIREBOND
++        (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT, LEADFRAME12NC, RECIPE)
++    VALUES
++        (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', 'SOT1235',
++         'PSMN4R0-40YS', '934111222333', 'WB_SOT1235_STD')
++SELECT 1 FROM dual;
++
++COMMIT;
++
++
++-- ---------------------------------------------------------------------
++-- 3. Copy the existing WIREBOND recipes out of AWACSRECIPEBYWSTYPE
++--
++-- If the wirebond recipes are already on the old recipe grid, this moves
++-- them across instead of keying them in again. Skips anything already in
++-- TBLWIREBOND, so it is safe to re-run.
++-- ---------------------------------------------------------------------
++-- INSERT INTO OCAPSYS.TBLWIREBOND
++--     (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT, LEADFRAME12NC, RECIPE)
++-- SELECT RAWTOHEX(SYS_GUID()), NVL(a.lastupdate, SYSDATE), a.lastupdatedby,
++--        a."PACKAGE", a.product, a.leadframe12nc, a.recipe
++-- FROM   OCAPSYS.AWACSRECIPEBYWSTYPE a
++-- WHERE  a.wstype = 'WIREBOND'
++--   AND  NOT EXISTS (SELECT 1
++--                    FROM   OCAPSYS.TBLWIREBOND w
++--                    WHERE  UPPER(w.product)       = UPPER(a.product)
++--                      AND  UPPER(w.leadframe12nc) = UPPER(a.leadframe12nc)
++--                      AND  UPPER(w.recipe)        = UPPER(a.recipe));
++-- COMMIT;
++
++
++-- ---------------------------------------------------------------------
++-- 4. What the page will show
++-- ---------------------------------------------------------------------
++SELECT ROWIDTOCHAR(ROWID) AS row_handle,
++       "PACKAGE",
++       product,
++       leadframe12nc,
++       recipe,
++       lastupdatedby,
++       TO_CHAR(lastupdate, 'YYYY-MM-DD HH24:MI:SS') AS lastupdate
++FROM   OCAPSYS.TBLWIREBOND
 +ORDER  BY lastupdate DESC NULLS LAST;
 --- a/Database/tblwirebond-access.sql
 +++ b/Database/tblwirebond-access.sql
-@@ -1,5 +1,5 @@
- -- =====================================================================
+@@ -1,84 +1,87 @@
+--- =====================================================================
 --- Give somebody the new "Wirebond OCAP" module (TBLWIREBOND).
-+-- Give somebody the "Wirebond" module (the TBLWIREBOND page).
- --
- -- WHO NEEDS THIS: only users who are NOT Super Admins.
- -- AccessEvaluator.GetAsync returns ModulePermission.Full to any user in the
-@@ -7,14 +7,19 @@
- -- the page and its Add/Edit/Delete buttons with no grant at all.
- --
- -- Easier than running this: open Access Management in the app and tick the
+---
+--- WHO NEEDS THIS: only users who are NOT Super Admins.
+--- AccessEvaluator.GetAsync returns ModulePermission.Full to any user in the
+--- SuperAdmin role before it ever looks at TBLACCESS, so a Super Admin sees
+--- the page and its Add/Edit/Delete buttons with no grant at all.
+---
+--- Easier than running this: open Access Management in the app and tick the
 --- boxes on the "Wirebond OCAP" row. It writes exactly the row below. Use
 --- this script when the app cannot be reached, or to grant a batch of users
 --- at once.
@@ -2057,6 +2145,82 @@
 --- against ModuleNames.WireBondOcap in Models/AppModule.cs. 'WIREBOND OCAP'
 --- also matches (the lookup is case-insensitive) but keep the app spelling so
 --- the Access Management grid shows one row instead of two.
+---
+--- ACCESS_LEVEL is one tier per row, not a list (Models/AccessGrant.cs):
+---   READ   view only
+---   WRITE  view + add + update
+---   ADMIN  view + add + update + delete
+---   NONE   nothing
+---
+--- The 'Wirebond' module is the recipe page over AWACSRECIPEBYWSTYPE and is a
+--- different grant. Granting one does not grant the other.
+---
+--- Run the INSERT and the COMMIT as SEPARATE statements, or the client
+--- reports ORA-00933 against the COMMIT line.
+--- =====================================================================
+-
+--- One user, full access.
+-INSERT INTO OCAPSYS.TBLACCESS
+-    (USER_ID, USER_NAME, ROLE_NAME, MODULE_NAME, ACCESS_LEVEL,
+-     GRANTED_BY, GRANTED_DATE, EXPIRY_DATE, STATUS, CREATED_DATE, UPDATED_DATE)
+-VALUES
+-    ('NX021557', 'Operator Name', 'User', 'Wirebond OCAP', 'ADMIN',
+-     'NX487878', SYSDATE, NULL, 'ACTIVE', SYSDATE, SYSDATE);
+-
+-COMMIT;
+-
+-
+--- Change an existing grant instead of adding a second row for the same
+--- user and module.
+--- UPDATE OCAPSYS.TBLACCESS
+---    SET access_level = 'WRITE',
+---        granted_by   = 'NX487878',
+---        granted_date = SYSDATE,
+---        updated_date = SYSDATE
+---  WHERE user_id     = 'NX021557'
+---    AND module_name = 'Wirebond OCAP';
+--- COMMIT;
+-
+-
+--- Every user who can already see the Wirebond recipe page, granted the same
+--- tier on the OCAP page. Skips anyone who already has an OCAP grant, so it
+--- is safe to re-run.
+--- INSERT INTO OCAPSYS.TBLACCESS
+---     (USER_ID, USER_NAME, ROLE_NAME, MODULE_NAME, ACCESS_LEVEL,
+---      GRANTED_BY, GRANTED_DATE, EXPIRY_DATE, STATUS, CREATED_DATE, UPDATED_DATE)
+--- SELECT a.user_id, a.user_name, a.role_name, 'Wirebond OCAP', a.access_level,
+---        'NX487878', SYSDATE, NULL, 'ACTIVE', SYSDATE, SYSDATE
+--- FROM   OCAPSYS.TBLACCESS a
+--- WHERE  a.module_name = 'Wirebond'
+---   AND  NOT EXISTS (SELECT 1
+---                    FROM   OCAPSYS.TBLACCESS b
+---                    WHERE  b.user_id = a.user_id
+---                      AND  UPPER(b.module_name) = 'WIREBOND OCAP');
+--- COMMIT;
+-
+-
+--- Who has what. A user with no row here has no access to the module - the
+--- ACCOUNT row carries their overall role and status, not module access.
+-SELECT user_id,
+-       user_name,
+-       role_name,
+-       module_name,
+-       access_level,
+-       status,
+-       granted_by,
+-       TO_CHAR(granted_date, 'YYYY-MM-DD HH24:MI') AS granted_date
+-FROM   OCAPSYS.TBLACCESS
+-WHERE  UPPER(module_name) IN ('WIREBOND OCAP', 'WIREBOND')
+-ORDER  BY user_id, module_name;
++-- =====================================================================
++-- Give somebody the "Wirebond" module (the TBLWIREBOND page).
++--
++-- WHO NEEDS THIS: only users who are NOT Super Admins.
++-- AccessEvaluator.GetAsync returns ModulePermission.Full to any user in the
++-- SuperAdmin role before it ever looks at TBLACCESS, so a Super Admin sees
++-- the page and its Add/Edit/Delete buttons with no grant at all.
++--
++-- Easier than running this: open Access Management in the app and tick the
 +-- boxes on the "Wirebond" row. It writes exactly the row below. Use this
 +-- script when the app cannot be reached, or to grant a batch of users at
 +-- once.
@@ -2070,51 +2234,40 @@
 +-- you to grant that name; nothing in the app ever reads it, so a user with
 +-- only a 'Wirebond OCAP' row sees no Wirebond page and no Add/Edit/Delete
 +-- buttons. The last block below repairs any such rows.
- --
- -- ACCESS_LEVEL is one tier per row, not a list (Models/AccessGrant.cs):
- --   READ   view only
-@@ -22,19 +27,16 @@
- --   ADMIN  view + add + update + delete
- --   NONE   nothing
- --
---- The 'Wirebond' module is the recipe page over AWACSRECIPEBYWSTYPE and is a
---- different grant. Granting one does not grant the other.
----
- -- Run the INSERT and the COMMIT as SEPARATE statements, or the client
- -- reports ORA-00933 against the COMMIT line.
- -- =====================================================================
- 
---- One user, full access.
++--
++-- ACCESS_LEVEL is one tier per row, not a list (Models/AccessGrant.cs):
++--   READ   view only
++--   WRITE  view + add + update
++--   ADMIN  view + add + update + delete
++--   NONE   nothing
++--
++-- Run the INSERT and the COMMIT as SEPARATE statements, or the client
++-- reports ORA-00933 against the COMMIT line.
++-- =====================================================================
++
 +-- One user, full access (view + add + update + delete).
- INSERT INTO OCAPSYS.TBLACCESS
-     (USER_ID, USER_NAME, ROLE_NAME, MODULE_NAME, ACCESS_LEVEL,
-      GRANTED_BY, GRANTED_DATE, EXPIRY_DATE, STATUS, CREATED_DATE, UPDATED_DATE)
- VALUES
--    ('NX021557', 'Operator Name', 'User', 'Wirebond OCAP', 'ADMIN',
++INSERT INTO OCAPSYS.TBLACCESS
++    (USER_ID, USER_NAME, ROLE_NAME, MODULE_NAME, ACCESS_LEVEL,
++     GRANTED_BY, GRANTED_DATE, EXPIRY_DATE, STATUS, CREATED_DATE, UPDATED_DATE)
++VALUES
 +    ('NX021557', 'Operator Name', 'User', 'Wirebond', 'ADMIN',
-      'NX487878', SYSDATE, NULL, 'ACTIVE', SYSDATE, SYSDATE);
- 
- COMMIT;
-@@ -48,24 +50,25 @@
- --        granted_date = SYSDATE,
- --        updated_date = SYSDATE
- --  WHERE user_id     = 'NX021557'
----    AND module_name = 'Wirebond OCAP';
++     'NX487878', SYSDATE, NULL, 'ACTIVE', SYSDATE, SYSDATE);
++
++COMMIT;
++
++
++-- Change an existing grant instead of adding a second row for the same
++-- user and module.
++-- UPDATE OCAPSYS.TBLACCESS
++--    SET access_level = 'WRITE',
++--        granted_by   = 'NX487878',
++--        granted_date = SYSDATE,
++--        updated_date = SYSDATE
++--  WHERE user_id     = 'NX021557'
 +--    AND UPPER(module_name) = 'WIREBOND';
- -- COMMIT;
- 
- 
---- Every user who can already see the Wirebond recipe page, granted the same
---- tier on the OCAP page. Skips anyone who already has an OCAP grant, so it
---- is safe to re-run.
---- INSERT INTO OCAPSYS.TBLACCESS
----     (USER_ID, USER_NAME, ROLE_NAME, MODULE_NAME, ACCESS_LEVEL,
----      GRANTED_BY, GRANTED_DATE, EXPIRY_DATE, STATUS, CREATED_DATE, UPDATED_DATE)
---- SELECT a.user_id, a.user_name, a.role_name, 'Wirebond OCAP', a.access_level,
----        'NX487878', SYSDATE, NULL, 'ACTIVE', SYSDATE, SYSDATE
---- FROM   OCAPSYS.TBLACCESS a
---- WHERE  a.module_name = 'Wirebond'
----   AND  NOT EXISTS (SELECT 1
++-- COMMIT;
++
++
 +-- REPAIR: fold any old 'Wirebond OCAP' grants into the real 'Wirebond'
 +-- module, keeping the tier that was already granted. Safe to re-run.
 +-- UPDATE OCAPSYS.TBLACCESS a
@@ -2122,58 +2275,167 @@
 +--        a.updated_date = SYSDATE
 +--  WHERE UPPER(a.module_name) = 'WIREBOND OCAP'
 +--    AND NOT EXISTS (SELECT 1
- --                    FROM   OCAPSYS.TBLACCESS b
- --                    WHERE  b.user_id = a.user_id
----                      AND  UPPER(b.module_name) = 'WIREBOND OCAP');
++--                    FROM   OCAPSYS.TBLACCESS b
++--                    WHERE  b.user_id = a.user_id
 +--                      AND  UPPER(b.module_name) = 'WIREBOND');
 +-- COMMIT;
 +
 +-- Then drop the leftovers of users who already had both.
 +-- DELETE FROM OCAPSYS.TBLACCESS
 +--  WHERE UPPER(module_name) = 'WIREBOND OCAP';
- -- COMMIT;
- 
- 
-@@ -80,5 +83,5 @@
-        granted_by,
-        TO_CHAR(granted_date, 'YYYY-MM-DD HH24:MI') AS granted_date
- FROM   OCAPSYS.TBLACCESS
--WHERE  UPPER(module_name) IN ('WIREBOND OCAP', 'WIREBOND')
++-- COMMIT;
++
++
++-- Who has what. A user with no row here has no access to the module - the
++-- ACCOUNT row carries their overall role and status, not module access.
++SELECT user_id,
++       user_name,
++       role_name,
++       module_name,
++       access_level,
++       status,
++       granted_by,
++       TO_CHAR(granted_date, 'YYYY-MM-DD HH24:MI') AS granted_date
++FROM   OCAPSYS.TBLACCESS
 +WHERE  UPPER(module_name) IN ('WIREBOND', 'WIREBOND OCAP')
- ORDER  BY user_id, module_name;
++ORDER  BY user_id, module_name;
 --- a/Database/tblrecipeaudit.sql
 +++ b/Database/tblrecipeaudit.sql
-@@ -10,7 +10,8 @@
- --                   transaction, and if the copy fails the delete is
- --                   rolled back with it.
- --
+@@ -1,65 +1,66 @@
+--- =====================================================================
+--- Undo storage for the recipe workspace - RUN THIS ONCE against the
+--- OCAPSYS schema before using Edit or Delete in the web app.
+---
+--- TBLRECIPEHISTORY  what a row looked like BEFORE each update, so a wrong
+---                   update can be reverted from Settings > Change History.
+--- TBLRECIPETRASH    rows that were deleted, so Settings > Trash can put
+---                   them back. Delete never removes a row outright: the
+---                   copy into TBLRECIPETRASH and the DELETE happen in one
+---                   transaction, and if the copy fails the delete is
+---                   rolled back with it.
+---
 --- Both cover AWACSWSTYPE, AWACSRECIPEBYWSTYPE and AWACSLF. The snapshot is
+--- the whole row as JSON, read from the data dictionary at run time, so
+--- adding a column to one of those MES tables needs no change here.
+---
+--- Until this script has been run, the app refuses updates and deletes with
+--- a message pointing back at it rather than losing the old values.
+--- =====================================================================
+-
+-CREATE TABLE tblrecipehistory (
+-    history_id    NUMBER GENERATED ALWAYS AS IDENTITY,
+-    table_name    VARCHAR2(30)  NOT NULL,
+-    target_label  VARCHAR2(200) NOT NULL,
+-    row_key       VARCHAR2(64)  NOT NULL,
+-    old_values    CLOB          NOT NULL,
+-    new_values    CLOB          NOT NULL,
+-    changed_by    VARCHAR2(50)  NOT NULL,
+-    changed_date  DATE DEFAULT SYSDATE NOT NULL,
+-    reverted      CHAR(1) DEFAULT 'N' NOT NULL,
+-    reverted_by   VARCHAR2(50),
+-    reverted_date DATE,
+-    CONSTRAINT pk_tblrecipehistory PRIMARY KEY (history_id),
+-    CONSTRAINT ck_tblrecipehistory_table
+-        CHECK (table_name IN ('AWACSWSTYPE', 'AWACSRECIPEBYWSTYPE', 'AWACSLF')),
+-    CONSTRAINT ck_tblrecipehistory_reverted
+-        CHECK (reverted IN ('Y', 'N'))
+-);
+-
+-CREATE INDEX ix_tblrecipehistory_open
+-    ON tblrecipehistory (reverted, changed_date DESC);
+-
+-CREATE TABLE tblrecipetrash (
+-    trash_id      NUMBER GENERATED ALWAYS AS IDENTITY,
+-    table_name    VARCHAR2(30)  NOT NULL,
+-    target_label  VARCHAR2(200) NOT NULL,
+-    row_data      CLOB          NOT NULL,
+-    deleted_by    VARCHAR2(50)  NOT NULL,
+-    deleted_date  DATE DEFAULT SYSDATE NOT NULL,
+-    restored      CHAR(1) DEFAULT 'N' NOT NULL,
+-    restored_by   VARCHAR2(50),
+-    restored_date DATE,
+-    CONSTRAINT pk_tblrecipetrash PRIMARY KEY (trash_id),
+-    CONSTRAINT ck_tblrecipetrash_table
+-        CHECK (table_name IN ('AWACSWSTYPE', 'AWACSRECIPEBYWSTYPE', 'AWACSLF')),
+-    CONSTRAINT ck_tblrecipetrash_restored
+-        CHECK (restored IN ('Y', 'N'))
+-);
+-
+-CREATE INDEX ix_tblrecipetrash_open
+-    ON tblrecipetrash (restored, deleted_date DESC);
+-
+--- Quick check that it worked:
+--- SELECT table_name, COUNT(1) FROM tblrecipehistory GROUP BY table_name;
+--- SELECT table_name, COUNT(1) FROM tblrecipetrash   GROUP BY table_name;
++-- =====================================================================
++-- Undo storage for the recipe workspace - RUN THIS ONCE against the
++-- OCAPSYS schema before using Edit or Delete in the web app.
++--
++-- TBLRECIPEHISTORY  what a row looked like BEFORE each update, so a wrong
++--                   update can be reverted from Settings > Change History.
++-- TBLRECIPETRASH    rows that were deleted, so Settings > Trash can put
++--                   them back. Delete never removes a row outright: the
++--                   copy into TBLRECIPETRASH and the DELETE happen in one
++--                   transaction, and if the copy fails the delete is
++--                   rolled back with it.
++--
 +-- Both cover AWACSWSTYPE, AWACSRECIPEBYWSTYPE, AWACSLF and TBLWIREBOND. The
 +-- snapshot is
- -- the whole row as JSON, read from the data dictionary at run time, so
- -- adding a column to one of those MES tables needs no change here.
- --
-@@ -32,7 +33,7 @@
-     reverted_date DATE,
-     CONSTRAINT pk_tblrecipehistory PRIMARY KEY (history_id),
-     CONSTRAINT ck_tblrecipehistory_table
--        CHECK (table_name IN ('AWACSWSTYPE', 'AWACSRECIPEBYWSTYPE', 'AWACSLF')),
++-- the whole row as JSON, read from the data dictionary at run time, so
++-- adding a column to one of those MES tables needs no change here.
++--
++-- Until this script has been run, the app refuses updates and deletes with
++-- a message pointing back at it rather than losing the old values.
++-- =====================================================================
++
++CREATE TABLE tblrecipehistory (
++    history_id    NUMBER GENERATED ALWAYS AS IDENTITY,
++    table_name    VARCHAR2(30)  NOT NULL,
++    target_label  VARCHAR2(200) NOT NULL,
++    row_key       VARCHAR2(64)  NOT NULL,
++    old_values    CLOB          NOT NULL,
++    new_values    CLOB          NOT NULL,
++    changed_by    VARCHAR2(50)  NOT NULL,
++    changed_date  DATE DEFAULT SYSDATE NOT NULL,
++    reverted      CHAR(1) DEFAULT 'N' NOT NULL,
++    reverted_by   VARCHAR2(50),
++    reverted_date DATE,
++    CONSTRAINT pk_tblrecipehistory PRIMARY KEY (history_id),
++    CONSTRAINT ck_tblrecipehistory_table
 +        CHECK (table_name IN ('AWACSWSTYPE', 'AWACSRECIPEBYWSTYPE', 'AWACSLF', 'TBLWIREBOND')),
-     CONSTRAINT ck_tblrecipehistory_reverted
-         CHECK (reverted IN ('Y', 'N'))
- );
-@@ -52,7 +53,7 @@
-     restored_date DATE,
-     CONSTRAINT pk_tblrecipetrash PRIMARY KEY (trash_id),
-     CONSTRAINT ck_tblrecipetrash_table
--        CHECK (table_name IN ('AWACSWSTYPE', 'AWACSRECIPEBYWSTYPE', 'AWACSLF')),
++    CONSTRAINT ck_tblrecipehistory_reverted
++        CHECK (reverted IN ('Y', 'N'))
++);
++
++CREATE INDEX ix_tblrecipehistory_open
++    ON tblrecipehistory (reverted, changed_date DESC);
++
++CREATE TABLE tblrecipetrash (
++    trash_id      NUMBER GENERATED ALWAYS AS IDENTITY,
++    table_name    VARCHAR2(30)  NOT NULL,
++    target_label  VARCHAR2(200) NOT NULL,
++    row_data      CLOB          NOT NULL,
++    deleted_by    VARCHAR2(50)  NOT NULL,
++    deleted_date  DATE DEFAULT SYSDATE NOT NULL,
++    restored      CHAR(1) DEFAULT 'N' NOT NULL,
++    restored_by   VARCHAR2(50),
++    restored_date DATE,
++    CONSTRAINT pk_tblrecipetrash PRIMARY KEY (trash_id),
++    CONSTRAINT ck_tblrecipetrash_table
 +        CHECK (table_name IN ('AWACSWSTYPE', 'AWACSRECIPEBYWSTYPE', 'AWACSLF', 'TBLWIREBOND')),
-     CONSTRAINT ck_tblrecipetrash_restored
-         CHECK (restored IN ('Y', 'N'))
- );
++    CONSTRAINT ck_tblrecipetrash_restored
++        CHECK (restored IN ('Y', 'N'))
++);
++
++CREATE INDEX ix_tblrecipetrash_open
++    ON tblrecipetrash (restored, deleted_date DESC);
++
++-- Quick check that it worked:
++-- SELECT table_name, COUNT(1) FROM tblrecipehistory GROUP BY table_name;
++-- SELECT table_name, COUNT(1) FROM tblrecipetrash   GROUP BY table_name;
 --- a/README.md
 +++ b/README.md
-@@ -1,103 +1,148 @@
+@@ -1,103 +1,158 @@
 -# Wirebond OCAP page (OCAPSYS.TBLWIREBOND)
 +# Wirebond page (OCAPSYS.TBLWIREBOND)
  
@@ -2197,9 +2459,19 @@
 +filter on.
 +
 +## The database change comes first
+ 
+-Copy the files over the project, keeping the folder structure:
++Until the table is changed the page cannot load at all — the app asks for
++`RECIPE` and Oracle answers **ORA-00904: "RECIPE": invalid identifier**.
 +
-+`Database/tblwirebond.sql` rebuilds TBLWIREBOND to match. **It drops the
-+table**, so take a copy of whatever is in there first:
++Two ways to change it. **Use the first one** if TBLWIREBOND already exists:
++
++| Script | |
++|---|---|
++| `Database/tblwirebond-migrate.sql` | **Recommended.** Converts the table in place with `ALTER`. Keeps the grants, synonyms and privileges, and cannot fail over a tablespace name. Step by step, one statement at a time. |
++| `Database/tblwirebond.sql` | `DROP` + `CREATE`. For a table that does not exist yet, or one you are happy to lose. |
++
++Either way, take a copy first:
 +
 +```sql
 +CREATE TABLE tblwirebond_bak AS SELECT * FROM tblwirebond;
@@ -2220,8 +2492,7 @@
 +**`PACKAGE` is a reserved word in Oracle.** It has to be written `"PACKAGE"` —
 +double-quoted and uppercase — everywhere it appears, or Oracle answers
 +ORA-00904. `AWACSRECIPEBYWSTYPE` already does this; the app now does it too.
- 
--Copy the files over the project, keeping the folder structure:
++
 +The old OCAP columns (`WBOCAPNO`, `WBOCAPWWK`, `WBDATE`, the 4M1E and
 +disposition fields) are gone, and so is the `OCAP_WIREBOND_WORKWEEK` trigger —
 +it derived `WBOCAPWWK` from `WBDATE`, and neither column exists any more.
@@ -2283,7 +2554,8 @@
 +| `Services/WireBondService.cs` | rewritten |
 +| `Controllers/WireBondController.cs` | rewritten |
 +| `Views/WireBond/Index.cshtml` | rewritten — the ten-column grid |
-+| `Database/tblwirebond.sql` | rewritten — **run this** |
++| `Database/tblwirebond-migrate.sql` | new — **run this**, converts the table in place |
++| `Database/tblwirebond.sql` | rewritten — drop + create, the alternative to the above |
 +| `Database/tblrecipeaudit.sql` | changed — TBLWIREBOND added to both CHECK constraints |
 +| `Database/tblwirebond-insert.sql` | rewritten — by-hand inserts, plus a copy-from-AWACSRECIPEBYWSTYPE block |
 +| `Database/tblwirebond-check.sql` | rewritten — diagnose a save that did nothing |
@@ -2295,7 +2567,7 @@
 +- `Views/WireBond/_WireBondFields.cshtml`
 +- `ViewModels/WireBondPanelModel.cs`
 +
-+Then: run `Database/tblwirebond.sql`, `dotnet build`, `dotnet run`.
++Then: run `Database/tblwirebond-migrate.sql`, `dotnet build`, `dotnet run`.
 +
 +## Testing it
 +
@@ -2414,6 +2686,442 @@
 +input `name=` values match `WireBondInputModel` exactly, the sort keys match the
 +service whitelist exactly, and colgroup / header / add row / display row / edit
 +row are 10 cells each. Run `dotnet build` before trusting it.
+--- a/Database/tblwirebond-check.sql
++++ b/Database/tblwirebond-check.sql
+@@ -0,0 +1,87 @@
++-- =====================================================================
++-- TBLWIREBOND - "I saved a row on the page and nothing happened"
++--
++-- Run the blocks in order as the OCAPSYS user. Each block is one
++-- statement: in SQL Developer use Run Statement (Ctrl+Enter) on the one
++-- you want, or Run Script (F5) for the whole file.
++-- =====================================================================
++
++
++-- ---------------------------------------------------------------------
++-- 1. Is the table the new shape?
++--
++-- Expect exactly: TBLROWID, LASTUPDATE, LASTUPDATEDBY, PACKAGE, PRODUCT,
++-- LEADFRAME12NC, RECIPE. If you still see WBOCAPNO / WBDATE, the app is
++-- reading columns that are not there and every query fails with
++-- ORA-00904: "RECIPE": invalid identifier - which is exactly the error the
++-- page shows. Fix it with Database/tblwirebond-migrate.sql.
++-- ---------------------------------------------------------------------
++SELECT column_id, column_name, data_type, data_length
++FROM   all_tab_columns
++WHERE  table_name = 'TBLWIREBOND'
++ORDER  BY column_id;
++
++
++-- ---------------------------------------------------------------------
++-- 2. Is the row actually there? Newest 20, same order as the page.
++-- ---------------------------------------------------------------------
++SELECT TO_CHAR(lastupdate, 'YYYY-MM-DD HH24:MI:SS') AS lastupdate,
++       lastupdatedby,
++       "PACKAGE",
++       product,
++       leadframe12nc,
++       recipe
++FROM   OCAPSYS.TBLWIREBOND
++ORDER  BY lastupdate DESC NULLS LAST
++FETCH FIRST 20 ROWS ONLY;
++
++
++-- ---------------------------------------------------------------------
++-- 3. THE ONE THAT BREAKS EDIT AND DELETE
++--
++-- Edit copies the old row into TBLRECIPEHISTORY, Delete copies the whole
++-- row into TBLRECIPETRASH, both in the same transaction as the write.
++-- Both tables CHECK the table name against a fixed list. If TBLWIREBOND
++-- is not in that list, every Edit and every Delete on the page fails with
++--   ORA-02290: check constraint (...) violated
++-- and rolls back - Add still works, which is what makes it confusing.
++--
++-- Both rows below must mention TBLWIREBOND. If they do not, run section 4
++-- of Database/tblwirebond.sql.
++-- ---------------------------------------------------------------------
++SELECT constraint_name, search_condition
++FROM   all_constraints
++WHERE  constraint_name IN ('CK_TBLRECIPEHISTORY_TABLE', 'CK_TBLRECIPETRASH_TABLE');
++
++
++-- ---------------------------------------------------------------------
++-- 4. Can the signed-in user see the Add / Edit / Delete buttons?
++--
++-- Super Admins always can. Everyone else needs a row here with
++-- MODULE_NAME 'Wirebond':
++--   READ  = view only    WRITE = view + add + update
++--   ADMIN = view + add + update + delete
++-- Replace NX487878 with the login id that is having the problem.
++-- ---------------------------------------------------------------------
++SELECT user_id, user_name, role_name, module_name, access_level, status
++FROM   OCAPSYS.TBLACCESS
++WHERE  user_id = 'NX487878'
++ORDER  BY module_name;
++
++
++-- ---------------------------------------------------------------------
++-- 5. End-to-end test, then thrown away. If this raises an error, the
++--    page would have raised the same one. Run one statement at a time.
++-- ---------------------------------------------------------------------
++INSERT INTO OCAPSYS.TBLWIREBOND
++    (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT, LEADFRAME12NC, RECIPE)
++VALUES
++    (RAWTOHEX(SYS_GUID()), SYSDATE, 'TESTUSER', 'SOT669',
++     'SELFTEST-PRODUCT', '934000000000', 'WB_SELFTEST');
++
++SELECT "PACKAGE", product, leadframe12nc, recipe
++FROM   OCAPSYS.TBLWIREBOND
++WHERE  product = 'SELFTEST-PRODUCT';
++
++-- Put the table back the way it was:
++ROLLBACK;
+--- a/Database/tblwirebond-migrate.sql
++++ b/Database/tblwirebond-migrate.sql
+@@ -0,0 +1,278 @@
++-- =====================================================================
++-- TBLWIREBOND - convert the table to the recipe shape.
++--
++-- FIXES: ORA-00904: "RECIPE": invalid identifier
++--
++-- HOW TO RUN THIS
++--   Open the file, click anywhere in it, press F5.
++--     Toad for Oracle .... F5 = Execute as Script
++--     SQL Developer ...... F5 = Run Script
++--
++--   That is the whole procedure. This file is ONE PL/SQL block and
++--   ENDS at the / on the last line - there is deliberately nothing
++--   after it. The verification queries live in
++--   tblwirebond-verify.sql, run that afterwards.
++--
++--   (Two earlier versions of this script failed on exactly that. Toad
++--   read past a / that had a trailing SELECT after it and reported
++--   PLS-00103: Encountered the symbol "SELECT". Nothing follows the /
++--   now, and the file is saved with Windows line endings so the / is
++--   seen as a line of its own.)
++--
++--   If your client still complains: select from the word DECLARE down
++--   to and including the / on the last line, then run.
++--
++-- IT IS SAFE TO RUN TWICE. Every step checks the database first and
++-- skips itself if it has already been done, so a half-finished attempt
++-- is repaired by running the whole thing again.
++--
++-- WHAT IT DOES
++--   1. copies the table to TBLWIREBOND_BAK, if that copy does not exist
++--   2. drops the OCAP_WIREBOND_WORKWEEK trigger
++--   3. adds TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT,
++--      LEADFRAME12NC, RECIPE - only the ones that are missing
++--   4. copies WBPACKAGE into "PACKAGE"
++--   5. lets TBLRECIPEHISTORY and TBLRECIPETRASH accept TBLWIREBOND rows,
++--      without which Edit and Delete fail with ORA-02290 while Add works
++--   6. drops every WB* column that is left
++--   7. checks the result and RAISES AN ERROR if anything is still wrong
++--   8. prints the finished table
++--
++-- TO SEE WHAT IT DID: View > DBMS Output, click the green +, pick your
++-- connection, then run. Worth doing - step 8 prints the finished table.
++-- If something is wrong the block raises an error either way.
++-- =====================================================================
++
++DECLARE
++    v_owner        VARCHAR2(128);
++    v_audit_owner  VARCHAR2(128);
++    v_count        PLS_INTEGER;
++    v_columns      VARCHAR2(4000);
++    v_missing      VARCHAR2(4000);
++
++    -- Every step goes through this. A step that cannot run is logged and
++    -- stepped over rather than stopping the block: half of them are
++    -- expected to be no-ops on a table that is already part-converted,
++    -- and the check at the end is what decides whether the whole thing
++    -- actually worked.
++    PROCEDURE run(p_sql VARCHAR2) IS
++    BEGIN
++        EXECUTE IMMEDIATE p_sql;
++        DBMS_OUTPUT.PUT_LINE('  done    : ' || p_sql);
++    EXCEPTION
++        WHEN OTHERS THEN
++            DBMS_OUTPUT.PUT_LINE('  skipped : ' || SQLERRM);
++            DBMS_OUTPUT.PUT_LINE('            ' || p_sql);
++    END run;
++
++    FUNCTION has_column(p_column VARCHAR2) RETURN BOOLEAN IS
++        n PLS_INTEGER;
++    BEGIN
++        SELECT COUNT(*) INTO n
++        FROM   all_tab_columns
++        WHERE  owner = v_owner
++          AND  table_name = 'TBLWIREBOND'
++          AND  column_name = p_column;
++        RETURN n > 0;
++    END has_column;
++
++    PROCEDURE add_column(p_column VARCHAR2, p_type VARCHAR2) IS
++    BEGIN
++        IF has_column(p_column) THEN
++            DBMS_OUTPUT.PUT_LINE('  already : ' || p_column);
++        ELSE
++            -- The column name is quoted on the way in, so PACKAGE - a
++            -- reserved word - is accepted like any other name.
++            run('ALTER TABLE ' || v_owner || '.TBLWIREBOND ADD ("'
++                || p_column || '" ' || p_type || ')');
++        END IF;
++    END add_column;
++BEGIN
++    ------------------------------------------------------------------
++    -- Which schema is the table actually in? Prefer OCAPSYS, but do not
++    -- insist on it - the app names the table without a schema, so it
++    -- could be anywhere this account can see.
++    ------------------------------------------------------------------
++    BEGIN
++        SELECT owner INTO v_owner
++        FROM   (SELECT owner
++                FROM   all_tables
++                WHERE  table_name = 'TBLWIREBOND'
++                ORDER  BY CASE WHEN owner = 'OCAPSYS' THEN 0 ELSE 1 END, owner)
++        WHERE  ROWNUM = 1;
++    EXCEPTION
++        WHEN NO_DATA_FOUND THEN
++            RAISE_APPLICATION_ERROR(-20001,
++                'TBLWIREBOND does not exist, or this account cannot see it. '
++                || 'Run Database/tblwirebond.sql to create it instead.');
++    END;
++
++    DBMS_OUTPUT.PUT_LINE('TBLWIREBOND found in schema ' || v_owner);
++    DBMS_OUTPUT.PUT_LINE('');
++
++    ------------------------------------------------------------------
++    -- 1. Backup
++    ------------------------------------------------------------------
++    DBMS_OUTPUT.PUT_LINE('1. backup');
++    SELECT COUNT(*) INTO v_count
++    FROM   all_tables
++    WHERE  owner = v_owner AND table_name = 'TBLWIREBOND_BAK';
++
++    IF v_count > 0 THEN
++        DBMS_OUTPUT.PUT_LINE('  already : ' || v_owner || '.TBLWIREBOND_BAK exists, left alone');
++    ELSE
++        run('CREATE TABLE ' || v_owner || '.TBLWIREBOND_BAK AS SELECT * FROM '
++            || v_owner || '.TBLWIREBOND');
++    END IF;
++
++    ------------------------------------------------------------------
++    -- 2. The work-week trigger, before the columns it reads
++    --
++    -- OCAP_WIREBOND_WORKWEEK reads WBDATE and writes WBOCAPWWK. Drop
++    -- those columns while it still exists and the trigger goes INVALID,
++    -- and then every insert dies with ORA-04098.
++    ------------------------------------------------------------------
++    DBMS_OUTPUT.PUT_LINE('2. work-week trigger');
++    SELECT COUNT(*) INTO v_count
++    FROM   all_triggers
++    WHERE  owner = v_owner AND trigger_name = 'OCAP_WIREBOND_WORKWEEK';
++
++    IF v_count = 0 THEN
++        DBMS_OUTPUT.PUT_LINE('  already : no OCAP_WIREBOND_WORKWEEK trigger');
++    ELSE
++        run('DROP TRIGGER ' || v_owner || '.OCAP_WIREBOND_WORKWEEK');
++    END IF;
++
++    ------------------------------------------------------------------
++    -- 3. The seven columns the page needs
++    ------------------------------------------------------------------
++    DBMS_OUTPUT.PUT_LINE('3. columns');
++    add_column('TBLROWID',      'VARCHAR2(50 BYTE)');
++    add_column('LASTUPDATE',    'DATE');
++    add_column('LASTUPDATEDBY', 'VARCHAR2(50 BYTE)');
++    add_column('PACKAGE',       'VARCHAR2(64 BYTE)');
++    add_column('PRODUCT',       'VARCHAR2(64 BYTE)');
++    add_column('LEADFRAME12NC', 'VARCHAR2(16 BYTE)');
++    add_column('RECIPE',        'VARCHAR2(120 BYTE)');
++
++    ------------------------------------------------------------------
++    -- 4. WBPACKAGE is the one old column that means the same thing
++    ------------------------------------------------------------------
++    DBMS_OUTPUT.PUT_LINE('4. carry WBPACKAGE across');
++    IF has_column('WBPACKAGE') THEN
++        run('UPDATE ' || v_owner || '.TBLWIREBOND SET "PACKAGE" = WBPACKAGE '
++            || 'WHERE WBPACKAGE IS NOT NULL AND "PACKAGE" IS NULL');
++        COMMIT;
++    ELSE
++        DBMS_OUTPUT.PUT_LINE('  already : no WBPACKAGE column, nothing to carry');
++    END IF;
++
++    ------------------------------------------------------------------
++    -- 5. Let the undo tables accept TBLWIREBOND rows
++    --
++    -- Edit copies the old row into TBLRECIPEHISTORY and Delete copies
++    -- the whole row into TBLRECIPETRASH, both inside the same
++    -- transaction as the write. Both tables CHECK the table name against
++    -- a fixed list that never included TBLWIREBOND, so both fail with
++    -- ORA-02290 and roll back - while Add works, which is what makes it
++    -- confusing.
++    ------------------------------------------------------------------
++    DBMS_OUTPUT.PUT_LINE('5. undo tables');
++    BEGIN
++        SELECT owner INTO v_audit_owner
++        FROM   (SELECT owner
++                FROM   all_tables
++                WHERE  table_name = 'TBLRECIPEHISTORY'
++                ORDER  BY CASE WHEN owner = v_owner THEN 0 ELSE 1 END, owner)
++        WHERE  ROWNUM = 1;
++
++        run('ALTER TABLE ' || v_audit_owner || '.TBLRECIPEHISTORY DROP CONSTRAINT ck_tblrecipehistory_table');
++        run('ALTER TABLE ' || v_audit_owner || '.TBLRECIPEHISTORY ADD CONSTRAINT ck_tblrecipehistory_table '
++            || 'CHECK (table_name IN (''AWACSWSTYPE'', ''AWACSRECIPEBYWSTYPE'', ''AWACSLF'', ''TBLWIREBOND''))');
++        run('ALTER TABLE ' || v_audit_owner || '.TBLRECIPETRASH DROP CONSTRAINT ck_tblrecipetrash_table');
++        run('ALTER TABLE ' || v_audit_owner || '.TBLRECIPETRASH ADD CONSTRAINT ck_tblrecipetrash_table '
++            || 'CHECK (table_name IN (''AWACSWSTYPE'', ''AWACSRECIPEBYWSTYPE'', ''AWACSLF'', ''TBLWIREBOND''))');
++    EXCEPTION
++        WHEN NO_DATA_FOUND THEN
++            DBMS_OUTPUT.PUT_LINE('  WARNING : TBLRECIPEHISTORY not found. Run Database/tblrecipeaudit.sql,');
++            DBMS_OUTPUT.PUT_LINE('            or Edit and Delete will fail on every page, not just this one.');
++    END;
++
++    ------------------------------------------------------------------
++    -- 6. Drop whatever WB* columns are left
++    --
++    -- Built from the data dictionary rather than a fixed list, so it
++    -- cannot fail by naming a column this particular table never had.
++    -- Nothing in the new shape starts with WB, so nothing new is at risk.
++    ------------------------------------------------------------------
++    DBMS_OUTPUT.PUT_LINE('6. drop the old OCAP columns');
++    v_columns := NULL;
++    FOR c IN (SELECT column_name
++              FROM   all_tab_columns
++              WHERE  owner = v_owner
++                AND  table_name = 'TBLWIREBOND'
++                AND  column_name LIKE 'WB%'
++              ORDER  BY column_id)
++    LOOP
++        v_columns := CASE WHEN v_columns IS NULL THEN '' ELSE v_columns || ', ' END
++                     || '"' || c.column_name || '"';
++    END LOOP;
++
++    IF v_columns IS NULL THEN
++        DBMS_OUTPUT.PUT_LINE('  already : no WB* columns left');
++    ELSE
++        run('ALTER TABLE ' || v_owner || '.TBLWIREBOND DROP (' || v_columns || ')');
++    END IF;
++
++    ------------------------------------------------------------------
++    -- 7. Did it actually work?
++    --
++    -- Everything above forgives a failure and carries on. This does not:
++    -- if the table is not the right shape now, the block raises and says
++    -- exactly what is missing.
++    ------------------------------------------------------------------
++    DBMS_OUTPUT.PUT_LINE('7. check');
++    v_missing := NULL;
++    IF NOT has_column('TBLROWID')      THEN v_missing := v_missing || 'TBLROWID ';      END IF;
++    IF NOT has_column('LASTUPDATE')    THEN v_missing := v_missing || 'LASTUPDATE ';    END IF;
++    IF NOT has_column('LASTUPDATEDBY') THEN v_missing := v_missing || 'LASTUPDATEDBY '; END IF;
++    IF NOT has_column('PACKAGE')       THEN v_missing := v_missing || 'PACKAGE ';       END IF;
++    IF NOT has_column('PRODUCT')       THEN v_missing := v_missing || 'PRODUCT ';       END IF;
++    IF NOT has_column('LEADFRAME12NC') THEN v_missing := v_missing || 'LEADFRAME12NC '; END IF;
++    IF NOT has_column('RECIPE')        THEN v_missing := v_missing || 'RECIPE ';        END IF;
++
++    IF v_missing IS NOT NULL THEN
++        RAISE_APPLICATION_ERROR(-20002,
++            'TBLWIREBOND is still missing: ' || v_missing
++            || '. Turn on DBMS Output and run this again - the skipped lines say why. '
++            || 'The usual reason is that this account cannot ALTER '
++            || v_owner || '.TBLWIREBOND.');
++    END IF;
++
++    SELECT COUNT(*) INTO v_count
++    FROM   all_tab_columns
++    WHERE  owner = v_owner AND table_name = 'TBLWIREBOND' AND column_name LIKE 'WB%';
++
++    IF v_count > 0 THEN
++        DBMS_OUTPUT.PUT_LINE('  note    : ' || v_count || ' WB* column(s) could not be dropped.');
++        DBMS_OUTPUT.PUT_LINE('            Harmless - the app never names them.');
++    END IF;
++
++    ------------------------------------------------------------------
++    -- 8. Print the finished table
++    ------------------------------------------------------------------
++    DBMS_OUTPUT.PUT_LINE('');
++    DBMS_OUTPUT.PUT_LINE('8. TBLWIREBOND is now:');
++    FOR c IN (SELECT column_name, data_type, data_length
++              FROM   all_tab_columns
++              WHERE  owner = v_owner AND table_name = 'TBLWIREBOND'
++              ORDER  BY column_id)
++    LOOP
++        DBMS_OUTPUT.PUT_LINE('     ' || RPAD(c.column_name, 16)
++                             || c.data_type || '(' || c.data_length || ')');
++    END LOOP;
++
++    DBMS_OUTPUT.PUT_LINE('');
++    DBMS_OUTPUT.PUT_LINE('Done. Rebuild the app and open Operations > Wirebond.');
++END;
++/
+--- a/Database/tblwirebond-verify.sql
++++ b/Database/tblwirebond-verify.sql
+@@ -0,0 +1,62 @@
++-- =====================================================================
++-- TBLWIREBOND - check the migration landed.
++--
++-- Run AFTER tblwirebond-migrate.sql. Press F5 (Execute as Script in
++-- Toad, Run Script in SQL Developer) - these are plain queries, there is
++-- no PL/SQL in this file.
++-- =====================================================================
++
++
++-- 1. The shape.
++--    Expect exactly seven rows: TBLROWID, LASTUPDATE, LASTUPDATEDBY,
++--    PACKAGE, PRODUCT, LEADFRAME12NC, RECIPE.
++--    Still seeing WBOCAPNO or WBDATE? The migration did not finish -
++--    re-run it with DBMS Output on and read the skipped lines.
++SELECT column_id, column_name, data_type, data_length
++FROM   all_tab_columns
++WHERE  table_name = 'TBLWIREBOND'
++ORDER  BY column_id;
++
++
++-- 2. The undo tables.
++--    BOTH rows must mention TBLWIREBOND. If they do not, Edit and Delete
++--    fail with ORA-02290 and roll back, while Add works fine - which is
++--    what makes it look like a bug in the page.
++SELECT constraint_name, search_condition
++FROM   all_constraints
++WHERE  constraint_name IN ('CK_TBLRECIPEHISTORY_TABLE', 'CK_TBLRECIPETRASH_TABLE');
++
++
++-- 3. Leftover OCAP rows.
++--    The old rows have no product, leadframe or recipe now, so they show
++--    as blank rows in the grid. This counts them.
++SELECT COUNT(1) AS blank_rows
++FROM   TBLWIREBOND
++WHERE  product IS NULL AND leadframe12nc IS NULL AND recipe IS NULL;
++
++
++-- 4. What the page will show.
++SELECT ROWIDTOCHAR(ROWID) AS row_handle,
++       "PACKAGE",
++       product,
++       leadframe12nc,
++       recipe,
++       lastupdatedby,
++       TO_CHAR(lastupdate, 'YYYY-MM-DD HH24:MI') AS lastupdate
++FROM   TBLWIREBOND
++ORDER  BY lastupdate DESC NULLS LAST
++FETCH FIRST 25 ROWS ONLY;
++
++
++-- ---------------------------------------------------------------------
++-- Clean-up, when you are happy. Uncomment the lines you want and run
++-- them one at a time.
++-- ---------------------------------------------------------------------
++
++-- Clear the blank OCAP rows out (TBLWIREBOND_BAK still has them):
++-- DELETE FROM TBLWIREBOND
++--  WHERE product IS NULL AND leadframe12nc IS NULL AND recipe IS NULL;
++-- COMMIT;
++
++-- Drop the backup once the page is working:
++-- DROP TABLE TBLWIREBOND_BAK;
 --- a/Views/WireBond/_WireBondFields.cshtml
 +++ b/Views/WireBond/_WireBondFields.cshtml
 @@ -1,217 +0,0 @@
@@ -2660,387 +3368,3 @@
 -        public bool IsEdit => Row is not null;
 -    }
 -}
---- a/Database/tblwirebond-check.sql
-+++ b/Database/tblwirebond-check.sql
-@@ -0,0 +1,86 @@
-+-- =====================================================================
-+-- TBLWIREBOND - "I saved a row on the page and nothing happened"
-+--
-+-- Run the blocks in order as the OCAPSYS user. Each block is one
-+-- statement: in SQL Developer use Run Statement (Ctrl+Enter) on the one
-+-- you want, or Run Script (F5) for the whole file.
-+-- =====================================================================
-+
-+
-+-- ---------------------------------------------------------------------
-+-- 1. Is the table the new shape?
-+--
-+-- Expect exactly: TBLROWID, LASTUPDATE, LASTUPDATEDBY, PACKAGE, PRODUCT,
-+-- LEADFRAME12NC, RECIPE. If you still see WBOCAPNO / WBDATE, the app is
-+-- reading columns that are not there and every query fails with
-+-- ORA-00904 - run Database/tblwirebond.sql.
-+-- ---------------------------------------------------------------------
-+SELECT column_id, column_name, data_type, data_length
-+FROM   all_tab_columns
-+WHERE  table_name = 'TBLWIREBOND'
-+ORDER  BY column_id;
-+
-+
-+-- ---------------------------------------------------------------------
-+-- 2. Is the row actually there? Newest 20, same order as the page.
-+-- ---------------------------------------------------------------------
-+SELECT TO_CHAR(lastupdate, 'YYYY-MM-DD HH24:MI:SS') AS lastupdate,
-+       lastupdatedby,
-+       "PACKAGE",
-+       product,
-+       leadframe12nc,
-+       recipe
-+FROM   OCAPSYS.TBLWIREBOND
-+ORDER  BY lastupdate DESC NULLS LAST
-+FETCH FIRST 20 ROWS ONLY;
-+
-+
-+-- ---------------------------------------------------------------------
-+-- 3. THE ONE THAT BREAKS EDIT AND DELETE
-+--
-+-- Edit copies the old row into TBLRECIPEHISTORY, Delete copies the whole
-+-- row into TBLRECIPETRASH, both in the same transaction as the write.
-+-- Both tables CHECK the table name against a fixed list. If TBLWIREBOND
-+-- is not in that list, every Edit and every Delete on the page fails with
-+--   ORA-02290: check constraint (...) violated
-+-- and rolls back - Add still works, which is what makes it confusing.
-+--
-+-- Both rows below must mention TBLWIREBOND. If they do not, run section 4
-+-- of Database/tblwirebond.sql.
-+-- ---------------------------------------------------------------------
-+SELECT constraint_name, search_condition
-+FROM   all_constraints
-+WHERE  constraint_name IN ('CK_TBLRECIPEHISTORY_TABLE', 'CK_TBLRECIPETRASH_TABLE');
-+
-+
-+-- ---------------------------------------------------------------------
-+-- 4. Can the signed-in user see the Add / Edit / Delete buttons?
-+--
-+-- Super Admins always can. Everyone else needs a row here with
-+-- MODULE_NAME 'Wirebond':
-+--   READ  = view only    WRITE = view + add + update
-+--   ADMIN = view + add + update + delete
-+-- Replace NX487878 with the login id that is having the problem.
-+-- ---------------------------------------------------------------------
-+SELECT user_id, user_name, role_name, module_name, access_level, status
-+FROM   OCAPSYS.TBLACCESS
-+WHERE  user_id = 'NX487878'
-+ORDER  BY module_name;
-+
-+
-+-- ---------------------------------------------------------------------
-+-- 5. End-to-end test, then thrown away. If this raises an error, the
-+--    page would have raised the same one. Run one statement at a time.
-+-- ---------------------------------------------------------------------
-+INSERT INTO OCAPSYS.TBLWIREBOND
-+    (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT, LEADFRAME12NC, RECIPE)
-+VALUES
-+    (RAWTOHEX(SYS_GUID()), SYSDATE, 'TESTUSER', 'SOT669',
-+     'SELFTEST-PRODUCT', '934000000000', 'WB_SELFTEST');
-+
-+SELECT "PACKAGE", product, leadframe12nc, recipe
-+FROM   OCAPSYS.TBLWIREBOND
-+WHERE  product = 'SELFTEST-PRODUCT';
-+
-+-- Put the table back the way it was:
-+ROLLBACK;
---- a/Database/tblwirebond-migrate.sql
-+++ b/Database/tblwirebond-migrate.sql
-@@ -0,0 +1,292 @@
-+-- =====================================================================
-+-- TBLWIREBOND - convert the table to the recipe shape.
-+--
-+-- FIXES: ORA-00904: "RECIPE": invalid identifier
-+--
-+-- HOW TO RUN THIS
-+--   Open the file, click anywhere in it, press F5.
-+--     Toad for Oracle .... F5 = Execute as Script
-+--     SQL Developer ...... F5 = Run Script
-+--   That is the whole procedure.
-+--
-+--   DO NOT use Execute Statement (F9 in Toad, Ctrl+Enter in SQL
-+--   Developer). That runs whatever the client thinks the statement under
-+--   the cursor is, and on a file of comment blocks it guesses wrong -
-+--   which is what the last script's
-+--     ORA-00933: SQL command not properly ended
-+--   was. There is ONE statement in this file now: the PL/SQL block
-+--   below, ending at the / on its own line. Nothing left to mis-split.
-+--
-+-- IT IS SAFE TO RUN TWICE. Every step checks the database first and
-+-- skips itself if it has already been done, so a half-finished attempt
-+-- is repaired by running the whole thing again.
-+--
-+-- WHAT IT DOES
-+--   1. copies the table to TBLWIREBOND_BAK, if that copy does not exist
-+--   2. drops the OCAP_WIREBOND_WORKWEEK trigger
-+--   3. adds TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT,
-+--      LEADFRAME12NC, RECIPE - only the ones that are missing
-+--   4. copies WBPACKAGE into "PACKAGE"
-+--   5. lets TBLRECIPEHISTORY and TBLRECIPETRASH accept TBLWIREBOND rows,
-+--      without which Edit and Delete fail with ORA-02290 while Add works
-+--   6. drops every WB* column that is left
-+--   7. checks the result and RAISES AN ERROR if anything is still wrong
-+--
-+-- TO SEE WHAT IT DID: View > DBMS Output, click the green +, pick your
-+-- connection, then run. Optional - if something is wrong the block
-+-- raises an error either way.
-+-- =====================================================================
-+
-+DECLARE
-+    v_owner        VARCHAR2(128);
-+    v_audit_owner  VARCHAR2(128);
-+    v_count        PLS_INTEGER;
-+    v_columns      VARCHAR2(4000);
-+    v_missing      VARCHAR2(4000);
-+
-+    -- Every step goes through this. A step that cannot run is logged and
-+    -- stepped over rather than stopping the block: half of them are
-+    -- expected to be no-ops on a table that is already part-converted,
-+    -- and the check at the end is what decides whether the whole thing
-+    -- actually worked.
-+    PROCEDURE run(p_sql VARCHAR2) IS
-+    BEGIN
-+        EXECUTE IMMEDIATE p_sql;
-+        DBMS_OUTPUT.PUT_LINE('  done    : ' || p_sql);
-+    EXCEPTION
-+        WHEN OTHERS THEN
-+            DBMS_OUTPUT.PUT_LINE('  skipped : ' || SQLERRM);
-+            DBMS_OUTPUT.PUT_LINE('            ' || p_sql);
-+    END run;
-+
-+    FUNCTION has_column(p_column VARCHAR2) RETURN BOOLEAN IS
-+        n PLS_INTEGER;
-+    BEGIN
-+        SELECT COUNT(*) INTO n
-+        FROM   all_tab_columns
-+        WHERE  owner = v_owner
-+          AND  table_name = 'TBLWIREBOND'
-+          AND  column_name = p_column;
-+        RETURN n > 0;
-+    END has_column;
-+
-+    PROCEDURE add_column(p_column VARCHAR2, p_type VARCHAR2) IS
-+    BEGIN
-+        IF has_column(p_column) THEN
-+            DBMS_OUTPUT.PUT_LINE('  already : ' || p_column);
-+        ELSE
-+            -- The column name is quoted on the way in, so PACKAGE - a
-+            -- reserved word - is accepted like any other name.
-+            run('ALTER TABLE ' || v_owner || '.TBLWIREBOND ADD ("'
-+                || p_column || '" ' || p_type || ')');
-+        END IF;
-+    END add_column;
-+BEGIN
-+    ------------------------------------------------------------------
-+    -- Which schema is the table actually in? Prefer OCAPSYS, but do not
-+    -- insist on it - the app names the table without a schema, so it
-+    -- could be anywhere this account can see.
-+    ------------------------------------------------------------------
-+    BEGIN
-+        SELECT owner INTO v_owner
-+        FROM   (SELECT owner
-+                FROM   all_tables
-+                WHERE  table_name = 'TBLWIREBOND'
-+                ORDER  BY CASE WHEN owner = 'OCAPSYS' THEN 0 ELSE 1 END, owner)
-+        WHERE  ROWNUM = 1;
-+    EXCEPTION
-+        WHEN NO_DATA_FOUND THEN
-+            RAISE_APPLICATION_ERROR(-20001,
-+                'TBLWIREBOND does not exist, or this account cannot see it. '
-+                || 'Run Database/tblwirebond.sql to create it instead.');
-+    END;
-+
-+    DBMS_OUTPUT.PUT_LINE('TBLWIREBOND found in schema ' || v_owner);
-+    DBMS_OUTPUT.PUT_LINE('');
-+
-+    ------------------------------------------------------------------
-+    -- 1. Backup
-+    ------------------------------------------------------------------
-+    DBMS_OUTPUT.PUT_LINE('1. backup');
-+    SELECT COUNT(*) INTO v_count
-+    FROM   all_tables
-+    WHERE  owner = v_owner AND table_name = 'TBLWIREBOND_BAK';
-+
-+    IF v_count > 0 THEN
-+        DBMS_OUTPUT.PUT_LINE('  already : ' || v_owner || '.TBLWIREBOND_BAK exists, left alone');
-+    ELSE
-+        run('CREATE TABLE ' || v_owner || '.TBLWIREBOND_BAK AS SELECT * FROM '
-+            || v_owner || '.TBLWIREBOND');
-+    END IF;
-+
-+    ------------------------------------------------------------------
-+    -- 2. The work-week trigger, before the columns it reads
-+    --
-+    -- OCAP_WIREBOND_WORKWEEK reads WBDATE and writes WBOCAPWWK. Drop
-+    -- those columns while it still exists and the trigger goes INVALID,
-+    -- and then every insert dies with ORA-04098.
-+    ------------------------------------------------------------------
-+    DBMS_OUTPUT.PUT_LINE('2. work-week trigger');
-+    SELECT COUNT(*) INTO v_count
-+    FROM   all_triggers
-+    WHERE  owner = v_owner AND trigger_name = 'OCAP_WIREBOND_WORKWEEK';
-+
-+    IF v_count = 0 THEN
-+        DBMS_OUTPUT.PUT_LINE('  already : no OCAP_WIREBOND_WORKWEEK trigger');
-+    ELSE
-+        run('DROP TRIGGER ' || v_owner || '.OCAP_WIREBOND_WORKWEEK');
-+    END IF;
-+
-+    ------------------------------------------------------------------
-+    -- 3. The seven columns the page needs
-+    ------------------------------------------------------------------
-+    DBMS_OUTPUT.PUT_LINE('3. columns');
-+    add_column('TBLROWID',      'VARCHAR2(50 BYTE)');
-+    add_column('LASTUPDATE',    'DATE');
-+    add_column('LASTUPDATEDBY', 'VARCHAR2(50 BYTE)');
-+    add_column('PACKAGE',       'VARCHAR2(64 BYTE)');
-+    add_column('PRODUCT',       'VARCHAR2(64 BYTE)');
-+    add_column('LEADFRAME12NC', 'VARCHAR2(16 BYTE)');
-+    add_column('RECIPE',        'VARCHAR2(120 BYTE)');
-+
-+    ------------------------------------------------------------------
-+    -- 4. WBPACKAGE is the one old column that means the same thing
-+    ------------------------------------------------------------------
-+    DBMS_OUTPUT.PUT_LINE('4. carry WBPACKAGE across');
-+    IF has_column('WBPACKAGE') THEN
-+        run('UPDATE ' || v_owner || '.TBLWIREBOND SET "PACKAGE" = WBPACKAGE '
-+            || 'WHERE WBPACKAGE IS NOT NULL AND "PACKAGE" IS NULL');
-+        COMMIT;
-+    ELSE
-+        DBMS_OUTPUT.PUT_LINE('  already : no WBPACKAGE column, nothing to carry');
-+    END IF;
-+
-+    ------------------------------------------------------------------
-+    -- 5. Let the undo tables accept TBLWIREBOND rows
-+    --
-+    -- Edit copies the old row into TBLRECIPEHISTORY and Delete copies
-+    -- the whole row into TBLRECIPETRASH, both inside the same
-+    -- transaction as the write. Both tables CHECK the table name against
-+    -- a fixed list that never included TBLWIREBOND, so both fail with
-+    -- ORA-02290 and roll back - while Add works, which is what makes it
-+    -- confusing.
-+    ------------------------------------------------------------------
-+    DBMS_OUTPUT.PUT_LINE('5. undo tables');
-+    BEGIN
-+        SELECT owner INTO v_audit_owner
-+        FROM   (SELECT owner
-+                FROM   all_tables
-+                WHERE  table_name = 'TBLRECIPEHISTORY'
-+                ORDER  BY CASE WHEN owner = v_owner THEN 0 ELSE 1 END, owner)
-+        WHERE  ROWNUM = 1;
-+
-+        run('ALTER TABLE ' || v_audit_owner || '.TBLRECIPEHISTORY DROP CONSTRAINT ck_tblrecipehistory_table');
-+        run('ALTER TABLE ' || v_audit_owner || '.TBLRECIPEHISTORY ADD CONSTRAINT ck_tblrecipehistory_table '
-+            || 'CHECK (table_name IN (''AWACSWSTYPE'', ''AWACSRECIPEBYWSTYPE'', ''AWACSLF'', ''TBLWIREBOND''))');
-+        run('ALTER TABLE ' || v_audit_owner || '.TBLRECIPETRASH DROP CONSTRAINT ck_tblrecipetrash_table');
-+        run('ALTER TABLE ' || v_audit_owner || '.TBLRECIPETRASH ADD CONSTRAINT ck_tblrecipetrash_table '
-+            || 'CHECK (table_name IN (''AWACSWSTYPE'', ''AWACSRECIPEBYWSTYPE'', ''AWACSLF'', ''TBLWIREBOND''))');
-+    EXCEPTION
-+        WHEN NO_DATA_FOUND THEN
-+            DBMS_OUTPUT.PUT_LINE('  WARNING : TBLRECIPEHISTORY not found. Run Database/tblrecipeaudit.sql,');
-+            DBMS_OUTPUT.PUT_LINE('            or Edit and Delete will fail on every page, not just this one.');
-+    END;
-+
-+    ------------------------------------------------------------------
-+    -- 6. Drop whatever WB* columns are left
-+    --
-+    -- Built from the data dictionary rather than a fixed list, so it
-+    -- cannot fail by naming a column this particular table never had.
-+    -- Nothing in the new shape starts with WB, so nothing new is at risk.
-+    ------------------------------------------------------------------
-+    DBMS_OUTPUT.PUT_LINE('6. drop the old OCAP columns');
-+    v_columns := NULL;
-+    FOR c IN (SELECT column_name
-+              FROM   all_tab_columns
-+              WHERE  owner = v_owner
-+                AND  table_name = 'TBLWIREBOND'
-+                AND  column_name LIKE 'WB%'
-+              ORDER  BY column_id)
-+    LOOP
-+        v_columns := CASE WHEN v_columns IS NULL THEN '' ELSE v_columns || ', ' END
-+                     || '"' || c.column_name || '"';
-+    END LOOP;
-+
-+    IF v_columns IS NULL THEN
-+        DBMS_OUTPUT.PUT_LINE('  already : no WB* columns left');
-+    ELSE
-+        run('ALTER TABLE ' || v_owner || '.TBLWIREBOND DROP (' || v_columns || ')');
-+    END IF;
-+
-+    ------------------------------------------------------------------
-+    -- 7. Did it actually work?
-+    --
-+    -- Everything above forgives a failure and carries on. This does not:
-+    -- if the table is not the right shape now, the block raises and says
-+    -- exactly what is missing.
-+    ------------------------------------------------------------------
-+    DBMS_OUTPUT.PUT_LINE('7. check');
-+    v_missing := NULL;
-+    IF NOT has_column('TBLROWID')      THEN v_missing := v_missing || 'TBLROWID ';      END IF;
-+    IF NOT has_column('LASTUPDATE')    THEN v_missing := v_missing || 'LASTUPDATE ';    END IF;
-+    IF NOT has_column('LASTUPDATEDBY') THEN v_missing := v_missing || 'LASTUPDATEDBY '; END IF;
-+    IF NOT has_column('PACKAGE')       THEN v_missing := v_missing || 'PACKAGE ';       END IF;
-+    IF NOT has_column('PRODUCT')       THEN v_missing := v_missing || 'PRODUCT ';       END IF;
-+    IF NOT has_column('LEADFRAME12NC') THEN v_missing := v_missing || 'LEADFRAME12NC '; END IF;
-+    IF NOT has_column('RECIPE')        THEN v_missing := v_missing || 'RECIPE ';        END IF;
-+
-+    IF v_missing IS NOT NULL THEN
-+        RAISE_APPLICATION_ERROR(-20002,
-+            'TBLWIREBOND is still missing: ' || v_missing
-+            || '. Turn on DBMS Output and run this again - the skipped lines say why. '
-+            || 'The usual reason is that this account cannot ALTER '
-+            || v_owner || '.TBLWIREBOND.');
-+    END IF;
-+
-+    SELECT COUNT(*) INTO v_count
-+    FROM   all_tab_columns
-+    WHERE  owner = v_owner AND table_name = 'TBLWIREBOND' AND column_name LIKE 'WB%';
-+
-+    IF v_count > 0 THEN
-+        DBMS_OUTPUT.PUT_LINE('  note    : ' || v_count || ' WB* column(s) could not be dropped.');
-+        DBMS_OUTPUT.PUT_LINE('            Harmless - the app never names them.');
-+    END IF;
-+
-+    DBMS_OUTPUT.PUT_LINE('');
-+    DBMS_OUTPUT.PUT_LINE('TBLWIREBOND is ready. Rebuild and open Operations > Wirebond.');
-+END;
-+/
-+
-+
-+-- =====================================================================
-+-- AFTERWARDS - three checks. Run them one at a time (Ctrl+Enter), or
-+-- select all three and press F5.
-+-- =====================================================================
-+
-+-- 1. The shape. Expect exactly seven rows: TBLROWID, LASTUPDATE,
-+--    LASTUPDATEDBY, PACKAGE, PRODUCT, LEADFRAME12NC, RECIPE.
-+SELECT column_id, column_name, data_type, data_length
-+FROM   all_tab_columns
-+WHERE  table_name = 'TBLWIREBOND'
-+ORDER  BY column_id;
-+
-+-- 2. Both constraints must now mention TBLWIREBOND, or Edit and Delete
-+--    fail with ORA-02290 while Add works.
-+SELECT constraint_name, search_condition
-+FROM   all_constraints
-+WHERE  constraint_name IN ('CK_TBLRECIPEHISTORY_TABLE', 'CK_TBLRECIPETRASH_TABLE');
-+
-+-- 3. Old OCAP rows have no product, leadframe or recipe, so they show as
-+--    blank rows in the grid. This counts them.
-+SELECT COUNT(1) AS blank_rows
-+FROM   TBLWIREBOND
-+WHERE  product IS NULL AND leadframe12nc IS NULL AND recipe IS NULL;
-+
-+
-+-- To clear those blank rows out (TBLWIREBOND_BAK still has them):
-+-- DELETE FROM TBLWIREBOND
-+--  WHERE product IS NULL AND leadframe12nc IS NULL AND recipe IS NULL;
-+-- COMMIT;
-+
-+-- When you are happy with the page:
-+-- DROP TABLE TBLWIREBOND_BAK;

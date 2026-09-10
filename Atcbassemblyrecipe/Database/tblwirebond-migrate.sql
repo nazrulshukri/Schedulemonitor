@@ -7,15 +7,20 @@
 --   Open the file, click anywhere in it, press F5.
 --     Toad for Oracle .... F5 = Execute as Script
 --     SQL Developer ...... F5 = Run Script
---   That is the whole procedure.
 --
---   DO NOT use Execute Statement (F9 in Toad, Ctrl+Enter in SQL
---   Developer). That runs whatever the client thinks the statement under
---   the cursor is, and on a file of comment blocks it guesses wrong -
---   which is what the last script's
---     ORA-00933: SQL command not properly ended
---   was. There is ONE statement in this file now: the PL/SQL block
---   below, ending at the / on its own line. Nothing left to mis-split.
+--   That is the whole procedure. This file is ONE PL/SQL block and
+--   ENDS at the / on the last line - there is deliberately nothing
+--   after it. The verification queries live in
+--   tblwirebond-verify.sql, run that afterwards.
+--
+--   (Two earlier versions of this script failed on exactly that. Toad
+--   read past a / that had a trailing SELECT after it and reported
+--   PLS-00103: Encountered the symbol "SELECT". Nothing follows the /
+--   now, and the file is saved with Windows line endings so the / is
+--   seen as a line of its own.)
+--
+--   If your client still complains: select from the word DECLARE down
+--   to and including the / on the last line, then run.
 --
 -- IT IS SAFE TO RUN TWICE. Every step checks the database first and
 -- skips itself if it has already been done, so a half-finished attempt
@@ -31,10 +36,11 @@
 --      without which Edit and Delete fail with ORA-02290 while Add works
 --   6. drops every WB* column that is left
 --   7. checks the result and RAISES AN ERROR if anything is still wrong
+--   8. prints the finished table
 --
 -- TO SEE WHAT IT DID: View > DBMS Output, click the green +, pick your
--- connection, then run. Optional - if something is wrong the block
--- raises an error either way.
+-- connection, then run. Worth doing - step 8 prints the finished table.
+-- If something is wrong the block raises an error either way.
 -- =====================================================================
 
 DECLARE
@@ -252,41 +258,21 @@ BEGIN
         DBMS_OUTPUT.PUT_LINE('            Harmless - the app never names them.');
     END IF;
 
+    ------------------------------------------------------------------
+    -- 8. Print the finished table
+    ------------------------------------------------------------------
     DBMS_OUTPUT.PUT_LINE('');
-    DBMS_OUTPUT.PUT_LINE('TBLWIREBOND is ready. Rebuild and open Operations > Wirebond.');
+    DBMS_OUTPUT.PUT_LINE('8. TBLWIREBOND is now:');
+    FOR c IN (SELECT column_name, data_type, data_length
+              FROM   all_tab_columns
+              WHERE  owner = v_owner AND table_name = 'TBLWIREBOND'
+              ORDER  BY column_id)
+    LOOP
+        DBMS_OUTPUT.PUT_LINE('     ' || RPAD(c.column_name, 16)
+                             || c.data_type || '(' || c.data_length || ')');
+    END LOOP;
+
+    DBMS_OUTPUT.PUT_LINE('');
+    DBMS_OUTPUT.PUT_LINE('Done. Rebuild the app and open Operations > Wirebond.');
 END;
 /
-
-
--- =====================================================================
--- AFTERWARDS - three checks. Run them one at a time (Ctrl+Enter), or
--- select all three and press F5.
--- =====================================================================
-
--- 1. The shape. Expect exactly seven rows: TBLROWID, LASTUPDATE,
---    LASTUPDATEDBY, PACKAGE, PRODUCT, LEADFRAME12NC, RECIPE.
-SELECT column_id, column_name, data_type, data_length
-FROM   all_tab_columns
-WHERE  table_name = 'TBLWIREBOND'
-ORDER  BY column_id;
-
--- 2. Both constraints must now mention TBLWIREBOND, or Edit and Delete
---    fail with ORA-02290 while Add works.
-SELECT constraint_name, search_condition
-FROM   all_constraints
-WHERE  constraint_name IN ('CK_TBLRECIPEHISTORY_TABLE', 'CK_TBLRECIPETRASH_TABLE');
-
--- 3. Old OCAP rows have no product, leadframe or recipe, so they show as
---    blank rows in the grid. This counts them.
-SELECT COUNT(1) AS blank_rows
-FROM   TBLWIREBOND
-WHERE  product IS NULL AND leadframe12nc IS NULL AND recipe IS NULL;
-
-
--- To clear those blank rows out (TBLWIREBOND_BAK still has them):
--- DELETE FROM TBLWIREBOND
---  WHERE product IS NULL AND leadframe12nc IS NULL AND recipe IS NULL;
--- COMMIT;
-
--- When you are happy with the page:
--- DROP TABLE TBLWIREBOND_BAK;

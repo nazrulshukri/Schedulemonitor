@@ -4,37 +4,46 @@ The page asks TBLWIREBOND for PACKAGE / PRODUCT / LEADFRAME12NC / RECIPE
 and the table still has the old OCAP columns. Oracle names the first
 column it cannot find, which is RECIPE. The database has to change.
 
-RUN Database/tblwirebond-migrate.sql
-------------------------------------
-It converts the table in place with ALTER instead of dropping it, so the
-grants, synonyms and privileges survive and it cannot fail because your
-tablespace is named something other than OCAPSYS_DAT.
-
+STEP 1 - RUN Database/tblwirebond-migrate.sql
+---------------------------------------------
 Open it, click anywhere in it, press F5.
    Toad for Oracle ... F5 = Execute as Script
    SQL Developer ..... F5 = Run Script
 
-DO NOT use Execute Statement (F9 in Toad, Ctrl+Enter in SQL Developer) -
-that is what produced ORA-00933 on the earlier version of this script.
-The file is now ONE PL/SQL block ending at a / on its own line, so there
-is nothing for the client to mis-split.
+The file is ONE PL/SQL block and ENDS at the / on the last line. There is
+deliberately nothing after it, and it is saved with Windows line endings,
+because both of those broke the two earlier versions of this script:
+
+   ORA-00933: SQL command not properly ended
+      the file was many statements between comment blocks and the client
+      picked a range that was not a statement
+
+   PLS-00103: Encountered the symbol "SELECT"
+      the client read straight past the / and swallowed the verification
+      queries that followed it into the PL/SQL block
 
 Safe to run twice. Every step checks the database first and skips itself
 if it is already done, so a half-finished attempt is repaired by running
 the whole thing again. If anything is still wrong at the end the block
 raises an error naming exactly which column is missing.
 
-Database/tblwirebond.sql is the DROP + CREATE alternative. Use it only
-for a table that does not exist yet, or one you are happy to lose.
+Turn on DBMS Output first if you want to watch it: View > DBMS Output,
+green +, pick your connection. Step 8 prints the finished table.
 
-STEP 5 IS NOT OPTIONAL
-----------------------
+STEP 2 - RUN Database/tblwirebond-verify.sql
+--------------------------------------------
+Plain queries, no PL/SQL. F5. Check 1 must show seven columns and check 2
+must show TBLWIREBOND in BOTH constraints.
+
+WHY CHECK 2 MATTERS
+-------------------
 It is a separate problem from ORA-00904 and it hits the moment the grid
 starts working. Edit writes to TBLRECIPEHISTORY and Delete writes to
 TBLRECIPETRASH, both inside the same transaction as the save. Both tables
 CHECK the table name against a fixed list that never included
 TBLWIREBOND, so Edit and Delete fail with ORA-02290 and roll back - while
-Add works fine, which is what makes it confusing.
+Add works fine, which is what makes it confusing. The migration fixes it;
+check 2 proves it.
 
 THE REST
 --------
