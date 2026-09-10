@@ -1,23 +1,45 @@
-ORDER OF OPERATIONS - the database change comes first.
+ORA-00904: "RECIPE": invalid identifier
+=======================================
+The page asks TBLWIREBOND for PACKAGE / PRODUCT / LEADFRAME12NC / RECIPE
+and the table still has the old OCAP columns. Oracle names the first
+column it cannot find, which is RECIPE. The database has to change.
 
-1. Back up whatever is in TBLWIREBOND now:
-      CREATE TABLE tblwirebond_bak AS SELECT * FROM tblwirebond;
+RUN Database/tblwirebond-migrate.sql
+------------------------------------
+It converts the table in place with ALTER instead of dropping it, so the
+grants, synonyms and privileges survive and it cannot fail because your
+tablespace is named something other than OCAPSYS_DAT.
 
-2. Run Database/tblwirebond.sql. It DROPS and recreates TBLWIREBOND with
-   the new seven columns, and section 4 fixes the CHECK constraints on
-   TBLRECIPEHISTORY and TBLRECIPETRASH.
+Run it ONE STATEMENT AT A TIME - in SQL Developer click into a statement
+and press Ctrl+Enter (Run Statement). Do NOT press F5 on the whole file.
+Some steps are meant to fail depending on what your table looks like;
+each one says which error to expect.
 
-   SECTION 4 IS NOT OPTIONAL. Without it Add works but Edit and Delete
-   both fail with ORA-02290 and roll back - TBLWIREBOND was never in the
-   allowed table-name list on those two undo tables.
+Start with STEP 0. It prints your current columns and tells you which of
+the later steps you actually need.
 
-3. Copy the source files over your project.
+Stop at the line that says STOP HERE AND TEST THE PAGE, test add / edit /
+delete, and only then run STEP 6 which drops the old columns for good.
 
-4. DELETE these two files - nothing references them any more:
+Database/tblwirebond.sql is the DROP + CREATE alternative. Use it only
+for a table that does not exist yet, or one you are happy to lose.
+
+STEP 5 IS NOT OPTIONAL
+----------------------
+It is a separate problem from ORA-00904 and it hits the moment the grid
+starts working. Edit writes to TBLRECIPEHISTORY and Delete writes to
+TBLRECIPETRASH, both inside the same transaction as the save. Both tables
+CHECK the table name against a fixed list that never included
+TBLWIREBOND, so Edit and Delete fail with ORA-02290 and roll back - while
+Add works fine, which is what makes it confusing.
+
+THE REST
+--------
+1. Copy the source files over your project, keeping the folder structure.
+2. DELETE these two - nothing references them any more:
       Views/WireBond/_WireBondFields.cshtml
       ViewModels/WireBondPanelModel.cs
-
-5. dotnet build, then dotnet run.
+3. dotnet build, then dotnet run.
 
 Optional: block 3 of Database/tblwirebond-insert.sql copies the existing
 WIREBOND rows out of AWACSRECIPEBYWSTYPE into TBLWIREBOND, so you do not

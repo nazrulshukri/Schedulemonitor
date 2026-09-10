@@ -15,8 +15,17 @@ filter on.
 
 ## The database change comes first
 
-`Database/tblwirebond.sql` rebuilds TBLWIREBOND to match. **It drops the
-table**, so take a copy of whatever is in there first:
+Until the table is changed the page cannot load at all — the app asks for
+`RECIPE` and Oracle answers **ORA-00904: "RECIPE": invalid identifier**.
+
+Two ways to change it. **Use the first one** if TBLWIREBOND already exists:
+
+| Script | |
+|---|---|
+| `Database/tblwirebond-migrate.sql` | **Recommended.** Converts the table in place with `ALTER`. Keeps the grants, synonyms and privileges, and cannot fail over a tablespace name. Step by step, one statement at a time. |
+| `Database/tblwirebond.sql` | `DROP` + `CREATE`. For a table that does not exist yet, or one you are happy to lose. |
+
+Either way, take a copy first:
 
 ```sql
 CREATE TABLE tblwirebond_bak AS SELECT * FROM tblwirebond;
@@ -68,7 +77,8 @@ constraints with a list that includes `TBLWIREBOND`, and
 | `Services/WireBondService.cs` | rewritten |
 | `Controllers/WireBondController.cs` | rewritten |
 | `Views/WireBond/Index.cshtml` | rewritten — the ten-column grid |
-| `Database/tblwirebond.sql` | rewritten — **run this** |
+| `Database/tblwirebond-migrate.sql` | new — **run this**, converts the table in place |
+| `Database/tblwirebond.sql` | rewritten — drop + create, the alternative to the above |
 | `Database/tblrecipeaudit.sql` | changed — TBLWIREBOND added to both CHECK constraints |
 | `Database/tblwirebond-insert.sql` | rewritten — by-hand inserts, plus a copy-from-AWACSRECIPEBYWSTYPE block |
 | `Database/tblwirebond-check.sql` | rewritten — diagnose a save that did nothing |
@@ -80,7 +90,7 @@ Delete these two — nothing references them any more:
 - `Views/WireBond/_WireBondFields.cshtml`
 - `ViewModels/WireBondPanelModel.cs`
 
-Then: run `Database/tblwirebond.sql`, `dotnet build`, `dotnet run`.
+Then: run `Database/tblwirebond-migrate.sql`, `dotnet build`, `dotnet run`.
 
 ## Testing it
 

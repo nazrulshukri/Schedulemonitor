@@ -6,6 +6,12 @@
 -- the recipe name. Same shape as AWACSRECIPEBYWSTYPE minus WSTYPE -
 -- every row in this table is wirebond, so there is nothing to filter on.
 --
+-- PREFER Database/tblwirebond-migrate.sql IF THE TABLE ALREADY EXISTS.
+-- That one converts the table in place with ALTER: it keeps the grants,
+-- the synonyms and the privileges, and it cannot fail because your
+-- tablespace is named something else. Use THIS script only for a table
+-- that does not exist yet, or one you are happy to lose.
+--
 -- THE DROP BELOW IS DESTRUCTIVE and this script REPLACES the old OCAP
 -- shape of the table (WBOCAPNO, WBOCAPWWK, WBDATE and the rest). Keep a
 -- copy of whatever is in there first:
@@ -34,22 +40,23 @@ CREATE TABLE OCAPSYS.TBLWIREBOND
   PRODUCT        VARCHAR2(64 BYTE),
   LEADFRAME12NC  VARCHAR2(16 BYTE),
   RECIPE         VARCHAR2(120 BYTE)
-)
-TABLESPACE OCAPSYS_DAT
-PCTFREE    10
-INITRANS   1
-MAXTRANS   255
-STORAGE    (
-            INITIAL          64K
-            NEXT             1M
-            MINEXTENTS       1
-            MAXEXTENTS       UNLIMITED
-            PCTINCREASE      0
-            BUFFER_POOL      DEFAULT
-           )
-LOGGING
-NOCOMPRESS
-NOCACHE;
+);
+
+-- The storage clause the old table carried. Left out above on purpose:
+-- TABLESPACE OCAPSYS_DAT fails with ORA-00959 on any database where that
+-- tablespace is named something else, and it takes the CREATE TABLE down
+-- with it - which leaves you with no table at all and a DROP that already
+-- succeeded. Without it Oracle uses the schema's default tablespace,
+-- which is what you want in almost every case. Add it back if your DBA
+-- says the table must live in a specific tablespace:
+--
+-- TABLESPACE OCAPSYS_DAT
+-- PCTFREE    10
+-- INITRANS   1
+-- MAXTRANS   255
+-- STORAGE    (INITIAL 64K NEXT 1M MINEXTENTS 1 MAXEXTENTS UNLIMITED
+--             PCTINCREASE 0 BUFFER_POOL DEFAULT)
+-- LOGGING NOCOMPRESS NOCACHE
 
 
 -- ---------------------------------------------------------------------

@@ -13,7 +13,8 @@
 -- Expect exactly: TBLROWID, LASTUPDATE, LASTUPDATEDBY, PACKAGE, PRODUCT,
 -- LEADFRAME12NC, RECIPE. If you still see WBOCAPNO / WBDATE, the app is
 -- reading columns that are not there and every query fails with
--- ORA-00904 - run Database/tblwirebond.sql.
+-- ORA-00904: "RECIPE": invalid identifier - which is exactly the error the
+-- page shows. Fix it with Database/tblwirebond-migrate.sql.
 -- ---------------------------------------------------------------------
 SELECT column_id, column_name, data_type, data_length
 FROM   all_tab_columns
