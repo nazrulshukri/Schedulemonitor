@@ -1,0 +1,128 @@
+--- a/Atcbassemblyrecipe/Program.cs
++++ b/Atcbassemblyrecipe/Program.cs
+@@ -42,6 +42,7 @@
+ builder.Services.AddScoped<IAuthService, AuthService>();
+ builder.Services.AddScoped<IAwacsWstypeService, AwacsWstypeService>();
+ builder.Services.AddScoped<IAwacsLfService, AwacsLfService>();
++builder.Services.AddScoped<IWireBondService, WireBondService>();
+ builder.Services
+     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+     .AddCookie(options =>
+--- a/Atcbassemblyrecipe/Models/AppModule.cs
++++ b/Atcbassemblyrecipe/Models/AppModule.cs
+@@ -12,8 +12,12 @@
+     public static class ModuleNames
+     {
+         public const string AwacsWstype = "AWACSWSTYPE";
+-        public const string TableSawing = "Sawing";
++        public const string TableSawing = "Sawing";
+         public const string TableWirebond = "Wirebond";
++        // The TBLWIREBOND OCAP log. Separate from TableWirebond above, which is
++        // the WIREBOND recipe grid over AWACSRECIPEBYWSTYPE - different table,
++        // so a person can be given one without the other.
++        public const string WireBondOcap = "Wirebond OCAP";
+         public const string TableMarker = "Marker";
+         public const string AwacsLf = "AWACSLF";
+         public const string RecycleBin = "Recycle Bin";
+@@ -50,6 +54,11 @@
+             },
+             new()
+             {
++                Name = ModuleNames.WireBondOcap,
++                Description = "TBLWIREBOND OCAP log: OCAP no, work week, machine, defect, 4M1E difference, action taken and disposition."
++            },
++            new()
++            {
+                 Name = ModuleNames.AwacsLf,
+                 Description = "AWACSLF leadframe master: LF 12NC, LFSIZE, default WO quantity, package, device."
+             },
+--- a/Atcbassemblyrecipe/Models/AuditTrail.cs
++++ b/Atcbassemblyrecipe/Models/AuditTrail.cs
+@@ -8,8 +8,9 @@
+         public const string AwacsWstype = "AWACSWSTYPE";
+         public const string AwacsRecipeByWstype = "AWACSRECIPEBYWSTYPE";
+         public const string AwacsLf = "AWACSLF";
++        public const string WireBond = "TBLWIREBOND";
+ 
+-        public static readonly string[] All = [AwacsWstype, AwacsRecipeByWstype, AwacsLf];
++        public static readonly string[] All = [AwacsWstype, AwacsRecipeByWstype, AwacsLf, WireBond];
+ 
+         public static bool IsSupported(string? tableName)
+         {
+--- a/Atcbassemblyrecipe/Data/RecipeAuditRepository.cs
++++ b/Atcbassemblyrecipe/Data/RecipeAuditRepository.cs
+@@ -747,6 +747,12 @@
+         private static readonly AuditedTable AwacsLf =
+             new(AuditedTableNames.AwacsLf, "ROWID = CHARTOROWID(:row_key)");
+ 
++        // TBLWIREBOND does have a TBLROWID column, but it is NULL on every row
++        // keyed in before the Wirebond OCAP page existed, so rows are addressed
++        // by ROWID like the two above rather than by a key half the table lacks.
++        private static readonly AuditedTable WireBond =
++            new(AuditedTableNames.WireBond, "ROWID = CHARTOROWID(:row_key)");
++
+         public static AuditedTable For(string tableName)
+         {
+             return tableName.Trim().ToUpperInvariant() switch
+@@ -754,6 +760,7 @@
+                 AuditedTableNames.AwacsWstype => AwacsWstype,
+                 AuditedTableNames.AwacsRecipeByWstype => AwacsRecipeByWstype,
+                 AuditedTableNames.AwacsLf => AwacsLf,
++                AuditedTableNames.WireBond => WireBond,
+                 _ => throw new InvalidOperationException($"{tableName} is not one of the tables this app can restore rows into.")
+             };
+         }
+--- a/Atcbassemblyrecipe/Views/Shared/_Layout.cshtml
++++ b/Atcbassemblyrecipe/Views/Shared/_Layout.cshtml
+@@ -39,6 +39,7 @@
+         var isMarkerActive = currentController == "Awacs" && currentAction == "TableMarker";
+         var isWirebondActive = currentController == "Awacs" && currentAction == "TableWirebond";
+         var isAwacsLfActive = currentController == "AwacsLf";
++        var isWireBondOcapActive = currentController == "WireBond";
+         var isRecycleBinActive = currentController == "RecycleBin";
+         var isAccessActive = currentController == "Access";
+         var isValidationActive = currentController == "Awacs" && currentAction == "RequestDatabaseChange";
+@@ -54,10 +55,10 @@
+         var pageTitle = ViewData["Title"]?.ToString() ?? "Mainpage";
+         var isSettingsPage = isAccessActive || isValidationActive || isRecycleBinActive;
+         var breadcrumbLayer = isSettingsPage ? "Settings" : "Operations";
+-        var operationsOpen = isTableActive || isSawingActive || isMarkerActive || isAwacsLfActive;
++        var operationsOpen = isTableActive || isSawingActive || isWirebondActive || isMarkerActive || isAwacsLfActive || isWireBondOcapActive;
+         // The pages whose grid is resizable, and so the pages whose account
+         // menu carries the table sizing controls.
+-        var hasGridControls = isTableActive || isSawingActive || isMarkerActive || isAwacsLfActive;
++        var hasGridControls = isTableActive || isSawingActive || isWirebondActive || isMarkerActive || isAwacsLfActive || isWireBondOcapActive;
+         var settingsOpen = isSettingsPage;
+ 
+         // Sidebar links follow the same TBLACCESS grants that gate the pages themselves,
+@@ -69,6 +70,7 @@
+         var canSeeMarker = isAuthenticated && (await Access.GetAsync(ModuleNames.TableMarker)).CanView;
+         var canSeeAwacsLf = isAuthenticated && (await Access.GetAsync(ModuleNames.AwacsLf)).CanView;
+         var canSeeWirebond = isAuthenticated && (await Access.GetAsync(ModuleNames.TableWirebond)).CanView;
++        var canSeeWireBondOcap = isAuthenticated && (await Access.GetAsync(ModuleNames.WireBondOcap)).CanView;
+         var canSeeRecycleBin = isAuthenticated && (await Access.GetAsync(ModuleNames.RecycleBin)).CanView;
+         var canSeeDbValidation = isAuthenticated && (await Access.GetAsync(ModuleNames.DbValidation)).CanView;
+         var canSeeAccessManagement = User.IsInRole(AppRole.SuperAdmin);
+@@ -195,7 +197,7 @@
+                 </div>
+ 
+                 <nav class="sidebar-nav">
+-                    @if (canSeeAwacs || canSeeSawing || canSeeMarker || canSeeAwacsLf)
++                    @if (canSeeAwacs || canSeeSawing || canSeeWirebond || canSeeMarker || canSeeAwacsLf || canSeeWireBondOcap)
+                     {
+                         <details class="nav-group" @(operationsOpen ? "open" : "")>
+                             <summary title="Operations">
+@@ -239,6 +241,13 @@
+                                         <span class="link-text">AWACSLF</span>
+                                     </a>
+                                 }
++                                @if (canSeeWireBondOcap)
++                                {
++                                    <a asp-controller="WireBond" asp-action="Index" class="sidebar-link @(isWireBondOcapActive ? "active" : "")" title="Wirebond OCAP">
++                                        <span class="sidebar-icon icon-table"></span>
++                                        <span class="link-text">Wirebond OCAP</span>
++                                    </a>
++                                }
+                             </div>
+                         </details>
+                     }
