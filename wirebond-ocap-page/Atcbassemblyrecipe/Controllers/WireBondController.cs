@@ -81,7 +81,7 @@ namespace Atcbassemblyrecipe.Controllers
             "dd-MMM-yyyy"
         ];
 
-        [ModuleAccess(ModuleNames.WireBondOcap, ModuleAction.View)]
+        [ModuleAccess(ModuleNames.TableWirebond, ModuleAction.View)]
         public async Task<IActionResult> Index(string? search, int page = 1, int pageSize = 25, string? sortBy = "lastupdate", string? sortDirection = "desc", bool promptAdd = false)
         {
             var normalizedSortBy = WireBondService.NormalizeSortBy(sortBy);
@@ -105,7 +105,7 @@ namespace Atcbassemblyrecipe.Controllers
             catch (Exception ex) when (ex is OracleException or InvalidOperationException)
             {
                 TempData["PopupType"] = "danger";
-                TempData["PopupMessage"] = DatabaseErrorMessage.Build(ex);
+                TempData["PopupMessage"] = Describe(ex);
             }
 
             return View(model);
@@ -119,7 +119,7 @@ namespace Atcbassemblyrecipe.Controllers
             return File(Encoding.UTF8.GetBytes(csv), "text/csv", "tblwirebond-template.csv");
         }
 
-        [ModuleAccess(ModuleNames.WireBondOcap, ModuleAction.View)]
+        [ModuleAccess(ModuleNames.TableWirebond, ModuleAction.View)]
         public async Task<IActionResult> Export(string? search, string? sortBy = "lastupdate", string? sortDirection = "desc")
         {
             try
@@ -171,14 +171,14 @@ namespace Atcbassemblyrecipe.Controllers
             catch (Exception ex) when (ex is OracleException or InvalidOperationException)
             {
                 TempData["PopupType"] = "danger";
-                TempData["PopupMessage"] = DatabaseErrorMessage.Build(ex);
+                TempData["PopupMessage"] = Describe(ex);
                 return RedirectToAction(nameof(Index), new { search, sortBy, sortDirection });
             }
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [ModuleAccess(ModuleNames.WireBondOcap, ModuleAction.Add)]
+        [ModuleAccess(ModuleNames.TableWirebond, ModuleAction.Add)]
         public async Task<IActionResult> Import(IFormFile? csvFile)
         {
             if (csvFile is null || csvFile.Length == 0)
@@ -309,7 +309,7 @@ namespace Atcbassemblyrecipe.Controllers
             catch (Exception ex) when (ex is OracleException or InvalidOperationException)
             {
                 TempData["PopupType"] = "danger";
-                TempData["PopupMessage"] = DatabaseErrorMessage.Build(ex);
+                TempData["PopupMessage"] = Describe(ex);
             }
 
             return RedirectToAction(nameof(Index));
@@ -317,7 +317,7 @@ namespace Atcbassemblyrecipe.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [ModuleAccess(ModuleNames.WireBondOcap, ModuleAction.Add)]
+        [ModuleAccess(ModuleNames.TableWirebond, ModuleAction.Add)]
         public async Task<IActionResult> Create(WireBondInputModel model)
         {
             if (!ModelState.IsValid)
@@ -335,7 +335,7 @@ namespace Atcbassemblyrecipe.Controllers
             catch (Exception ex) when (ex is OracleException or InvalidOperationException)
             {
                 TempData["PopupType"] = "danger";
-                TempData["PopupMessage"] = DatabaseErrorMessage.Build(ex);
+                TempData["PopupMessage"] = Describe(ex);
                 return RedirectToAction(nameof(Index), new { promptAdd = true });
             }
 
@@ -349,7 +349,7 @@ namespace Atcbassemblyrecipe.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [ModuleAccess(ModuleNames.WireBondOcap, ModuleAction.Update)]
+        [ModuleAccess(ModuleNames.TableWirebond, ModuleAction.Update)]
         public async Task<IActionResult> Edit(WireBondInputModel model)
         {
             if (!ModelState.IsValid)
@@ -367,7 +367,7 @@ namespace Atcbassemblyrecipe.Controllers
             catch (Exception ex) when (ex is OracleException or InvalidOperationException)
             {
                 TempData["PopupType"] = "danger";
-                TempData["PopupMessage"] = DatabaseErrorMessage.Build(ex);
+                TempData["PopupMessage"] = Describe(ex);
                 return RedirectToAction(nameof(Index));
             }
 
@@ -378,7 +378,7 @@ namespace Atcbassemblyrecipe.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [ModuleAccess(ModuleNames.WireBondOcap, ModuleAction.Delete)]
+        [ModuleAccess(ModuleNames.TableWirebond, ModuleAction.Delete)]
         public async Task<IActionResult> Delete(string id, bool confirmed)
         {
             if (!confirmed)
@@ -396,7 +396,7 @@ namespace Atcbassemblyrecipe.Controllers
             catch (Exception ex) when (ex is OracleException or InvalidOperationException)
             {
                 TempData["PopupType"] = "danger";
-                TempData["PopupMessage"] = DatabaseErrorMessage.Build(ex);
+                TempData["PopupMessage"] = Describe(ex);
                 return RedirectToAction(nameof(Index));
             }
 
@@ -451,6 +451,28 @@ namespace Atcbassemblyrecipe.Controllers
             return read.HadHeaderRow
                 ? string.Empty
                 : " The file had no header row, so the columns were read in template order.";
+        }
+
+        // DatabaseErrorMessage.Build answers every OracleException with the same
+        // "check the password, VPN and service name" text. That is right for a
+        // connection failure and actively misleading for anything else: an
+        // ORA-00904 or ORA-00942 raised by this page's own SQL would read as if
+        // the database were unreachable, and the grid would just look empty. Real
+        // connection errors keep the original wording; everything else says what
+        // Oracle actually said.
+        private static string Describe(Exception ex)
+        {
+            if (ex is OracleException oracle && !IsConnectionError(oracle.Number))
+            {
+                return $"ORA-{oracle.Number:00000}: {oracle.Message.Trim()}";
+            }
+
+            return DatabaseErrorMessage.Build(ex);
+        }
+
+        private static bool IsConnectionError(int oraNumber)
+        {
+            return oraNumber is 1017 or 1005 or 12154 or 12170 or 12505 or 12514 or 12541 or 12545 or 28000 or 28001;
         }
 
         private static string NormalizeSortDirection(string? sortDirection)

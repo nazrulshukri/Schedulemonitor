@@ -13,11 +13,8 @@ namespace Atcbassemblyrecipe.Models
     {
         public const string AwacsWstype = "AWACSWSTYPE";
         public const string TableSawing = "Sawing";
+        // The Wirebond page, which reads OCAPSYS.TBLWIREBOND (the OCAP log).
         public const string TableWirebond = "Wirebond";
-        // The TBLWIREBOND OCAP log. Separate from TableWirebond above, which is
-        // the WIREBOND recipe grid over AWACSRECIPEBYWSTYPE - different table,
-        // so a person can be given one without the other.
-        public const string WireBondOcap = "Wirebond OCAP";
         public const string TableMarker = "Marker";
         public const string AwacsLf = "AWACSLF";
         public const string RecycleBin = "Recycle Bin";
@@ -50,11 +47,6 @@ namespace Atcbassemblyrecipe.Models
              new()
             {
                 Name = ModuleNames.TableWirebond,
-                Description = "AWACSRECIPEBYWSTYPE rows where WSTYPE is WIREBOND: package, product, leadframe 12NC, recipe."
-            },
-            new()
-            {
-                Name = ModuleNames.WireBondOcap,
                 Description = "TBLWIREBOND OCAP log: OCAP no, work week, machine, defect, 4M1E difference, action taken and disposition."
             },
             new()

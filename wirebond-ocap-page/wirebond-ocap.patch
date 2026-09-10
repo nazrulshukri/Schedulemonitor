@@ -10,32 +10,25 @@
      .AddCookie(options =>
 --- a/Atcbassemblyrecipe/Models/AppModule.cs
 +++ b/Atcbassemblyrecipe/Models/AppModule.cs
-@@ -12,8 +12,12 @@
+@@ -12,7 +12,8 @@
      public static class ModuleNames
      {
          public const string AwacsWstype = "AWACSWSTYPE";
 -        public const string TableSawing = "Sawing";
 +        public const string TableSawing = "Sawing";
++        // The Wirebond page, which reads OCAPSYS.TBLWIREBOND (the OCAP log).
          public const string TableWirebond = "Wirebond";
-+        // The TBLWIREBOND OCAP log. Separate from TableWirebond above, which is
-+        // the WIREBOND recipe grid over AWACSRECIPEBYWSTYPE - different table,
-+        // so a person can be given one without the other.
-+        public const string WireBondOcap = "Wirebond OCAP";
          public const string TableMarker = "Marker";
          public const string AwacsLf = "AWACSLF";
-         public const string RecycleBin = "Recycle Bin";
-@@ -50,6 +54,11 @@
+@@ -46,7 +47,7 @@
+              new()
+             {
+                 Name = ModuleNames.TableWirebond,
+-                Description = "AWACSRECIPEBYWSTYPE rows where WSTYPE is WIREBOND: package, product, leadframe 12NC, recipe."
++                Description = "TBLWIREBOND OCAP log: OCAP no, work week, machine, defect, 4M1E difference, action taken and disposition."
              },
              new()
              {
-+                Name = ModuleNames.WireBondOcap,
-+                Description = "TBLWIREBOND OCAP log: OCAP no, work week, machine, defect, 4M1E difference, action taken and disposition."
-+            },
-+            new()
-+            {
-                 Name = ModuleNames.AwacsLf,
-                 Description = "AWACSLF leadframe master: LF 12NC, LFSIZE, default WO quantity, package, device."
-             },
 --- a/Atcbassemblyrecipe/Models/AuditTrail.cs
 +++ b/Atcbassemblyrecipe/Models/AuditTrail.cs
 @@ -8,8 +8,9 @@
@@ -72,57 +65,183 @@
                  _ => throw new InvalidOperationException($"{tableName} is not one of the tables this app can restore rows into.")
              };
          }
+--- a/Atcbassemblyrecipe/Controllers/DiagnosticsController.cs
++++ b/Atcbassemblyrecipe/Controllers/DiagnosticsController.cs
+@@ -3,6 +3,7 @@
+ using Microsoft.AspNetCore.Authorization;
+ using Microsoft.AspNetCore.Mvc;
+ using Oracle.ManagedDataAccess.Client;
++using System.Text;
+ using Atcbassemblyrecipe.Infrastructure;
+ 
+ namespace Atcbassemblyrecipe.Controllers
+@@ -17,6 +18,121 @@
+             _connectionFactory = connectionFactory;
+         }
+ 
++        // /Diagnostics/WireBond - what the APP's own Oracle session can see in
++        // TBLWIREBOND, as plain text. This exists because "the grid is empty" has
++        // several causes that look identical in the browser: the rows are still
++        // uncommitted in somebody's SQL client, the app is signed in to a
++        // different schema or service than the client was, or the query itself
++        // failed. This says which.
++        public async Task<IActionResult> WireBond()
++        {
++            var report = new StringBuilder();
++
++            try
++            {
++                await using var connection = _connectionFactory.CreateConnection();
++                await connection.OpenAsync();
++
++                report.AppendLine("=== Who the app is connected as ===");
++                report.AppendLine(await ScalarAsync(connection,
++                    """
++                    SELECT 'user=' || USER
++                           || '  db=' || SYS_CONTEXT('USERENV', 'DB_NAME')
++                           || '  service=' || SYS_CONTEXT('USERENV', 'SERVICE_NAME')
++                           || '  schema=' || SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')
++                    FROM dual
++                    """));
++
++                report.AppendLine();
++                report.AppendLine("=== Which TBLWIREBOND the name resolves to ===");
++                report.AppendLine(await ScalarAsync(connection,
++                    """
++                    SELECT NVL(MAX('owner=' || owner || '  type=' || object_type), 'NOT VISIBLE to this user')
++                    FROM all_objects
++                    WHERE object_name = 'TBLWIREBOND'
++                      AND object_type IN ('TABLE', 'VIEW', 'SYNONYM')
++                    """));
++
++                report.AppendLine();
++                report.AppendLine("=== Rows this session can see ===");
++                report.AppendLine("committed rows = " + await ScalarAsync(connection, "SELECT COUNT(*) FROM tblwirebond"));
++                report.AppendLine();
++                report.AppendLine("If your SQL client shows rows and this says 0, the rows are not");
++                report.AppendLine("committed yet. Run COMMIT in that client and reload this page.");
++
++                report.AppendLine();
++                report.AppendLine("=== Newest 5 ===");
++                await using (var command = connection.CreateCommand())
++                {
++                    command.CommandText = """
++                        SELECT wbocapno, wbocapwwk,
++                               TO_CHAR(wbdate, 'YYYY-MM-DD HH24:MI') AS wbdate,
++                               wbmachine, lastupdatedby,
++                               TO_CHAR(lastupdate, 'YYYY-MM-DD HH24:MI:SS') AS lastupdate
++                        FROM tblwirebond
++                        ORDER BY lastupdate DESC NULLS LAST
++                        FETCH FIRST 5 ROWS ONLY
++                        """;
++
++                    await using var reader = await command.ExecuteReaderTracedAsync();
++                    var any = false;
++                    while (await reader.ReadAsync())
++                    {
++                        any = true;
++                        report.AppendLine(string.Join(" | ", Enumerable
++                            .Range(0, reader.FieldCount)
++                            .Select(index => reader.IsDBNull(index) ? "(null)" : reader.GetString(index))));
++                    }
++
++                    if (!any)
++                    {
++                        report.AppendLine("(none)");
++                    }
++                }
++
++                report.AppendLine();
++                report.AppendLine("=== Work-week trigger ===");
++                report.AppendLine(await ScalarAsync(connection,
++                    """
++                    SELECT NVL(MAX('status=' || status || '  enabled=' || DECODE(status, 'ENABLED', 'yes', 'no')),
++                               'OCAP_WIREBOND_WORKWEEK NOT FOUND')
++                    FROM all_triggers
++                    WHERE trigger_name = 'OCAP_WIREBOND_WORKWEEK'
++                    """));
++
++                report.AppendLine();
++                report.AppendLine("=== get_wwk_app_cutoff (the trigger calls it) ===");
++                report.AppendLine(await ScalarAsync(connection,
++                    """
++                    SELECT NVL(MAX('owner=' || owner || '  status=' || status), 'GET_WWK_APP_CUTOFF NOT VISIBLE')
++                    FROM all_objects
++                    WHERE object_name = 'GET_WWK_APP_CUTOFF'
++                    """));
++
++                return Content(report.ToString(), "text/plain");
++            }
++            catch (OracleException ex)
++            {
++                report.AppendLine();
++                report.AppendLine($"FAILED with ORA-{ex.Number:00000}: {ex.Message.Trim()}");
++                return Content(report.ToString(), "text/plain");
++            }
++            catch (InvalidOperationException ex)
++            {
++                report.AppendLine();
++                report.AppendLine($"FAILED: {ex.Message}");
++                return Content(report.ToString(), "text/plain");
++            }
++        }
++
++        private static async Task<string> ScalarAsync(OracleConnection connection, string sql)
++        {
++            await using var command = connection.CreateCommand();
++            command.CommandText = sql;
++            var value = await command.ExecuteScalarTracedAsync();
++            return value is null or DBNull ? "(null)" : value.ToString() ?? "(null)";
++        }
++
+         public async Task<IActionResult> Ocap()
+         {
+             try
 --- a/Atcbassemblyrecipe/Views/Shared/_Layout.cshtml
 +++ b/Atcbassemblyrecipe/Views/Shared/_Layout.cshtml
-@@ -39,6 +39,7 @@
+@@ -37,7 +37,11 @@
+         var isTableActive = currentController == "Home" && currentAction == "Index";
+         var isSawingActive = currentController == "Awacs" && currentAction == "TableSawing";
          var isMarkerActive = currentController == "Awacs" && currentAction == "TableMarker";
-         var isWirebondActive = currentController == "Awacs" && currentAction == "TableWirebond";
+-        var isWirebondActive = currentController == "Awacs" && currentAction == "TableWirebond";
++        // One Wirebond page, and it is the TBLWIREBOND one. The old recipe grid
++        // (AwacsController.TableWirebond over AWACSRECIPEBYWSTYPE) still exists as
++        // an action but is no longer in the menu.
++        var isWirebondActive = currentController == "WireBond"
++            || (currentController == "Awacs" && currentAction == "TableWirebond");
          var isAwacsLfActive = currentController == "AwacsLf";
-+        var isWireBondOcapActive = currentController == "WireBond";
          var isRecycleBinActive = currentController == "RecycleBin";
          var isAccessActive = currentController == "Access";
-         var isValidationActive = currentController == "Awacs" && currentAction == "RequestDatabaseChange";
-@@ -54,10 +55,10 @@
+@@ -54,10 +58,10 @@
          var pageTitle = ViewData["Title"]?.ToString() ?? "Mainpage";
          var isSettingsPage = isAccessActive || isValidationActive || isRecycleBinActive;
          var breadcrumbLayer = isSettingsPage ? "Settings" : "Operations";
 -        var operationsOpen = isTableActive || isSawingActive || isMarkerActive || isAwacsLfActive;
-+        var operationsOpen = isTableActive || isSawingActive || isWirebondActive || isMarkerActive || isAwacsLfActive || isWireBondOcapActive;
++        var operationsOpen = isTableActive || isSawingActive || isWirebondActive || isMarkerActive || isAwacsLfActive;
          // The pages whose grid is resizable, and so the pages whose account
          // menu carries the table sizing controls.
 -        var hasGridControls = isTableActive || isSawingActive || isMarkerActive || isAwacsLfActive;
-+        var hasGridControls = isTableActive || isSawingActive || isWirebondActive || isMarkerActive || isAwacsLfActive || isWireBondOcapActive;
++        var hasGridControls = isTableActive || isSawingActive || isWirebondActive || isMarkerActive || isAwacsLfActive;
          var settingsOpen = isSettingsPage;
  
          // Sidebar links follow the same TBLACCESS grants that gate the pages themselves,
-@@ -69,6 +70,7 @@
-         var canSeeMarker = isAuthenticated && (await Access.GetAsync(ModuleNames.TableMarker)).CanView;
-         var canSeeAwacsLf = isAuthenticated && (await Access.GetAsync(ModuleNames.AwacsLf)).CanView;
-         var canSeeWirebond = isAuthenticated && (await Access.GetAsync(ModuleNames.TableWirebond)).CanView;
-+        var canSeeWireBondOcap = isAuthenticated && (await Access.GetAsync(ModuleNames.WireBondOcap)).CanView;
-         var canSeeRecycleBin = isAuthenticated && (await Access.GetAsync(ModuleNames.RecycleBin)).CanView;
-         var canSeeDbValidation = isAuthenticated && (await Access.GetAsync(ModuleNames.DbValidation)).CanView;
-         var canSeeAccessManagement = User.IsInRole(AppRole.SuperAdmin);
-@@ -195,7 +197,7 @@
+@@ -195,7 +199,7 @@
                  </div>
  
                  <nav class="sidebar-nav">
 -                    @if (canSeeAwacs || canSeeSawing || canSeeMarker || canSeeAwacsLf)
-+                    @if (canSeeAwacs || canSeeSawing || canSeeWirebond || canSeeMarker || canSeeAwacsLf || canSeeWireBondOcap)
++                    @if (canSeeAwacs || canSeeSawing || canSeeWirebond || canSeeMarker || canSeeAwacsLf)
                      {
                          <details class="nav-group" @(operationsOpen ? "open" : "")>
                              <summary title="Operations">
-@@ -239,6 +241,13 @@
-                                         <span class="link-text">AWACSLF</span>
+@@ -220,8 +224,8 @@
+                                 }
+                                 @if (canSeeWirebond)
+                                 {
+-                                    <a asp-controller="Awacs" asp-action="TableWirebond" class="sidebar-link @(isWirebondActive ? "active" : "")" title="Wirebond">
+-                                        <span class="sidebar-icon icon-recipe"></span>
++                                    <a asp-controller="WireBond" asp-action="Index" class="sidebar-link @(isWirebondActive ? "active" : "")" title="Wirebond">
++                                        <span class="sidebar-icon icon-table"></span>
+                                         <span class="link-text">Wirebond</span>
                                      </a>
                                  }
-+                                @if (canSeeWireBondOcap)
-+                                {
-+                                    <a asp-controller="WireBond" asp-action="Index" class="sidebar-link @(isWireBondOcapActive ? "active" : "")" title="Wirebond OCAP">
-+                                        <span class="sidebar-icon icon-table"></span>
-+                                        <span class="link-text">Wirebond OCAP</span>
-+                                    </a>
-+                                }
-                             </div>
-                         </details>
-                     }

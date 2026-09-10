@@ -1,11 +1,10 @@
 @model WireBondViewModel
 
 @{
-    ViewData["Title"] = "Wirebond OCAP";
+    ViewData["Title"] = "Wirebond";
     // Per-module permissions come from this user's TBLACCESS grants (see
-    // Services/AccessEvaluator.cs), not from their role. This module is separate
-    // from the Wirebond recipe module: same word, different table.
-    var permission = await Access.GetAsync(ModuleNames.WireBondOcap);
+    // Services/AccessEvaluator.cs), not from their role.
+    var permission = await Access.GetAsync(ModuleNames.TableWirebond);
     var canAdd = permission.CanAdd;
     var canUpdate = permission.CanUpdate;
     var canDelete = permission.CanDelete;
@@ -14,7 +13,7 @@
 <div class="page-heading">
     <div>
         <span class="eyebrow">OCAP Workspace</span>
-        <h1>Wirebond OCAP</h1>
+        <h1>Wirebond</h1>
         <p>TBLWIREBOND: OCAP records raised on the wire bonders - defect, 4M1E difference, action taken and disposition. The work week is calculated by the database from the OCAP date.</p>
     </div>
 </div>
@@ -225,7 +224,7 @@
 
 <div class="pagination-bar">
     <span>Showing page @Model.Page of @Model.TotalPages, @Model.TotalRows total rows</span>
-    <nav aria-label="Wirebond OCAP pages">
+    <nav aria-label="Wirebond pages">
         <ul class="pagination mb-0">
             <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
                 <a class="page-link" asp-controller="WireBond" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection">Prev</a>

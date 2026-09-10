@@ -37,9 +37,12 @@
         var isTableActive = currentController == "Home" && currentAction == "Index";
         var isSawingActive = currentController == "Awacs" && currentAction == "TableSawing";
         var isMarkerActive = currentController == "Awacs" && currentAction == "TableMarker";
-        var isWirebondActive = currentController == "Awacs" && currentAction == "TableWirebond";
+        // One Wirebond page, and it is the TBLWIREBOND one. The old recipe grid
+        // (AwacsController.TableWirebond over AWACSRECIPEBYWSTYPE) still exists as
+        // an action but is no longer in the menu.
+        var isWirebondActive = currentController == "WireBond"
+            || (currentController == "Awacs" && currentAction == "TableWirebond");
         var isAwacsLfActive = currentController == "AwacsLf";
-        var isWireBondOcapActive = currentController == "WireBond";
         var isRecycleBinActive = currentController == "RecycleBin";
         var isAccessActive = currentController == "Access";
         var isValidationActive = currentController == "Awacs" && currentAction == "RequestDatabaseChange";
@@ -55,10 +58,10 @@
         var pageTitle = ViewData["Title"]?.ToString() ?? "Mainpage";
         var isSettingsPage = isAccessActive || isValidationActive || isRecycleBinActive;
         var breadcrumbLayer = isSettingsPage ? "Settings" : "Operations";
-        var operationsOpen = isTableActive || isSawingActive || isWirebondActive || isMarkerActive || isAwacsLfActive || isWireBondOcapActive;
+        var operationsOpen = isTableActive || isSawingActive || isWirebondActive || isMarkerActive || isAwacsLfActive;
         // The pages whose grid is resizable, and so the pages whose account
         // menu carries the table sizing controls.
-        var hasGridControls = isTableActive || isSawingActive || isWirebondActive || isMarkerActive || isAwacsLfActive || isWireBondOcapActive;
+        var hasGridControls = isTableActive || isSawingActive || isWirebondActive || isMarkerActive || isAwacsLfActive;
         var settingsOpen = isSettingsPage;
 
         // Sidebar links follow the same TBLACCESS grants that gate the pages themselves,
@@ -70,7 +73,6 @@
         var canSeeMarker = isAuthenticated && (await Access.GetAsync(ModuleNames.TableMarker)).CanView;
         var canSeeAwacsLf = isAuthenticated && (await Access.GetAsync(ModuleNames.AwacsLf)).CanView;
         var canSeeWirebond = isAuthenticated && (await Access.GetAsync(ModuleNames.TableWirebond)).CanView;
-        var canSeeWireBondOcap = isAuthenticated && (await Access.GetAsync(ModuleNames.WireBondOcap)).CanView;
         var canSeeRecycleBin = isAuthenticated && (await Access.GetAsync(ModuleNames.RecycleBin)).CanView;
         var canSeeDbValidation = isAuthenticated && (await Access.GetAsync(ModuleNames.DbValidation)).CanView;
         var canSeeAccessManagement = User.IsInRole(AppRole.SuperAdmin);
@@ -197,7 +199,7 @@
                 </div>
 
                 <nav class="sidebar-nav">
-                    @if (canSeeAwacs || canSeeSawing || canSeeWirebond || canSeeMarker || canSeeAwacsLf || canSeeWireBondOcap)
+                    @if (canSeeAwacs || canSeeSawing || canSeeWirebond || canSeeMarker || canSeeAwacsLf)
                     {
                         <details class="nav-group" @(operationsOpen ? "open" : "")>
                             <summary title="Operations">
@@ -222,8 +224,8 @@
                                 }
                                 @if (canSeeWirebond)
                                 {
-                                    <a asp-controller="Awacs" asp-action="TableWirebond" class="sidebar-link @(isWirebondActive ? "active" : "")" title="Wirebond">
-                                        <span class="sidebar-icon icon-recipe"></span>
+                                    <a asp-controller="WireBond" asp-action="Index" class="sidebar-link @(isWirebondActive ? "active" : "")" title="Wirebond">
+                                        <span class="sidebar-icon icon-table"></span>
                                         <span class="link-text">Wirebond</span>
                                     </a>
                                 }
@@ -239,13 +241,6 @@
                                     <a asp-controller="AwacsLf" asp-action="Index" class="sidebar-link @(isAwacsLfActive ? "active" : "")" title="AWACSLF">
                                         <span class="sidebar-icon icon-table"></span>
                                         <span class="link-text">AWACSLF</span>
-                                    </a>
-                                }
-                                @if (canSeeWireBondOcap)
-                                {
-                                    <a asp-controller="WireBond" asp-action="Index" class="sidebar-link @(isWireBondOcapActive ? "active" : "")" title="Wirebond OCAP">
-                                        <span class="sidebar-icon icon-table"></span>
-                                        <span class="link-text">Wirebond OCAP</span>
                                     </a>
                                 }
                             </div>
