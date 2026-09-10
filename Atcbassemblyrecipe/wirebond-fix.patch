@@ -1,0 +1,958 @@
+--- a/Views/WireBond/Index.cshtml
++++ b/Views/WireBond/Index.cshtml
+@@ -1,11 +1,16 @@
+ @model WireBondViewModel
+ 
+ @{
+-    ViewData["Title"] = "Wirebond OCAP";
++    ViewData["Title"] = "Wirebond";
+     // Per-module permissions come from this user's TBLACCESS grants (see
+-    // Services/AccessEvaluator.cs), not from their role. This module is separate
+-    // from the Wirebond recipe module: same word, different table.
+-    var permission = await Access.GetAsync(ModuleNames.WireBondOcap);
++    // Services/AccessEvaluator.cs), not from their role.
++    //
++    // This MUST be the same constant the controller enforces with
++    // [ModuleAccess(...)] - ModuleNames.TableWirebond ("Wirebond"). It used to
++    // read a ModuleNames.WireBondOcap that was never declared, which is a Razor
++    // compile error, so the whole app failed to build and the Add / Edit /
++    // Delete controls on this page never rendered at all.
++    var permission = await Access.GetAsync(ModuleNames.TableWirebond);
+     var canAdd = permission.CanAdd;
+     var canUpdate = permission.CanUpdate;
+     var canDelete = permission.CanDelete;
+@@ -13,9 +18,9 @@
+ 
+ <div class="page-heading">
+     <div>
+-        <span class="eyebrow">OCAP Workspace</span>
+-        <h1>Wirebond OCAP</h1>
+-        <p>TBLWIREBOND: OCAP records raised on the wire bonders - defect, 4M1E difference, action taken and disposition. The work week is calculated by the database from the OCAP date.</p>
++        <span class="eyebrow">Operations</span>
++        <h1>Wirebond</h1>
++        <p>TBLWIREBOND: wirebond records raised on the wire bonders - defect, 4M1E difference, action taken and disposition. The work week is calculated by the database from the wirebond date.</p>
+     </div>
+ </div>
+ 
+@@ -25,7 +30,7 @@
+         <input type="hidden" name="sortDirection" value="@Model.SortDirection" />
+         <div>
+             <label for="search" class="form-label">Search</label>
+-            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Search OCAP no, work week, machine, package, defect, or difference no" />
++            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Search record no, work week, machine, package, defect, or difference no" />
+         </div>
+         <div>
+             <label for="pageSize" class="form-label">Rows</label>
+@@ -42,7 +47,7 @@
+     <div class="excel-actions">
+         @if (canAdd)
+         {
+-            <button type="button" class="btn btn-primary" id="showAddRow"><partial name="_Icon" model="@("plus")" /> Add OCAP Record</button>
++            <button type="button" class="btn btn-primary" id="showAddRow"><partial name="_Icon" model="@("plus")" /> Add Wirebond Record</button>
+         }
+         <button type="button" class="btn btn-outline-secondary" data-template-modal><partial name="_Icon" model="@("template")" /> Template</button>
+         <a class="btn btn-outline-secondary" asp-controller="WireBond" asp-action="Export" asp-route-search="@Model.Search" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection"><partial name="_Icon" model="@("export")" /> Export CSV</a>
+@@ -84,6 +89,17 @@
+         <option value="@value"></option>
+     }
+ </datalist>
++@* The machine list is AWACSWSTYPE.WSID for WSTYPE = 'WIREBOND' - the same
++   workstation master the recipe pages read, so a machine keyed in here matches
++   the one the rest of the app knows about. It is a suggestion list only: the
++   field still accepts a machine that is not in AWACSWSTYPE, and an empty or
++   unreachable AWACSWSTYPE just renders an empty list rather than an error. *@
++<datalist id="wireBondMachineOptions">
++    @foreach (var value in Model.MachineOptions)
++    {
++        <option value="@value"></option>
++    }
++</datalist>
+ 
+ <div class="table-responsive data-panel excel-panel">
+     <table class="table table-hover align-middle excel-table" id="wireBondTable" data-resizable-table="tblwirebond">
+@@ -123,7 +139,7 @@
+                     <td colspan="9">
+                         <partial name="_WireBondFields" model="@(new WireBondPanelModel("createWireBondForm", null))" />
+                         <div class="d-flex gap-2 mt-2">
+-                            <button type="submit" form="createWireBondForm" class="btn btn-primary"><partial name="_Icon" model="@("save")" /> Save OCAP Record</button>
++                            <button type="submit" form="createWireBondForm" class="btn btn-primary"><partial name="_Icon" model="@("save")" /> Save Wirebond Record</button>
+                             <button type="button" class="btn btn-outline-secondary" id="cancelAddRow"><partial name="_Icon" model="@("cancel")" /> Cancel</button>
+                         </div>
+                     </td>
+@@ -133,7 +149,13 @@
+             @if (Model.Rows.Count == 0)
+             {
+                 <tr>
+-                    <td colspan="9" class="text-center text-muted py-4">No TBLWIREBOND records found.</td>
++                    <td colspan="9" class="text-center text-muted py-4">
++                        No TBLWIREBOND records found.
++                        @if (canAdd)
++                        {
++                            <button type="button" class="btn btn-sm btn-primary ms-2" id="showAddRowEmpty">Add the first record</button>
++                        }
++                    </td>
+                 </tr>
+             }
+             else
+@@ -141,7 +163,13 @@
+                 var rowNumber = ((Model.Page - 1) * Model.PageSize) + 1;
+                 foreach (var row in Model.Rows)
+                 {
+-                    <tr class="excel-display-row" data-row-id="@row.TblRowId">
++                    // The row that was just saved is flashed and scrolled to, so an
++                    // insert or an edit visibly lands in the grid instead of the
++                    // user having to hunt for it.
++                    var isJustSaved = !string.IsNullOrEmpty(Model.Highlight)
++                        && string.Equals(row.OcapNo, Model.Highlight, StringComparison.OrdinalIgnoreCase);
++
++                    <tr class="excel-display-row @(isJustSaved ? "row-just-saved" : "")" data-row-id="@row.TblRowId">
+                         <td><input class="form-check-input" type="checkbox" aria-label="Select @row.OcapNo" /></td>
+                         <td>@rowNumber</td>
+                         <td class="fw-semibold">@row.OcapNo</td>
+@@ -152,7 +180,7 @@
+                         <td class="text-center">
+                             @if (canUpdate)
+                             {
+-                                <button type="button" class="icon-btn icon-edit" data-edit-row="@row.TblRowId" title="Edit OCAP record" aria-label="Edit @row.OcapNo">
++                                <button type="button" class="icon-btn icon-edit" data-edit-row="@row.TblRowId" title="Edit wirebond record" aria-label="Edit @row.OcapNo">
+                                     <span></span>
+                                 </button>
+                             }
+@@ -160,7 +188,7 @@
+                         <td class="text-center">
+                             @if (canDelete)
+                             {
+-                                <button type="button" class="icon-btn icon-delete" data-delete-form="deleteWireBondForm-@row.TblRowId" data-delete-label="@row.OcapNo" title="Move OCAP record to Trash" aria-label="Delete @row.OcapNo">
++                                <button type="button" class="icon-btn icon-delete" data-delete-form="deleteWireBondForm-@row.TblRowId" data-delete-label="@row.OcapNo" title="Move wirebond record to Trash" aria-label="Delete @row.OcapNo">
+                                     <span></span>
+                                 </button>
+                             }
+@@ -225,7 +253,7 @@
+ 
+ <div class="pagination-bar">
+     <span>Showing page @Model.Page of @Model.TotalPages, @Model.TotalRows total rows</span>
+-    <nav aria-label="Wirebond OCAP pages">
++    <nav aria-label="Wirebond pages">
+         <ul class="pagination mb-0">
+             <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
+                 <a class="page-link" asp-controller="WireBond" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection">Prev</a>
+@@ -277,7 +305,7 @@
+                         </thead>
+                         <tbody>
+                             <tr>
+-                                <td>OCAP-WB-2026-001</td>
++                                <td>WB-2026-001</td>
+                                 <td>2026-09-10 14:30</td>
+                                 <td>WB-07</td>
+                                 <td>SOT669</td>
+@@ -286,7 +314,7 @@
+                                 <td>PROCESS</td>
+                             </tr>
+                             <tr>
+-                                <td>OCAP-WB-2026-002</td>
++                                <td>WB-2026-002</td>
+                                 <td>2026-09-10 22:05</td>
+                                 <td>WB-12</td>
+                                 <td>SOT1210</td>
+@@ -304,7 +332,7 @@
+                     DIFFNO, DIFFREJECTQTY and REMARKS. A header row can additionally name
+                     DEFECTOTHERS, DIFFAFFECTED, DIFFFABSITE, DIFFNOTAFFECTED, DIFFREMARKS,
+                     VERIFIEDBY, ACTIONTAKEN, DISPOSITION, RCMACHINEERROR and MACHINEERROR, so an
+-                    Export CSV can be edited and uploaded again. An OCAP number that is already in
++                    Export CSV can be edited and uploaded again. A record no that is already in
+                     the table - or twice in the same file - cancels the whole import.
+                 </div>
+             </div>
+@@ -324,7 +352,7 @@
+                 <div class="modal-header">
+                     <div>
+                         <span class="eyebrow">Delete Validation</span>
+-                        <h5 class="modal-title" id="deleteConfirmTitle">Move OCAP record to Trash</h5>
++                        <h5 class="modal-title" id="deleteConfirmTitle">Move wirebond record to Trash</h5>
+                     </div>
+                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                 </div>
+@@ -342,6 +370,20 @@
+     </div>
+ }
+ 
++@* The doubled at-sign in the keyframes rule below is Razor escaping: it renders
++   as a single one. A bare at-sign there would be read as a Razor expression. *@
++<style>
++    .row-just-saved > td {
++        animation: wireBondJustSaved 3s ease-out 1;
++    }
++
++    @@keyframes wireBondJustSaved {
++        0% { background-color: rgba(255, 176, 0, 0.55); }
++        70% { background-color: rgba(255, 176, 0, 0.35); }
++        100% { background-color: transparent; }
++    }
++</style>
++
+ @section Scripts {
+     <script src="~/js/excel-grid.js" asp-append-version="true"></script>
+     <script>
+@@ -363,6 +405,14 @@
+                 });
+             });
+         });
++
++        // The empty-grid button is the same action as the toolbar button.
++        document.getElementById('showAddRowEmpty')?.addEventListener('click', () => {
++            document.getElementById('showAddRow')?.click();
++        });
++
++        // Bring the row that was just saved into view.
++        document.querySelector('.row-just-saved')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+     </script>
+ }
+ 
+@@ -370,9 +420,9 @@
+     private static readonly (string Key, string Label)[] SortableColumns = new (string Key, string Label)[]
+     {
+         ("sequence", "#"),
+-        ("wbocapno", "OCAP No"),
++        ("wbocapno", "Record No"),
+         ("wbocapwwk", "Work Week"),
+-        ("wbdate", "OCAP Date"),
++        ("wbdate", "Date"),
+         ("lastupdatedby", "Last Updated By"),
+         ("lastupdate", "Timestamp")
+     };
+--- a/Views/WireBond/_WireBondFields.cshtml
++++ b/Views/WireBond/_WireBondFields.cshtml
+@@ -12,7 +12,7 @@
+     data-original-value is what excel-grid.js reads to put a cancelled edit back;
+     the page's own script extends that to the textareas.
+ 
+-    WBOCAPWWK has no input: the database trigger derives it from the OCAP date.
++    WBOCAPWWK has no input: the database trigger derives it from the date on the row.
+ *@
+ 
+ @{
+@@ -22,18 +22,18 @@
+ <div class="wirebond-panel">
+     <div class="row g-2">
+         <div class="col-12">
+-            <span class="eyebrow">@(Model.IsEdit ? "Edit OCAP record" : "New OCAP record")</span>
++            <span class="eyebrow">@(Model.IsEdit ? "Edit wirebond record" : "New wirebond record")</span>
+         </div>
+ 
+         <div class="col-md-3">
+-            <label class="form-label" for="@(Model.FormId)-OcapNo">OCAP No <span class="text-danger">*</span></label>
++            <label class="form-label" for="@(Model.FormId)-OcapNo">Record No <span class="text-danger">*</span></label>
+             <input id="@(Model.FormId)-OcapNo" name="OcapNo" form="@Model.FormId" class="form-control cell-input"
+-                   maxlength="100" placeholder="OCAP-WB-2026-001" required
++                   maxlength="100" placeholder="WB-2026-001" title="WBOCAPNO - the business key of the record" required
+                    value="@row?.OcapNo" data-original-value="@row?.OcapNo" />
+         </div>
+ 
+         <div class="col-md-3">
+-            <label class="form-label" for="@(Model.FormId)-OcapDate">OCAP Date <span class="text-danger">*</span></label>
++            <label class="form-label" for="@(Model.FormId)-OcapDate">Date <span class="text-danger">*</span></label>
+             <input id="@(Model.FormId)-OcapDate" name="OcapDate" form="@Model.FormId" type="datetime-local"
+                    class="form-control cell-input" required
+                    value="@(row?.OcapDate?.ToString("yyyy-MM-ddTHH:mm"))"
+@@ -44,7 +44,7 @@
+             <label class="form-label">Work Week</label>
+             <input class="form-control cell-input bg-light text-muted" readonly aria-readonly="true"
+                    value="@(Model.IsEdit ? row?.OcapWorkWeek : "Set by the database")"
+-                   title="WBOCAPWWK is calculated by the OCAP_WIREBOND_WORKWEEK trigger from the OCAP date" />
++                   title="WBOCAPWWK is calculated by the OCAP_WIREBOND_WORKWEEK trigger from the date on the row" />
+         </div>
+ 
+         <div class="col-md-3">
+@@ -77,8 +77,10 @@
+ 
+         <div class="col-md-3">
+             <label class="form-label" for="@(Model.FormId)-Machine">Machine</label>
++            @* list = AWACSWSTYPE.WSID for WSTYPE 'WIREBOND'. A suggestion list,
++               not a constraint - a machine that is not in AWACSWSTYPE still saves. *@
+             <input id="@(Model.FormId)-Machine" name="Machine" form="@Model.FormId" class="form-control cell-input"
+-                   maxlength="100" placeholder="WB-07"
++                   maxlength="100" list="wireBondMachineOptions" placeholder="WB-07"
+                    value="@row?.Machine" data-original-value="@row?.Machine" />
+         </div>
+ 
+--- a/ViewModels/WireBondViewModel.cs
++++ b/ViewModels/WireBondViewModel.cs
+@@ -12,6 +12,16 @@
+         public string SortBy { get; set; } = "lastupdate";
+         public string SortDirection { get; set; } = "desc";
+         public bool PromptAdd { get; set; }
++
++        // WSID values from AWACSWSTYPE for WSTYPE = 'WIREBOND', offered as the
++        // Machine pick list. Empty is fine - the field is free text either way.
++        public IReadOnlyList<string> MachineOptions { get; set; } = [];
++
++        // WBOCAPNO of the row that was just inserted or updated. The grid flashes
++        // it and scrolls to it, so a save visibly lands instead of the user
++        // having to look for it.
++        public string Highlight { get; set; } = string.Empty;
++
+         public int TotalPages => TotalRows == 0 ? 1 : (int)Math.Ceiling(TotalRows / (double)PageSize);
+     }
+ }
+--- a/Controllers/WireBondController.cs
++++ b/Controllers/WireBondController.cs
+@@ -13,11 +13,14 @@
+ 
+ namespace Atcbassemblyrecipe.Controllers
+ {
+-    // The TBLWIREBOND OCAP log: one row per wire bond OCAP record.
++    // The TBLWIREBOND grid: one row per wire bond record. This is THE Wirebond
++    // page - the one in the sidebar, gated by the single ModuleNames.TableWirebond
++    // ("Wirebond") grant in TBLACCESS.
+     //
+-    // Separate from AwacsController.TableWirebond, which is the WIREBOND *recipe*
+-    // grid over AWACSRECIPEBYWSTYPE. Two different tables that happen to share a
+-    // word, so they are two different modules with their own TBLACCESS grants.
++    // AwacsController.TableWirebond still exists as a route over
++    // AWACSRECIPEBYWSTYPE (the WIREBOND *recipe* grid) but is no longer in the
++    // menu, and it is gated by the same "Wirebond" grant. There is no separate
++    // "Wirebond OCAP" module - granting "Wirebond" is all a user needs.
+     [Authorize]
+     public class WireBondController : Controller
+     {
+@@ -82,7 +85,7 @@
+         ];
+ 
+         [ModuleAccess(ModuleNames.TableWirebond, ModuleAction.View)]
+-        public async Task<IActionResult> Index(string? search, int page = 1, int pageSize = 25, string? sortBy = "lastupdate", string? sortDirection = "desc", bool promptAdd = false)
++        public async Task<IActionResult> Index(string? search, int page = 1, int pageSize = 25, string? sortBy = "lastupdate", string? sortDirection = "desc", bool promptAdd = false, string? highlight = null)
+         {
+             var normalizedSortBy = WireBondService.NormalizeSortBy(sortBy);
+             var normalizedSortDirection = NormalizeSortDirection(sortDirection);
+@@ -90,7 +93,8 @@
+             {
+                 SortBy = normalizedSortBy,
+                 SortDirection = normalizedSortDirection,
+-                PromptAdd = promptAdd
++                PromptAdd = promptAdd,
++                Highlight = highlight?.Trim() ?? string.Empty
+             };
+ 
+             try
+@@ -101,6 +105,10 @@
+                 model.Page = result.Page;
+                 model.PageSize = result.PageSize;
+                 model.TotalRows = result.TotalRows;
++
++                // Never fatal: an unreadable AWACSWSTYPE just means no machine
++                // suggestions, and the service already answers with an empty list.
++                model.MachineOptions = await _wireBondService.GetMachineOptionsAsync();
+             }
+             catch (Exception ex) when (ex is OracleException or InvalidOperationException)
+             {
+@@ -115,7 +123,7 @@
+         {
+             const string csv =
+                 "OCAPNO,WBDATE,ISSUEDBY,BFG,OPERATORID,PROCESS,MACHINE,PACKAGE,SOQTY,DEFECT,DEFECTCAT,DIFF4M1E,DIFFNO,DIFFREJECTQTY,REMARKS\r\n"
+-                + "OCAP-WB-2026-001,2026-09-10 14:30,NX487878,BFG1,OP1023,WIREBOND,WB-07,SOT669,3000,NON STICK ON PAD,PROCESS,MACHINE,DIFF-2026-0912,120,Raised on night shift\r\n";
++                + "WB-2026-001,2026-09-10 14:30,NX487878,BFG1,OP1023,WIREBOND,WB-07,SOT669,3000,NON STICK ON PAD,PROCESS,MACHINE,DIFF-2026-0912,120,Raised on night shift\r\n";
+             return File(Encoding.UTF8.GetBytes(csv), "text/csv", "tblwirebond-template.csv");
+         }
+ 
+@@ -240,7 +248,7 @@
+                 // duplicate pair. Caught here instead.
+                 if (!string.IsNullOrWhiteSpace(ocapNo) && !seenOcapNumbers.Add(InputText.CleanUpper(ocapNo)))
+                 {
+-                    importErrors.Add($"Line {row.LineNumber}: OCAP No {ocapNo} appears more than once in this file.");
++                    importErrors.Add($"Line {row.LineNumber}: Record No {ocapNo} appears more than once in this file.");
+                     continue;
+                 }
+ 
+@@ -342,8 +350,12 @@
+             TempData["PopupType"] = result.Success ? "success" : "danger";
+             TempData["PopupMessage"] = result.Message;
+ 
++            // No search, no page number and the default sort (lastupdate desc), so
++            // the row that was just inserted is the first row of the grid. highlight
++            // flashes it and scrolls to it. model.OcapNo is the value the service
++            // actually stored - CreateAsync normalizes the model in place.
+             return result.Success
+-                ? RedirectToAction(nameof(Index))
++                ? RedirectToAction(nameof(Index), new { highlight = model.OcapNo })
+                 : RedirectToAction(nameof(Index), new { promptAdd = true });
+         }
+ 
+@@ -373,7 +385,9 @@
+ 
+             TempData["PopupType"] = result.Success ? "success" : "danger";
+             TempData["PopupMessage"] = result.Message;
+-            return RedirectToAction(nameof(Index));
++            return result.Success
++                ? RedirectToAction(nameof(Index), new { highlight = model.OcapNo })
++                : RedirectToAction(nameof(Index));
+         }
+ 
+         [HttpPost]
+--- a/Services/WireBondService.cs
++++ b/Services/WireBondService.cs
+@@ -10,6 +10,7 @@
+     {
+         Task<PagedResult<WireBond>> GetAsync(string? search, int page, int pageSize, string? sortBy, string? sortDirection);
+         Task<IReadOnlyList<WireBond>> GetForExportAsync(string? search, string? sortBy, string? sortDirection);
++        Task<IReadOnlyList<string>> GetMachineOptionsAsync();
+         Task<(bool Success, string Message)> CreateAsync(WireBondInputModel model, string userName);
+         Task<(bool Success, int Inserted, string Message)> CreateManyAsync(IReadOnlyList<WireBondInputModel> models, string userName);
+         Task<(bool Success, string Message)> UpdateAsync(WireBondInputModel model, string userName);
+@@ -154,6 +155,51 @@
+             return rows;
+         }
+ 
++        // The wire bonders as AWACSWSTYPE knows them: WSID for WSTYPE 'WIREBOND'.
++        // Offered as the Machine pick list on the add and edit panels so a machine
++        // keyed in here matches the workstation master the recipe pages read.
++        //
++        // Deliberately swallows database errors instead of surfacing them. This is
++        // a convenience list, and AWACSWSTYPE is a different table than the one
++        // this page owns - if it is missing, empty, or not granted to the app
++        // account, the Machine field simply stays free text. Failing the whole
++        // grid over a dropdown would be a worse trade.
++        public async Task<IReadOnlyList<string>> GetMachineOptionsAsync()
++        {
++            var values = new List<string>();
++
++            try
++            {
++                await using var connection = _connectionFactory.CreateConnection();
++                await connection.OpenAsync();
++
++                await using var command = connection.CreateCommand();
++                command.BindByName = true;
++                command.CommandText = """
++                    SELECT DISTINCT wsid
++                    FROM awacswstype
++                    WHERE UPPER(wstype) = 'WIREBOND'
++                      AND wsid IS NOT NULL
++                    ORDER BY wsid
++                    """;
++
++                await using var reader = await command.ExecuteReaderTracedAsync();
++                while (await reader.ReadAsync())
++                {
++                    if (!reader.IsDBNull(0))
++                    {
++                        values.Add(reader.GetString(0));
++                    }
++                }
++            }
++            catch (Exception ex) when (ex is OracleException or InvalidOperationException)
++            {
++                return [];
++            }
++
++            return values;
++        }
++
+         public async Task<(bool Success, string Message)> CreateAsync(WireBondInputModel model, string userName)
+         {
+             Normalize(model);
+--- a/Models/AppModule.cs
++++ b/Models/AppModule.cs
+@@ -13,7 +13,8 @@
+     {
+         public const string AwacsWstype = "AWACSWSTYPE";
+         public const string TableSawing = "Sawing";
+-        // The Wirebond page, which reads OCAPSYS.TBLWIREBOND (the OCAP log).
++        // The Wirebond page, which reads OCAPSYS.TBLWIREBOND. There is exactly
++        // one Wirebond module and one Wirebond page - grant this one.
+         public const string TableWirebond = "Wirebond";
+         public const string TableMarker = "Marker";
+         public const string AwacsLf = "AWACSLF";
+@@ -47,7 +48,7 @@
+              new()
+             {
+                 Name = ModuleNames.TableWirebond,
+-                Description = "TBLWIREBOND OCAP log: OCAP no, work week, machine, defect, 4M1E difference, action taken and disposition."
++                Description = "TBLWIREBOND: record no, work week, machine, defect, 4M1E difference, action taken and disposition."
+             },
+             new()
+             {
+--- a/Data/RecipeAuditRepository.cs
++++ b/Data/RecipeAuditRepository.cs
+@@ -748,7 +748,7 @@
+             new(AuditedTableNames.AwacsLf, "ROWID = CHARTOROWID(:row_key)");
+ 
+         // TBLWIREBOND does have a TBLROWID column, but it is NULL on every row
+-        // keyed in before the Wirebond OCAP page existed, so rows are addressed
++        // keyed in before the Wirebond page existed, so rows are addressed
+         // by ROWID like the two above rather than by a key half the table lacks.
+         private static readonly AuditedTable WireBond =
+             new(AuditedTableNames.WireBond, "ROWID = CHARTOROWID(:row_key)");
+--- a/Database/tblwirebond-access.sql
++++ b/Database/tblwirebond-access.sql
+@@ -1,5 +1,5 @@
+ -- =====================================================================
+--- Give somebody the new "Wirebond OCAP" module (TBLWIREBOND).
++-- Give somebody the "Wirebond" module (the TBLWIREBOND page).
+ --
+ -- WHO NEEDS THIS: only users who are NOT Super Admins.
+ -- AccessEvaluator.GetAsync returns ModulePermission.Full to any user in the
+@@ -7,14 +7,19 @@
+ -- the page and its Add/Edit/Delete buttons with no grant at all.
+ --
+ -- Easier than running this: open Access Management in the app and tick the
+--- boxes on the "Wirebond OCAP" row. It writes exactly the row below. Use
+--- this script when the app cannot be reached, or to grant a batch of users
+--- at once.
+---
+--- MODULE_NAME must be spelled exactly 'Wirebond OCAP' - it is compared
+--- against ModuleNames.WireBondOcap in Models/AppModule.cs. 'WIREBOND OCAP'
+--- also matches (the lookup is case-insensitive) but keep the app spelling so
+--- the Access Management grid shows one row instead of two.
++-- boxes on the "Wirebond" row. It writes exactly the row below. Use this
++-- script when the app cannot be reached, or to grant a batch of users at
++-- once.
++--
++-- MODULE_NAME must be spelled exactly 'Wirebond' - it is compared against
++-- ModuleNames.TableWirebond in Models/AppModule.cs. 'WIREBOND' also matches
++-- (the lookup is case-insensitive) but keep the app spelling so the Access
++-- Management grid shows one row instead of two.
++--
++-- THERE IS NO 'Wirebond OCAP' MODULE. An earlier draft of this script told
++-- you to grant that name; nothing in the app ever reads it, so a user with
++-- only a 'Wirebond OCAP' row sees no Wirebond page and no Add/Edit/Delete
++-- buttons. The last block below repairs any such rows.
+ --
+ -- ACCESS_LEVEL is one tier per row, not a list (Models/AccessGrant.cs):
+ --   READ   view only
+@@ -22,19 +27,16 @@
+ --   ADMIN  view + add + update + delete
+ --   NONE   nothing
+ --
+--- The 'Wirebond' module is the recipe page over AWACSRECIPEBYWSTYPE and is a
+--- different grant. Granting one does not grant the other.
+---
+ -- Run the INSERT and the COMMIT as SEPARATE statements, or the client
+ -- reports ORA-00933 against the COMMIT line.
+ -- =====================================================================
+ 
+--- One user, full access.
++-- One user, full access (view + add + update + delete).
+ INSERT INTO OCAPSYS.TBLACCESS
+     (USER_ID, USER_NAME, ROLE_NAME, MODULE_NAME, ACCESS_LEVEL,
+      GRANTED_BY, GRANTED_DATE, EXPIRY_DATE, STATUS, CREATED_DATE, UPDATED_DATE)
+ VALUES
+-    ('NX021557', 'Operator Name', 'User', 'Wirebond OCAP', 'ADMIN',
++    ('NX021557', 'Operator Name', 'User', 'Wirebond', 'ADMIN',
+      'NX487878', SYSDATE, NULL, 'ACTIVE', SYSDATE, SYSDATE);
+ 
+ COMMIT;
+@@ -48,24 +50,25 @@
+ --        granted_date = SYSDATE,
+ --        updated_date = SYSDATE
+ --  WHERE user_id     = 'NX021557'
+---    AND module_name = 'Wirebond OCAP';
++--    AND UPPER(module_name) = 'WIREBOND';
+ -- COMMIT;
+ 
+ 
+--- Every user who can already see the Wirebond recipe page, granted the same
+--- tier on the OCAP page. Skips anyone who already has an OCAP grant, so it
+--- is safe to re-run.
+--- INSERT INTO OCAPSYS.TBLACCESS
+---     (USER_ID, USER_NAME, ROLE_NAME, MODULE_NAME, ACCESS_LEVEL,
+---      GRANTED_BY, GRANTED_DATE, EXPIRY_DATE, STATUS, CREATED_DATE, UPDATED_DATE)
+--- SELECT a.user_id, a.user_name, a.role_name, 'Wirebond OCAP', a.access_level,
+---        'NX487878', SYSDATE, NULL, 'ACTIVE', SYSDATE, SYSDATE
+--- FROM   OCAPSYS.TBLACCESS a
+--- WHERE  a.module_name = 'Wirebond'
+---   AND  NOT EXISTS (SELECT 1
++-- REPAIR: fold any old 'Wirebond OCAP' grants into the real 'Wirebond'
++-- module, keeping the tier that was already granted. Safe to re-run.
++-- UPDATE OCAPSYS.TBLACCESS a
++--    SET a.module_name  = 'Wirebond',
++--        a.updated_date = SYSDATE
++--  WHERE UPPER(a.module_name) = 'WIREBOND OCAP'
++--    AND NOT EXISTS (SELECT 1
+ --                    FROM   OCAPSYS.TBLACCESS b
+ --                    WHERE  b.user_id = a.user_id
+---                      AND  UPPER(b.module_name) = 'WIREBOND OCAP');
++--                      AND  UPPER(b.module_name) = 'WIREBOND');
++-- COMMIT;
++
++-- Then drop the leftovers of users who already had both.
++-- DELETE FROM OCAPSYS.TBLACCESS
++--  WHERE UPPER(module_name) = 'WIREBOND OCAP';
+ -- COMMIT;
+ 
+ 
+@@ -80,5 +83,5 @@
+        granted_by,
+        TO_CHAR(granted_date, 'YYYY-MM-DD HH24:MI') AS granted_date
+ FROM   OCAPSYS.TBLACCESS
+-WHERE  UPPER(module_name) IN ('WIREBOND OCAP', 'WIREBOND')
++WHERE  UPPER(module_name) IN ('WIREBOND', 'WIREBOND OCAP')
+ ORDER  BY user_id, module_name;
+--- a/README.md
++++ b/README.md
+@@ -1,54 +1,128 @@
+-# Wirebond OCAP page (OCAPSYS.TBLWIREBOND)
++# Wirebond page (OCAPSYS.TBLWIREBOND)
+ 
+-A new page for the ATCB Assembly Recipe app that reads and writes
+-`OCAPSYS.TBLWIREBOND` — the wire bond OCAP log. The existing **Wirebond** page is
+-unchanged: it stays the WIREBOND *recipe* grid over `AWACSRECIPEBYWSTYPE`. Two
+-tables, two modules, two grants.
++The **Wirebond** page of the ATCB Assembly Recipe app: one grid over
++`OCAPSYS.TBLWIREBOND`, with add, edit and delete straight from the page.
+ 
+-Route: `/WireBond/Index`. Sidebar: **Operations → Wirebond OCAP**.
++Route: `/WireBond/Index`. Sidebar: **Operations → Wirebond**.
++
++There is exactly one Wirebond page and one Wirebond module now. The old
++"Wirebond OCAP" name is gone — see *What changed* below.
++
++## What changed in this drop
++
++**1. The page could not build at all.** `Views/WireBond/Index.cshtml` asked for
++`ModuleNames.WireBondOcap`:
++
++```cshtml
++var permission = await Access.GetAsync(ModuleNames.WireBondOcap);   // does not exist
++```
++
++`Models/AppModule.cs` never declared that constant — it only has
++`TableWirebond = "Wirebond"`, which is what `WireBondController` already
++enforces with `[ModuleAccess(...)]`. Razor views are compiled by the build in
++.NET 6 and later, so this was a hard compile error: `dotnet build` failed, and
++with no build there was no Add button, no Edit button, no Delete button and no
++insert. That one line is now:
++
++```cshtml
++var permission = await Access.GetAsync(ModuleNames.TableWirebond);  // same constant the controller enforces
++```
++
++**2. "OCAP" is gone from the page.** Title, sidebar entry, panel headings,
++buttons, the delete dialog and the grid headers now read *Wirebond* and
++*Record No* instead of *Wirebond OCAP* and *OCAP No*. The database column names
++are untouched (`WBOCAPNO`, `WBOCAPWWK`, …) and so are the CSV headers
++(`OCAPNO`, `WBDATE`, …), so existing CSV files and any MES code still work.
++
++**3. A saved row is visibly a saved row.** After a successful add or edit the
++page returns to the grid sorted newest-first, flashes the row that was written
++and scrolls it into view.
++
++**4. Machine is a pick list, from AWACSWSTYPE.** The Machine field on the add
++and edit panels now suggests `AWACSWSTYPE.WSID` where `WSTYPE = 'WIREBOND'`, so
++a machine keyed in here matches the workstation master the recipe pages read.
++It is a suggestion only — a machine that is not in AWACSWSTYPE still saves, and
++if AWACSWSTYPE is empty or unreadable the list is simply empty. It never fails
++the page.
++
++**5. `Database/tblwirebond-access.sql` granted a module that does not exist.**
++It wrote `MODULE_NAME = 'Wirebond OCAP'`. Nothing in the app reads that name, so
++a user granted it saw nothing. It now writes `'Wirebond'`, and carries a repair
++block for rows that were already inserted with the old name.
+ 
+ ## Install
+ 
+-Copy the files over the project, keeping the folder structure:
++Copy these files over the project, keeping the folder structure:
+ 
+ | File | |
+ |---|---|
+-| `Models/WireBond.cs` | new |
+-| `ViewModels/WireBondInputModel.cs` | new |
+-| `ViewModels/WireBondViewModel.cs` | new |
+-| `ViewModels/WireBondPanelModel.cs` | new |
+-| `Services/WireBondService.cs` | new |
+-| `Controllers/WireBondController.cs` | new |
+-| `Views/WireBond/Index.cshtml` | new |
+-| `Views/WireBond/_WireBondFields.cshtml` | new |
+-| `Database/tblwirebond-access.sql` | new |
+-| `Program.cs` | changed — one DI line |
+-| `Models/AppModule.cs` | changed — new module name + catalog entry |
+-| `Models/AuditTrail.cs` | changed — `TBLWIREBOND` added to the audited tables |
+-| `Data/RecipeAuditRepository.cs` | changed — how a TBLWIREBOND row is addressed |
+-| `Views/Shared/_Layout.cshtml` | changed — sidebar link + the menu fix |
+-
+-`wirebond-ocap.patch` is the same five changed files as a diff against the
+-original project, if you would rather review the changes than overwrite.
++| `Views/WireBond/Index.cshtml` | changed — **the build fix**, plus the renaming and the row flash |
++| `Views/WireBond/_WireBondFields.cshtml` | changed — renaming, Machine pick list |
++| `ViewModels/WireBondViewModel.cs` | changed — `MachineOptions`, `Highlight` |
++| `Controllers/WireBondController.cs` | changed — loads the machine list, redirects with `highlight` |
++| `Services/WireBondService.cs` | changed — `GetMachineOptionsAsync()` |
++| `Models/AppModule.cs` | changed — module description wording only |
++| `Database/tblwirebond-access.sql` | changed — grants `'Wirebond'`, repairs `'Wirebond OCAP'` |
++| `Database/tblwirebond-check.sql` | new — diagnose a save that did not appear |
+ 
+ Then:
+ 
+-1. Run `Database/tblwirebond.sql` once, if TBLWIREBOND and its trigger are not
+-   already in place. If the table already holds rows, run only the
+-   `CREATE OR REPLACE TRIGGER` part — the corrected trigger matters, see below.
+-2. `dotnet build`, then run the app.
+-3. Sign in and open **Operations → Wirebond OCAP**. Rows already in TBLWIREBOND
+-   appear immediately, including any you inserted by hand.
+-
+-No `TBLACCESS` row is needed for a Super Admin: `AccessEvaluator.GetAsync`
+-returns full permission to the SuperAdmin role before it looks at TBLACCESS.
+-Everyone else needs a grant — tick the boxes on the **Wirebond OCAP** row in
+-Access Management, or run `Database/tblwirebond-access.sql`.
++1. `dotnet build`
++2. `dotnet run` (or F5 in Visual Studio)
++3. Sign in and open **Operations → Wirebond**.
++
++Rows already in `TBLWIREBOND` appear immediately, including any inserted by
++hand in SQL Developer.
++
++## Testing it end to end
++
++1. Open **Operations → Wirebond**. An empty table shows *No TBLWIREBOND records
++   found* with an **Add the first record** button.
++2. Click **Add Wirebond Record**. Fill **Record No** and **Date** — those two
++   are required, everything else is optional.
++3. **Save Wirebond Record**. A green popup names the row and the work week the
++   database calculated, and the grid comes back with that row at the top,
++   flashed amber.
++4. Check the database sees the same thing:
++   ```sql
++   SELECT wbocapno, wbocapwwk, lastupdatedby, wbdate
++   FROM   OCAPSYS.TBLWIREBOND
++   ORDER  BY lastupdate DESC NULLS LAST
++   FETCH FIRST 5 ROWS ONLY;
++   ```
++5. Click the pencil on that row, change a field, **Save Changes** — same flash,
++   and the old values are on the Change History page.
++6. Click the bin, type `DELETE` in the dialog, confirm. The row goes to Trash
++   and can be restored from the Recycle Bin.
++
++If a save does not appear, run `Database/tblwirebond-check.sql`. Block 1 answers
++the only question that matters first: is the row in the table? If it is, the
++problem is page permissions (block 5). If it is not, the insert never
++committed (blocks 2–4).
++
++## Permissions
++
++A Super Admin needs no grant: `AccessEvaluator.GetAsync` returns full permission
++to the SuperAdmin role before it ever looks at `TBLACCESS`.
++
++Everybody else needs one `TBLACCESS` row with `MODULE_NAME = 'Wirebond'` —
++tick the boxes on the **Wirebond** row in Access Management, or run
++`Database/tblwirebond-access.sql`. The tier decides which buttons render *and*
++which POSTs the server accepts:
++
++| ACCESS_LEVEL | View | Add | Edit | Delete |
++|---|---|---|---|---|
++| `READ` | yes | | | |
++| `WRITE` | yes | yes | yes | |
++| `ADMIN` | yes | yes | yes | yes |
++
++Hiding a button is presentation only; every action carries
++`[ModuleAccess(ModuleNames.TableWirebond, …)]` as the real check.
+ 
+ ## What the page does
+ 
+-- **Grid**: OCAP No, Work Week, OCAP Date, Last Updated By, Timestamp. Sortable
+-  on every column, searchable across OCAP no, work week, machine, package,
++- **Grid**: Record No, Work Week, Date, Last Updated By, Timestamp. Sortable on
++  every column, searchable across record no, work week, machine, package,
+   defect, category, difference no, issued by, verified by, operator and last
+   updated by. 25/50/100 rows per page.
+ - **Add / Edit**: all 25 writable columns in one full-width panel, grouped as
+@@ -65,8 +139,8 @@
+   uploaded again. Dates are parsed against a fixed list of formats, never the
+   server locale, so `10/09/2026` cannot mean September on one machine and
+   October on another.
+-- **Validation**: OCAP No required; OCAP Date required and not in the future;
+-  `Defect = OTHERS` requires Defect (Others); a duplicate OCAP No is refused
++- **Validation**: Record No required; Date required and not in the future;
++  `Defect = OTHERS` requires Defect (Others); a duplicate record no is refused
+   (the table has no unique constraint, so this check is the only guard), and a
+   number repeated inside one CSV file cancels the import.
+ 
+@@ -82,22 +156,19 @@
+ **`WBOCAPWWK` is never written by the app.** The `BEFORE INSERT` trigger
+ `OCAP_WIREBOND_WORKWEEK` derives it, so the form shows it read-only and the
+ success popup reads back what the database chose. That trigger does not fire on
+-UPDATE, so editing a saved record's OCAP date leaves the work week on the week
+-the record was first raised — which is what the OCAP number belongs to.
+-
+-**The trigger as originally written fails every insert on most sessions.** It
+-called `get_wwk_app_cutoff(to_date(sysdate, 'DD-MM-YYYY-HH24:MI:SS'))`, which
+-converts a DATE to text with the session `NLS_DATE_FORMAT` and then parses it
+-back with a mask that does not match — ORA-01843/ORA-01861, inside a
+-`BEFORE INSERT` trigger, so the insert dies with it. `Database/tblwirebond.sql`
+-carries the corrected version.
+-
+-## Not done
+-
+-Not compiled — this was written against the source, and the container had no
+-.NET 10 SDK. Every field name, bind variable, column name and reader index was
+-cross-checked against the table DDL and the models, but run `dotnet build`
+-before trusting it.
++UPDATE, so editing a saved record's date leaves the work week on the week the
++record was first raised.
+ 
+-Nothing here changes the existing Wirebond recipe page, its module, or its
+-grants.
++**The trigger can block every insert.** It calls `get_wwk_app_cutoff`. If that
++function is missing from the schema, or not granted to it, the trigger is
++INVALID and every insert fails with ORA-04098 — which the page reports in a red
++popup. Block 4 of `Database/tblwirebond-check.sql` installs a fail-safe version
++that calls the function through dynamic SQL and falls back to the ISO week of
++the row's own date, so a broken work-week function can never cost you a record.
++
++## Not compiled here
++
++Written against the source; the container had no .NET 10 SDK to build with.
++Every field name, bind variable, column name, reader index and Razor construct
++was cross-checked by hand against the table DDL, the models and the existing
++pages — but run `dotnet build` before trusting it.
+--- a/Database/tblwirebond-check.sql
++++ b/Database/tblwirebond-check.sql
+@@ -0,0 +1,149 @@
++-- =====================================================================
++-- TBLWIREBOND - "I saved a row on the page and nothing appeared"
++--
++-- Run the blocks in order as the OCAPSYS user (or as an account with
++-- SELECT on OCAPSYS). Each block is one statement: in SQL Developer use
++-- Run Statement (Ctrl+Enter) on the block you want, or Run Script (F5)
++-- for the whole file.
++--
++-- The page inserts with LASTUPDATE = SYSDATE and sorts newest first, so
++-- a successful save is always the FIRST row of the grid. If block 1
++-- finds the row but the grid does not show it, the problem is the page
++-- (permissions - see block 5). If block 1 finds nothing, the insert
++-- never committed - blocks 2 and 3 say why.
++-- =====================================================================
++
++
++-- ---------------------------------------------------------------------
++-- 1. Is the row actually there? Newest 20, same order as the page.
++-- ---------------------------------------------------------------------
++SELECT TO_CHAR(lastupdate, 'YYYY-MM-DD HH24:MI:SS') AS lastupdate,
++       lastupdatedby,
++       wbocapno,
++       wbocapwwk,
++       TO_CHAR(wbdate, 'YYYY-MM-DD HH24:MI') AS wbdate,
++       wbmachine,
++       wbpackage,
++       wbdefect,
++       tblrowid
++FROM   OCAPSYS.TBLWIREBOND
++ORDER  BY lastupdate DESC NULLS LAST
++FETCH FIRST 20 ROWS ONLY;
++
++
++-- ---------------------------------------------------------------------
++-- 2. Is the work-week trigger healthy?
++--
++-- STATUS must be ENABLED and VALID. An INVALID trigger fails EVERY
++-- insert with ORA-04098, and the page shows that text in a red popup.
++-- The usual cause is that GET_WWK_APP_CUTOFF does not exist in this
++-- schema (or is not granted to it), which is a compile-time failure the
++-- trigger body cannot catch.
++-- ---------------------------------------------------------------------
++SELECT trigger_name, status, table_name
++FROM   all_triggers
++WHERE  trigger_name = 'OCAP_WIREBOND_WORKWEEK';
++
++SELECT object_name, object_type, status
++FROM   all_objects
++WHERE  object_name = 'OCAP_WIREBOND_WORKWEEK';
++
++
++-- ---------------------------------------------------------------------
++-- 3. Does the work-week function the trigger calls exist here?
++--    No rows back = the trigger in tblwirebond.sql cannot compile.
++--    Fix it with block 4.
++-- ---------------------------------------------------------------------
++SELECT owner, object_name, object_type, status
++FROM   all_objects
++WHERE  object_name = 'GET_WWK_APP_CUTOFF';
++
++
++-- ---------------------------------------------------------------------
++-- 4. FAIL-SAFE WORK-WEEK TRIGGER (optional but recommended)
++--
++-- Same behaviour as the trigger in tblwirebond.sql, with one difference:
++-- GET_WWK_APP_CUTOFF is called through dynamic SQL, so a missing,
++-- invalid or un-granted function can never stop an insert. When the
++-- function cannot be called the work week falls back to the ISO week of
++-- the row's own date (e.g. 2026 week 37 -> '202637').
++--
++-- A work week the caller supplied on purpose is still kept.
++--
++-- Run this whole block as a script (F5) - it ends with the / on its own
++-- line, which is what tells the client the PL/SQL body is finished.
++-- ---------------------------------------------------------------------
++CREATE OR REPLACE TRIGGER OCAPSYS.OCAP_WIREBOND_WORKWEEK
++BEFORE INSERT
++ON OCAPSYS.TBLWIREBOND
++FOR EACH ROW
++DECLARE
++   v_when     DATE := NVL(:NEW.WBDATE, SYSDATE);
++   v_workweek NUMBER;
++   v_text     VARCHAR2(100);
++BEGIN
++   -- A work week that was passed in deliberately (a backdated record being
++   -- keyed in late) wins. Drop this IF if the trigger should always win.
++   IF :NEW.WBOCAPWWK IS NOT NULL THEN
++      RETURN;
++   END IF;
++
++   BEGIN
++      EXECUTE IMMEDIATE 'BEGIN :r := get_wwk_app_cutoff(:d); END;'
++        USING OUT v_workweek, IN v_when;
++      v_text := TO_CHAR(v_workweek);
++   EXCEPTION
++      WHEN OTHERS THEN
++         -- Missing function, no grant, bad NLS date handling inside it -
++         -- none of that is a reason to reject the record.
++         v_text := NULL;
++   END;
++
++   :NEW.WBOCAPWWK := NVL(v_text,
++                         TO_CHAR(v_when, 'IYYY') || TO_CHAR(v_when, 'IW'));
++END;
++/
++
++-- Confirm it compiled clean (no rows back = no errors):
++SELECT line, position, text
++FROM   all_errors
++WHERE  name = 'OCAP_WIREBOND_WORKWEEK'
++ORDER  BY sequence;
++
++
++-- ---------------------------------------------------------------------
++-- 5. Can the signed-in user actually see the Add / Edit / Delete
++--    buttons? Super Admins always can. Everyone else needs a row here
++--    with MODULE_NAME 'Wirebond':
++--      READ  = view only (no Add / Edit / Delete)
++--      WRITE = view + add + update
++--      ADMIN = view + add + update + delete
++--    Replace NX487878 with the login id that is having the problem.
++-- ---------------------------------------------------------------------
++SELECT user_id, user_name, role_name, module_name, access_level, status
++FROM   OCAPSYS.TBLACCESS
++WHERE  user_id = 'NX487878'
++ORDER  BY module_name;
++
++
++-- ---------------------------------------------------------------------
++-- 6. End-to-end test insert, then thrown away. If this raises an error,
++--    the page would have raised the same one. If it succeeds, the write
++--    path is fine and the problem is access (block 5).
++--
++--    Run the three statements one at a time.
++-- ---------------------------------------------------------------------
++INSERT INTO OCAPSYS.TBLWIREBOND
++    (TBLROWID, LASTUPDATE, LASTUPDATEDBY, WBOCAPNO, WBDATE,
++     WBPROCESS, WBMACHINE, WBPACKAGE, WBSOQTY, WBDEFECT, WBDEFECTCAT)
++VALUES
++    (RAWTOHEX(SYS_GUID()), SYSDATE, 'TESTUSER', 'WB-SELFTEST-001', SYSDATE,
++     'WIREBOND', 'WB-07', 'SOT669', 3000, 'NON STICK ON PAD', 'PROCESS');
++
++-- The trigger should have filled WBOCAPWWK on the row above:
++SELECT wbocapno, wbocapwwk, TO_CHAR(wbdate, 'YYYY-MM-DD HH24:MI') AS wbdate
++FROM   OCAPSYS.TBLWIREBOND
++WHERE  wbocapno = 'WB-SELFTEST-001';
++
++-- Put the table back the way it was:
++ROLLBACK;

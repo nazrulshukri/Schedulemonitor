@@ -1,0 +1,449 @@
+@model WireBondViewModel
+
+@{
+    ViewData["Title"] = "Wirebond";
+    // Per-module permissions come from this user's TBLACCESS grants (see
+    // Services/AccessEvaluator.cs), not from their role.
+    //
+    // This MUST be the same constant the controller enforces with
+    // [ModuleAccess(...)] - ModuleNames.TableWirebond ("Wirebond"). It used to
+    // read a ModuleNames.WireBondOcap that was never declared, which is a Razor
+    // compile error, so the whole app failed to build and the Add / Edit /
+    // Delete controls on this page never rendered at all.
+    var permission = await Access.GetAsync(ModuleNames.TableWirebond);
+    var canAdd = permission.CanAdd;
+    var canUpdate = permission.CanUpdate;
+    var canDelete = permission.CanDelete;
+}
+
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">Operations</span>
+        <h1>Wirebond</h1>
+        <p>TBLWIREBOND: wirebond records raised on the wire bonders - defect, 4M1E difference, action taken and disposition. The work week is calculated by the database from the wirebond date.</p>
+    </div>
+</div>
+
+<section class="data-panel excel-toolbar-panel">
+    <form asp-controller="WireBond" asp-action="Index" method="get" class="excel-search">
+        <input type="hidden" name="sortBy" value="@Model.SortBy" />
+        <input type="hidden" name="sortDirection" value="@Model.SortDirection" />
+        <div>
+            <label for="search" class="form-label">Search</label>
+            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Search record no, work week, machine, package, defect, or difference no" />
+        </div>
+        <div>
+            <label for="pageSize" class="form-label">Rows</label>
+            <select id="pageSize" name="pageSize" class="form-select">
+                <option value="25" selected="@(Model.PageSize == 25)">25</option>
+                <option value="50" selected="@(Model.PageSize == 50)">50</option>
+                <option value="100" selected="@(Model.PageSize == 100)">100</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary"><partial name="_Icon" model="@("search")" /> Search</button>
+        <a asp-controller="WireBond" asp-action="Index" class="btn btn-outline-secondary"><partial name="_Icon" model="@("clear")" /> Clear</a>
+    </form>
+
+    <div class="excel-actions">
+        @if (canAdd)
+        {
+            <button type="button" class="btn btn-primary" id="showAddRow"><partial name="_Icon" model="@("plus")" /> Add Wirebond Record</button>
+        }
+        <button type="button" class="btn btn-outline-secondary" data-template-modal><partial name="_Icon" model="@("template")" /> Template</button>
+        <a class="btn btn-outline-secondary" asp-controller="WireBond" asp-action="Export" asp-route-search="@Model.Search" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection"><partial name="_Icon" model="@("export")" /> Export CSV</a>
+        @if (canAdd)
+        {
+            <form asp-controller="WireBond" asp-action="Import" method="post" enctype="multipart/form-data" class="csv-import-form">
+                <label class="btn btn-outline-secondary mb-0" for="wireBondCsvFile"><partial name="_Icon" model="@("import")" /> Import CSV</label>
+                <input id="wireBondCsvFile" name="csvFile" type="file" accept=".csv,.txt,.tsv" />
+                <button type="submit" class="btn btn-primary"><partial name="_Icon" model="@("upload")" /> Upload</button>
+                <span class="csv-file-error" data-csv-file-error aria-live="polite"></span>
+            </form>
+        }
+    </div>
+</section>
+
+@* Hints, not constraints - TBLWIREBOND has no check constraints and the fields
+   still accept anything, so a new code does not need a code change. *@
+<datalist id="wireBondProcessOptions">
+    @foreach (var value in WireBondOptions.Processes)
+    {
+        <option value="@value"></option>
+    }
+</datalist>
+<datalist id="wireBondDefectOptions">
+    @foreach (var value in WireBondOptions.Defects)
+    {
+        <option value="@value"></option>
+    }
+</datalist>
+<datalist id="wireBondCategoryOptions">
+    @foreach (var value in WireBondOptions.DefectCategories)
+    {
+        <option value="@value"></option>
+    }
+</datalist>
+<datalist id="wireBondDifferenceOptions">
+    @foreach (var value in WireBondOptions.Differences)
+    {
+        <option value="@value"></option>
+    }
+</datalist>
+@* The machine list is AWACSWSTYPE.WSID for WSTYPE = 'WIREBOND' - the same
+   workstation master the recipe pages read, so a machine keyed in here matches
+   the one the rest of the app knows about. It is a suggestion list only: the
+   field still accepts a machine that is not in AWACSWSTYPE, and an empty or
+   unreachable AWACSWSTYPE just renders an empty list rather than an error. *@
+<datalist id="wireBondMachineOptions">
+    @foreach (var value in Model.MachineOptions)
+    {
+        <option value="@value"></option>
+    }
+</datalist>
+
+<div class="table-responsive data-panel excel-panel">
+    <table class="table table-hover align-middle excel-table" id="wireBondTable" data-resizable-table="tblwirebond">
+        <colgroup>
+            <col class="col-select" />
+            <col class="col-sequence" />
+            <col class="col-product" />
+            <col class="col-wstype" />
+            <col class="col-date" />
+            <col class="col-user" />
+            <col class="col-date" />
+            <col class="col-action" />
+            <col class="col-action" />
+        </colgroup>
+        <thead>
+            <tr>
+                <th data-col-key="select"><input class="form-check-input" type="checkbox" aria-label="Select all rows" disabled /><span class="column-resizer"></span></th>
+                @foreach (var column in SortableColumns)
+                {
+                    <th data-col-key="@column.Key">
+                        <a class="sort-header @SortClass(Model, column.Key)" asp-controller="WireBond" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="1" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@column.Key" asp-route-sortDirection="@NextSortDirection(Model, column.Key)">@column.Label<span></span></a>
+                        <span class="column-resizer"></span>
+                    </th>
+                }
+                <th data-col-key="edit">Edit<span class="column-resizer"></span></th>
+                <th data-col-key="delete">Delete<span class="column-resizer"></span></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (canAdd)
+            {
+                @* 28 columns will not fit as inline cells, so the add and edit
+                   panels are one full-width cell carrying the whole form. The
+                   excel-grid.js contract is unchanged: #addRow, [data-row-id],
+                   [data-edit-panel], [data-edit-row], [data-cancel-edit]. *@
+                <tr id="addRow" class="excel-edit-row @(Model.PromptAdd ? "" : "d-none")">
+                    <td colspan="9">
+                        <partial name="_WireBondFields" model="@(new WireBondPanelModel("createWireBondForm", null))" />
+                        <div class="d-flex gap-2 mt-2">
+                            <button type="submit" form="createWireBondForm" class="btn btn-primary"><partial name="_Icon" model="@("save")" /> Save Wirebond Record</button>
+                            <button type="button" class="btn btn-outline-secondary" id="cancelAddRow"><partial name="_Icon" model="@("cancel")" /> Cancel</button>
+                        </div>
+                    </td>
+                </tr>
+            }
+
+            @if (Model.Rows.Count == 0)
+            {
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-4">
+                        No TBLWIREBOND records found.
+                        @if (canAdd)
+                        {
+                            <button type="button" class="btn btn-sm btn-primary ms-2" id="showAddRowEmpty">Add the first record</button>
+                        }
+                    </td>
+                </tr>
+            }
+            else
+            {
+                var rowNumber = ((Model.Page - 1) * Model.PageSize) + 1;
+                foreach (var row in Model.Rows)
+                {
+                    // The row that was just saved is flashed and scrolled to, so an
+                    // insert or an edit visibly lands in the grid instead of the
+                    // user having to hunt for it.
+                    var isJustSaved = !string.IsNullOrEmpty(Model.Highlight)
+                        && string.Equals(row.OcapNo, Model.Highlight, StringComparison.OrdinalIgnoreCase);
+
+                    <tr class="excel-display-row @(isJustSaved ? "row-just-saved" : "")" data-row-id="@row.TblRowId">
+                        <td><input class="form-check-input" type="checkbox" aria-label="Select @row.OcapNo" /></td>
+                        <td>@rowNumber</td>
+                        <td class="fw-semibold">@row.OcapNo</td>
+                        <td>@row.OcapWorkWeek</td>
+                        <td>@row.OcapDate?.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td title="@row.LastUpdatedBy">@(await Directory.GetDisplayNameAsync(row.LastUpdatedBy))</td>
+                        <td>@row.LastUpdate?.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td class="text-center">
+                            @if (canUpdate)
+                            {
+                                <button type="button" class="icon-btn icon-edit" data-edit-row="@row.TblRowId" title="Edit wirebond record" aria-label="Edit @row.OcapNo">
+                                    <span></span>
+                                </button>
+                            }
+                        </td>
+                        <td class="text-center">
+                            @if (canDelete)
+                            {
+                                <button type="button" class="icon-btn icon-delete" data-delete-form="deleteWireBondForm-@row.TblRowId" data-delete-label="@row.OcapNo" title="Move wirebond record to Trash" aria-label="Delete @row.OcapNo">
+                                    <span></span>
+                                </button>
+                            }
+                        </td>
+                    </tr>
+
+                    @if (canUpdate)
+                    {
+                        var editFormId = $"editWireBondForm-{row.TblRowId}";
+                        <tr class="excel-edit-row d-none" data-edit-panel="@row.TblRowId">
+                            <td colspan="9">
+                                <partial name="_WireBondFields" model="@(new WireBondPanelModel(editFormId, row))" />
+                                <div class="d-flex gap-2 mt-2">
+                                    <button type="submit" form="@editFormId" class="btn btn-primary"><partial name="_Icon" model="@("save")" /> Save Changes</button>
+                                    <button type="button" class="btn btn-outline-secondary" data-cancel-edit="@row.TblRowId"><partial name="_Icon" model="@("cancel")" /> Cancel</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+
+                    rowNumber += 1;
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+@* Row forms live outside the table - see the note in Views/Awacs/RecipeGrid.cshtml. *@
+<div class="row-forms d-none" aria-hidden="true">
+    @if (canAdd)
+    {
+        <form id="createWireBondForm" asp-controller="WireBond" asp-action="Create" method="post">
+            <input type="hidden" name="Confirmed" value="true" />
+        </form>
+    }
+
+    @foreach (var row in Model.Rows)
+    {
+        if (canUpdate)
+        {
+            <form id="editWireBondForm-@row.TblRowId" asp-controller="WireBond" asp-action="Edit" method="post">
+                <input type="hidden" name="TblRowId" value="@row.TblRowId" />
+                <input type="hidden" name="Confirmed" value="true" />
+            </form>
+        }
+
+        if (canDelete)
+        {
+            <form id="deleteWireBondForm-@row.TblRowId" asp-controller="WireBond" asp-action="Delete" method="post">
+                <input type="hidden" name="id" value="@row.TblRowId" />
+                <input type="hidden" name="confirmed" value="true" />
+            </form>
+        }
+    }
+</div>
+
+@{
+    var startPage = Math.Max(1, Model.Page - 2);
+    var endPage = Math.Min(Model.TotalPages, startPage + 4);
+    startPage = Math.Max(1, endPage - 4);
+}
+
+<div class="pagination-bar">
+    <span>Showing page @Model.Page of @Model.TotalPages, @Model.TotalRows total rows</span>
+    <nav aria-label="Wirebond pages">
+        <ul class="pagination mb-0">
+            <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
+                <a class="page-link" asp-controller="WireBond" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection">Prev</a>
+            </li>
+            @for (var pageNumber = startPage; pageNumber <= endPage; pageNumber++)
+            {
+                <li class="page-item @(pageNumber == Model.Page ? "active" : "")">
+                    <a class="page-link" asp-controller="WireBond" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@pageNumber" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection">@pageNumber</a>
+                </li>
+            }
+            <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : "")">
+                <a class="page-link" asp-controller="WireBond" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page + 1)" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection">Next</a>
+            </li>
+        </ul>
+    </nav>
+</div>
+
+<div class="modal fade" id="wireBondTemplateModal" tabindex="-1" aria-labelledby="wireBondTemplateTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content modern-modal template-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="eyebrow">CSV Template</span>
+                    <h5 class="modal-title" id="wireBondTemplateTitle">TBLWIREBOND upload format</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ol class="template-steps">
+                    <li>Download the template below.</li>
+                    <li>Key in the values under the same headers - or delete the header row and key in the values only, in the same left-to-right order.</li>
+                    <li>Write WBDATE as <code>2026-09-10 14:30</code> or <code>10/09/2026</code>. It is required: the work week is calculated from it.</li>
+                    <li>Leave the work week out entirely - the database sets it.</li>
+                    <li>In Excel, use Save As and choose CSV (Comma delimited) (*.csv).</li>
+                </ol>
+
+                <div class="template-preview-wrap">
+                    <table class="table template-preview-table align-middle">
+                        <thead>
+                            <tr>
+                                <th>OCAPNO</th>
+                                <th>WBDATE</th>
+                                <th>MACHINE</th>
+                                <th>PACKAGE</th>
+                                <th>SOQTY</th>
+                                <th>DEFECT</th>
+                                <th>DEFECTCAT</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>WB-2026-001</td>
+                                <td>2026-09-10 14:30</td>
+                                <td>WB-07</td>
+                                <td>SOT669</td>
+                                <td>3000</td>
+                                <td>NON STICK ON PAD</td>
+                                <td>PROCESS</td>
+                            </tr>
+                            <tr>
+                                <td>WB-2026-002</td>
+                                <td>2026-09-10 22:05</td>
+                                <td>WB-12</td>
+                                <td>SOT1210</td>
+                                <td>5000</td>
+                                <td>BOND LIFT</td>
+                                <td>MACHINE</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="template-note">
+                    Required columns: OCAPNO, WBDATE. The full template also carries ISSUEDBY, BFG,
+                    OPERATORID, PROCESS, MACHINE, PACKAGE, SOQTY, DEFECT, DEFECTCAT, DIFF4M1E,
+                    DIFFNO, DIFFREJECTQTY and REMARKS. A header row can additionally name
+                    DEFECTOTHERS, DIFFAFFECTED, DIFFFABSITE, DIFFNOTAFFECTED, DIFFREMARKS,
+                    VERIFIEDBY, ACTIONTAKEN, DISPOSITION, RCMACHINEERROR and MACHINEERROR, so an
+                    Export CSV can be edited and uploaded again. A record no that is already in
+                    the table - or twice in the same file - cancels the whole import.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a class="btn btn-primary" asp-controller="WireBond" asp-action="DownloadTemplate"><partial name="_Icon" model="@("download")" /> Download CSV Template</a>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><partial name="_Icon" model="@("close")" /> Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (canDelete)
+{
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modern-modal delete-confirm-modal">
+                <div class="modal-header">
+                    <div>
+                        <span class="eyebrow">Delete Validation</span>
+                        <h5 class="modal-title" id="deleteConfirmTitle">Move wirebond record to Trash</h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">This moves <strong id="deleteTargetName"></strong> to Trash, where it can be restored.</p>
+                    <label for="deletePhrase" class="form-label">Type DELETE to continue</label>
+                    <input id="deletePhrase" class="form-control" autocomplete="off" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><partial name="_Icon" model="@("cancel")" /> Cancel</button>
+                    <button type="button" class="btn btn-nxp-orange" id="confirmDeleteButton" disabled><partial name="_Icon" model="@("delete")" /> Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* The doubled at-sign in the keyframes rule below is Razor escaping: it renders
+   as a single one. A bare at-sign there would be read as a Razor expression. *@
+<style>
+    .row-just-saved > td {
+        animation: wireBondJustSaved 3s ease-out 1;
+    }
+
+    @@keyframes wireBondJustSaved {
+        0% { background-color: rgba(255, 176, 0, 0.55); }
+        70% { background-color: rgba(255, 176, 0, 0.35); }
+        100% { background-color: transparent; }
+    }
+</style>
+
+@section Scripts {
+    <script src="~/js/excel-grid.js" asp-append-version="true"></script>
+    <script>
+        window.excelGrid.init({
+            tableId: 'wireBondTable',
+            storageKey: 'tblwirebond',
+            csvInputId: 'wireBondCsvFile',
+            templateModalId: 'wireBondTemplateModal'
+        });
+
+        // excel-grid.js resets input[data-original-value] when an edit is
+        // cancelled. This panel also has textareas, which it does not know about.
+        document.querySelectorAll('[data-cancel-edit]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const key = button.getAttribute('data-cancel-edit');
+                const panel = document.querySelector(`[data-edit-panel="${CSS.escape(key)}"]`);
+                panel?.querySelectorAll('textarea[data-original-value]').forEach((field) => {
+                    field.value = field.getAttribute('data-original-value') ?? '';
+                });
+            });
+        });
+
+        // The empty-grid button is the same action as the toolbar button.
+        document.getElementById('showAddRowEmpty')?.addEventListener('click', () => {
+            document.getElementById('showAddRow')?.click();
+        });
+
+        // Bring the row that was just saved into view.
+        document.querySelector('.row-just-saved')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    </script>
+}
+
+@functions {
+    private static readonly (string Key, string Label)[] SortableColumns = new (string Key, string Label)[]
+    {
+        ("sequence", "#"),
+        ("wbocapno", "Record No"),
+        ("wbocapwwk", "Work Week"),
+        ("wbdate", "Date"),
+        ("lastupdatedby", "Last Updated By"),
+        ("lastupdate", "Timestamp")
+    };
+
+    private static string NextSortDirection(WireBondViewModel model, string column)
+    {
+        return string.Equals(model.SortBy, column, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(model.SortDirection, "asc", StringComparison.OrdinalIgnoreCase)
+                ? "desc"
+                : "asc";
+    }
+
+    private static string SortClass(WireBondViewModel model, string column)
+    {
+        if (!string.Equals(model.SortBy, column, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        return string.Equals(model.SortDirection, "asc", StringComparison.OrdinalIgnoreCase)
+            ? "is-active is-asc"
+            : "is-active is-desc";
+    }
+}
