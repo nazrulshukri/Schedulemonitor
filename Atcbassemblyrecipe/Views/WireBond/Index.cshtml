@@ -6,10 +6,7 @@
     // Services/AccessEvaluator.cs), not from their role.
     //
     // This MUST be the same constant the controller enforces with
-    // [ModuleAccess(...)] - ModuleNames.TableWirebond ("Wirebond"). It used to
-    // read a ModuleNames.WireBondOcap that was never declared, which is a Razor
-    // compile error, so the whole app failed to build and the Add / Edit /
-    // Delete controls on this page never rendered at all.
+    // [ModuleAccess(...)] - ModuleNames.TableWirebond ("Wirebond").
     var permission = await Access.GetAsync(ModuleNames.TableWirebond);
     var canAdd = permission.CanAdd;
     var canUpdate = permission.CanUpdate;
@@ -20,7 +17,7 @@
     <div>
         <span class="eyebrow">Operations</span>
         <h1>Wirebond</h1>
-        <p>TBLWIREBOND: wirebond records raised on the wire bonders - defect, 4M1E difference, action taken and disposition. The work week is calculated by the database from the wirebond date.</p>
+        <p>@Model.TotalRows rows in TBLWIREBOND. Add a row inline, edit it in place, delete it to Trash - the same grid as the recipe pages.</p>
     </div>
 </div>
 
@@ -47,7 +44,7 @@
     <div class="excel-actions">
         @if (canAdd)
         {
-            <button type="button" class="btn btn-primary" id="showAddRow"><partial name="_Icon" model="@("plus")" /> Add Wirebond Record</button>
+            <button type="button" class="btn btn-primary" id="showAddRow"><partial name="_Icon" model="@("plus")" /> Add Record</button>
         }
         <button type="button" class="btn btn-outline-secondary" data-template-modal><partial name="_Icon" model="@("template")" /> Template</button>
         <a class="btn btn-outline-secondary" asp-controller="WireBond" asp-action="Export" asp-route-search="@Model.Search" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection"><partial name="_Icon" model="@("export")" /> Export CSV</a>
@@ -89,11 +86,9 @@
         <option value="@value"></option>
     }
 </datalist>
-@* The machine list is AWACSWSTYPE.WSID for WSTYPE = 'WIREBOND' - the same
-   workstation master the recipe pages read, so a machine keyed in here matches
-   the one the rest of the app knows about. It is a suggestion list only: the
-   field still accepts a machine that is not in AWACSWSTYPE, and an empty or
-   unreachable AWACSWSTYPE just renders an empty list rather than an error. *@
+@* AWACSWSTYPE.WSID for WSTYPE = 'WIREBOND' - the workstation master the recipe
+   pages read. Suggestion only: a machine that is not in AWACSWSTYPE still saves,
+   and an empty or unreachable AWACSWSTYPE renders an empty list, not an error. *@
 <datalist id="wireBondMachineOptions">
     @foreach (var value in Model.MachineOptions)
     {
@@ -102,15 +97,38 @@
 </datalist>
 
 <div class="table-responsive data-panel excel-panel">
-    <table class="table table-hover align-middle excel-table" id="wireBondTable" data-resizable-table="tblwirebond">
+    <table class="table table-hover align-middle excel-table" id="wireBondTable" data-resizable-table="tblwirebond-grid">
         <colgroup>
             <col class="col-select" />
             <col class="col-sequence" />
-            <col class="col-product" />
-            <col class="col-wstype" />
-            <col class="col-date" />
-            <col class="col-user" />
-            <col class="col-date" />
+            <col class="wb-col-wbocapno" />
+            <col class="wb-col-wbocapwwk" />
+            <col class="wb-col-wbdate" />
+            <col class="wb-col-wbissuedby" />
+            <col class="wb-col-wbbfg" />
+            <col class="wb-col-wboperatorid" />
+            <col class="wb-col-wbprocess" />
+            <col class="wb-col-wbmachine" />
+            <col class="wb-col-wbpackage" />
+            <col class="wb-col-wbsoqty" />
+            <col class="wb-col-wbdefect" />
+            <col class="wb-col-wbdefectcat" />
+            <col class="wb-col-wbdefectothers" />
+            <col class="wb-col-wbmachineerror" />
+            <col class="wb-col-wbrcmachineerror" />
+            <col class="wb-col-wbdiff4m1e" />
+            <col class="wb-col-wbdiffno" />
+            <col class="wb-col-wbdifffabsite" />
+            <col class="wb-col-wbdiffrejectqty" />
+            <col class="wb-col-wbdiffaffected" />
+            <col class="wb-col-wbdiffnotaffected" />
+            <col class="wb-col-wbdiffremarks" />
+            <col class="wb-col-wbverifiedby" />
+            <col class="wb-col-wbactiontaken" />
+            <col class="wb-col-wbdisposition" />
+            <col class="wb-col-wbremarks" />
+            <col class="wb-col-lastupdatedby" />
+            <col class="wb-col-lastupdate" />
             <col class="col-action" />
             <col class="col-action" />
         </colgroup>
@@ -131,17 +149,46 @@
         <tbody>
             @if (canAdd)
             {
-                @* 28 columns will not fit as inline cells, so the add and edit
-                   panels are one full-width cell carrying the whole form. The
-                   excel-grid.js contract is unchanged: #addRow, [data-row-id],
-                   [data-edit-panel], [data-edit-row], [data-cancel-edit]. *@
                 <tr id="addRow" class="excel-edit-row @(Model.PromptAdd ? "" : "d-none")">
-                    <td colspan="9">
-                        <partial name="_WireBondFields" model="@(new WireBondPanelModel("createWireBondForm", null))" />
-                        <div class="d-flex gap-2 mt-2">
-                            <button type="submit" form="createWireBondForm" class="btn btn-primary"><partial name="_Icon" model="@("save")" /> Save Wirebond Record</button>
-                            <button type="button" class="btn btn-outline-secondary" id="cancelAddRow"><partial name="_Icon" model="@("cancel")" /> Cancel</button>
-                        </div>
+                    <td><input class="form-check-input" type="checkbox" aria-label="New row" disabled /></td>
+                    <td><span class="cell-muted">New</span></td>
+                    <td><input name="OcapNo" form="createWireBondForm" class="form-control cell-input" maxlength="100" required placeholder="WB-2026-001" aria-label="Record No" /></td>
+                    <td><span class="cell-muted">Set by the database</span></td>
+                    <td><input name="OcapDate" form="createWireBondForm" class="form-control cell-input" type="datetime-local" required aria-label="Date" /></td>
+                    <td><input name="IssuedBy" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="NX487878" aria-label="Issued By" /></td>
+                    <td><input name="Bfg" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="BFG1" aria-label="BFG" /></td>
+                    <td><input name="OperatorId" form="createWireBondForm" class="form-control cell-input" maxlength="50" placeholder="OP1023" aria-label="Operator ID" /></td>
+                    <td><input name="Process" form="createWireBondForm" class="form-control cell-input" maxlength="100" list="wireBondProcessOptions" value="WIREBOND" placeholder="WIREBOND" aria-label="Process" /></td>
+                    <td><input name="Machine" form="createWireBondForm" class="form-control cell-input" maxlength="100" list="wireBondMachineOptions" placeholder="WB-07" aria-label="Machine" /></td>
+                    <td><input name="Package" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="SOT669" aria-label="Package" /></td>
+                    <td><input name="SoQty" form="createWireBondForm" class="form-control cell-input" type="number" step="1" min="0" placeholder="3000" aria-label="SO Qty" /></td>
+                    <td><input name="Defect" form="createWireBondForm" class="form-control cell-input" maxlength="100" list="wireBondDefectOptions" placeholder="NON STICK ON PAD" aria-label="Defect" /></td>
+                    <td><input name="DefectCategory" form="createWireBondForm" class="form-control cell-input" maxlength="100" list="wireBondCategoryOptions" placeholder="PROCESS" aria-label="Defect Category" /></td>
+                    <td><input name="DefectOthers" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="Only when Defect is OTHERS" aria-label="Defect (Others)" /></td>
+                    <td><input name="MachineError" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="E-042" aria-label="Machine Error" /></td>
+                    <td><input name="RcMachineError" form="createWireBondForm" class="form-control cell-input" maxlength="1000" placeholder="Z-axis search level fault" aria-label="Machine Error - Root Cause" /></td>
+                    <td><input name="Diff4M1E" form="createWireBondForm" class="form-control cell-input" maxlength="100" list="wireBondDifferenceOptions" placeholder="MACHINE" aria-label="4M1E" /></td>
+                    <td><input name="DiffNo" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="DIFF-2026-0912" aria-label="Difference No" /></td>
+                    <td><input name="DiffFabSite" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="ATCB" aria-label="Fab Site" /></td>
+                    <td><input name="DiffRejectQty" form="createWireBondForm" class="form-control cell-input" type="number" step="1" min="0" placeholder="120" aria-label="Reject Qty" /></td>
+                    <td><input name="DiffAffected" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="LOT2609001" aria-label="Affected" /></td>
+                    <td><input name="DiffNotAffected" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="LOT2609003" aria-label="Not Affected" /></td>
+                    <td><input name="DiffRemarks" form="createWireBondForm" class="form-control cell-input" maxlength="2000" placeholder="How the difference was found" aria-label="Difference Remarks" /></td>
+                    <td><input name="VerifiedBy" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="NX000123" aria-label="Verified By" /></td>
+                    <td><input name="ActionTaken" form="createWireBondForm" class="form-control cell-input" maxlength="2000" placeholder="Capillary replaced" aria-label="Action Taken" /></td>
+                    <td><input name="Disposition" form="createWireBondForm" class="form-control cell-input" maxlength="2000" placeholder="Affected lots to 100% visual" aria-label="Disposition" /></td>
+                    <td><input name="Remarks" form="createWireBondForm" class="form-control cell-input" maxlength="500" placeholder="Raised on night shift" aria-label="Remarks" /></td>
+                    <td><span class="cell-muted">Current user</span></td>
+                    <td><span class="cell-muted">Set on save</span></td>
+                    <td class="text-center">
+                        <button type="submit" form="createWireBondForm" class="icon-btn icon-save" title="Save new record" aria-label="Save new record">
+                            <span></span>
+                        </button>
+                    </td>
+                    <td class="text-center">
+                        <button type="button" class="icon-btn icon-cancel" id="cancelAddRow" title="Cancel add row" aria-label="Cancel add row">
+                            <span></span>
+                        </button>
                     </td>
                 </tr>
             }
@@ -149,8 +196,8 @@
             @if (Model.Rows.Count == 0)
             {
                 <tr>
-                    <td colspan="9" class="text-center text-muted py-4">
-                        No TBLWIREBOND records found.
+                    <td colspan="32" class="text-center text-muted py-4">
+                        No rows found.
                         @if (canAdd)
                         {
                             <button type="button" class="btn btn-sm btn-primary ms-2" id="showAddRowEmpty">Add the first record</button>
@@ -163,24 +210,46 @@
                 var rowNumber = ((Model.Page - 1) * Model.PageSize) + 1;
                 foreach (var row in Model.Rows)
                 {
-                    // The row that was just saved is flashed and scrolled to, so an
-                    // insert or an edit visibly lands in the grid instead of the
-                    // user having to hunt for it.
+                    // The row that was just saved is flashed and scrolled to, so a
+                    // save visibly lands instead of the user having to hunt for it.
                     var isJustSaved = !string.IsNullOrEmpty(Model.Highlight)
                         && string.Equals(row.OcapNo, Model.Highlight, StringComparison.OrdinalIgnoreCase);
 
                     <tr class="excel-display-row @(isJustSaved ? "row-just-saved" : "")" data-row-id="@row.TblRowId">
                         <td><input class="form-check-input" type="checkbox" aria-label="Select @row.OcapNo" /></td>
                         <td>@rowNumber</td>
-                        <td class="fw-semibold">@row.OcapNo</td>
-                        <td>@row.OcapWorkWeek</td>
+                        <td class="fw-semibold" title="@row.OcapNo">@row.OcapNo</td>
+                        <td title="@row.OcapWorkWeek">@row.OcapWorkWeek</td>
                         <td>@row.OcapDate?.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td title="@row.IssuedBy">@row.IssuedBy</td>
+                        <td title="@row.Bfg">@row.Bfg</td>
+                        <td title="@row.OperatorId">@row.OperatorId</td>
+                        <td title="@row.Process">@row.Process</td>
+                        <td title="@row.Machine">@row.Machine</td>
+                        <td title="@row.Package">@row.Package</td>
+                        <td title="@row.SoQty">@row.SoQty</td>
+                        <td title="@row.Defect">@row.Defect</td>
+                        <td title="@row.DefectCategory">@row.DefectCategory</td>
+                        <td title="@row.DefectOthers">@row.DefectOthers</td>
+                        <td title="@row.MachineError">@row.MachineError</td>
+                        <td title="@row.RcMachineError">@row.RcMachineError</td>
+                        <td title="@row.Diff4M1E">@row.Diff4M1E</td>
+                        <td title="@row.DiffNo">@row.DiffNo</td>
+                        <td title="@row.DiffFabSite">@row.DiffFabSite</td>
+                        <td title="@row.DiffRejectQty">@row.DiffRejectQty</td>
+                        <td title="@row.DiffAffected">@row.DiffAffected</td>
+                        <td title="@row.DiffNotAffected">@row.DiffNotAffected</td>
+                        <td title="@row.DiffRemarks">@row.DiffRemarks</td>
+                        <td title="@row.VerifiedBy">@row.VerifiedBy</td>
+                        <td title="@row.ActionTaken">@row.ActionTaken</td>
+                        <td title="@row.Disposition">@row.Disposition</td>
+                        <td title="@row.Remarks">@row.Remarks</td>
                         <td title="@row.LastUpdatedBy">@(await Directory.GetDisplayNameAsync(row.LastUpdatedBy))</td>
                         <td>@row.LastUpdate?.ToString("yyyy-MM-dd HH:mm")</td>
                         <td class="text-center">
                             @if (canUpdate)
                             {
-                                <button type="button" class="icon-btn icon-edit" data-edit-row="@row.TblRowId" title="Edit wirebond record" aria-label="Edit @row.OcapNo">
+                                <button type="button" class="icon-btn icon-edit" data-edit-row="@row.TblRowId" title="Edit record" aria-label="Edit @row.OcapNo">
                                     <span></span>
                                 </button>
                             }
@@ -188,7 +257,7 @@
                         <td class="text-center">
                             @if (canDelete)
                             {
-                                <button type="button" class="icon-btn icon-delete" data-delete-form="deleteWireBondForm-@row.TblRowId" data-delete-label="@row.OcapNo" title="Move wirebond record to Trash" aria-label="Delete @row.OcapNo">
+                                <button type="button" class="icon-btn icon-delete" data-delete-form="deleteWireBondForm-@row.TblRowId" data-delete-label="@row.OcapNo" title="Move record to Trash" aria-label="Delete @row.OcapNo">
                                     <span></span>
                                 </button>
                             }
@@ -199,12 +268,45 @@
                     {
                         var editFormId = $"editWireBondForm-{row.TblRowId}";
                         <tr class="excel-edit-row d-none" data-edit-panel="@row.TblRowId">
-                            <td colspan="9">
-                                <partial name="_WireBondFields" model="@(new WireBondPanelModel(editFormId, row))" />
-                                <div class="d-flex gap-2 mt-2">
-                                    <button type="submit" form="@editFormId" class="btn btn-primary"><partial name="_Icon" model="@("save")" /> Save Changes</button>
-                                    <button type="button" class="btn btn-outline-secondary" data-cancel-edit="@row.TblRowId"><partial name="_Icon" model="@("cancel")" /> Cancel</button>
-                                </div>
+                            <td><input class="form-check-input" type="checkbox" aria-label="Editing @row.OcapNo" disabled /></td>
+                            <td><span class="cell-muted">@rowNumber</span></td>
+                            <td><input name="OcapNo" form="@editFormId" class="form-control cell-input" maxlength="100" required value="@row.OcapNo" data-original-value="@row.OcapNo" aria-label="Record No" /></td>
+                            <td><span class="cell-muted">@row.OcapWorkWeek</span></td>
+                            <td><input name="OcapDate" form="@editFormId" class="form-control cell-input" type="datetime-local" required value="@(row.OcapDate?.ToString("yyyy-MM-ddTHH:mm"))" data-original-value="@(row.OcapDate?.ToString("yyyy-MM-ddTHH:mm"))" aria-label="Date" /></td>
+                            <td><input name="IssuedBy" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.IssuedBy" data-original-value="@row.IssuedBy" aria-label="Issued By" /></td>
+                            <td><input name="Bfg" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.Bfg" data-original-value="@row.Bfg" aria-label="BFG" /></td>
+                            <td><input name="OperatorId" form="@editFormId" class="form-control cell-input" maxlength="50" value="@row.OperatorId" data-original-value="@row.OperatorId" aria-label="Operator ID" /></td>
+                            <td><input name="Process" form="@editFormId" class="form-control cell-input" maxlength="100" list="wireBondProcessOptions" value="@row.Process" data-original-value="@row.Process" aria-label="Process" /></td>
+                            <td><input name="Machine" form="@editFormId" class="form-control cell-input" maxlength="100" list="wireBondMachineOptions" value="@row.Machine" data-original-value="@row.Machine" aria-label="Machine" /></td>
+                            <td><input name="Package" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.Package" data-original-value="@row.Package" aria-label="Package" /></td>
+                            <td><input name="SoQty" form="@editFormId" class="form-control cell-input" type="number" step="1" min="0" value="@row.SoQty" data-original-value="@(row.SoQty?.ToString())" aria-label="SO Qty" /></td>
+                            <td><input name="Defect" form="@editFormId" class="form-control cell-input" maxlength="100" list="wireBondDefectOptions" value="@row.Defect" data-original-value="@row.Defect" aria-label="Defect" /></td>
+                            <td><input name="DefectCategory" form="@editFormId" class="form-control cell-input" maxlength="100" list="wireBondCategoryOptions" value="@row.DefectCategory" data-original-value="@row.DefectCategory" aria-label="Defect Category" /></td>
+                            <td><input name="DefectOthers" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.DefectOthers" data-original-value="@row.DefectOthers" aria-label="Defect (Others)" /></td>
+                            <td><input name="MachineError" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.MachineError" data-original-value="@row.MachineError" aria-label="Machine Error" /></td>
+                            <td><input name="RcMachineError" form="@editFormId" class="form-control cell-input" maxlength="1000" value="@row.RcMachineError" data-original-value="@row.RcMachineError" aria-label="Machine Error - Root Cause" /></td>
+                            <td><input name="Diff4M1E" form="@editFormId" class="form-control cell-input" maxlength="100" list="wireBondDifferenceOptions" value="@row.Diff4M1E" data-original-value="@row.Diff4M1E" aria-label="4M1E" /></td>
+                            <td><input name="DiffNo" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.DiffNo" data-original-value="@row.DiffNo" aria-label="Difference No" /></td>
+                            <td><input name="DiffFabSite" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.DiffFabSite" data-original-value="@row.DiffFabSite" aria-label="Fab Site" /></td>
+                            <td><input name="DiffRejectQty" form="@editFormId" class="form-control cell-input" type="number" step="1" min="0" value="@row.DiffRejectQty" data-original-value="@(row.DiffRejectQty?.ToString())" aria-label="Reject Qty" /></td>
+                            <td><input name="DiffAffected" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.DiffAffected" data-original-value="@row.DiffAffected" aria-label="Affected" /></td>
+                            <td><input name="DiffNotAffected" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.DiffNotAffected" data-original-value="@row.DiffNotAffected" aria-label="Not Affected" /></td>
+                            <td><input name="DiffRemarks" form="@editFormId" class="form-control cell-input" maxlength="2000" value="@row.DiffRemarks" data-original-value="@row.DiffRemarks" aria-label="Difference Remarks" /></td>
+                            <td><input name="VerifiedBy" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.VerifiedBy" data-original-value="@row.VerifiedBy" aria-label="Verified By" /></td>
+                            <td><input name="ActionTaken" form="@editFormId" class="form-control cell-input" maxlength="2000" value="@row.ActionTaken" data-original-value="@row.ActionTaken" aria-label="Action Taken" /></td>
+                            <td><input name="Disposition" form="@editFormId" class="form-control cell-input" maxlength="2000" value="@row.Disposition" data-original-value="@row.Disposition" aria-label="Disposition" /></td>
+                            <td><input name="Remarks" form="@editFormId" class="form-control cell-input" maxlength="500" value="@row.Remarks" data-original-value="@row.Remarks" aria-label="Remarks" /></td>
+                            <td><span class="cell-muted">Save user</span></td>
+                            <td><span class="cell-muted">Set on save</span></td>
+                            <td class="text-center">
+                                <button type="submit" form="@editFormId" class="icon-btn icon-save" title="Save edit" aria-label="Save @row.OcapNo">
+                                    <span></span>
+                                </button>
+                            </td>
+                            <td class="text-center">
+                                <button type="button" class="icon-btn icon-cancel" data-cancel-edit="@row.TblRowId" title="Cancel edit" aria-label="Cancel edit @row.OcapNo">
+                                    <span></span>
+                                </button>
                             </td>
                         </tr>
                     }
@@ -216,7 +318,16 @@
     </table>
 </div>
 
-@* Row forms live outside the table - see the note in Views/Awacs/RecipeGrid.cshtml. *@
+@*
+    Every row form lives here, outside the table.
+
+    A <form> written between two <tr> elements does not survive HTML parsing: the
+    browser closes it straight away and moves its hidden inputs - row id,
+    confirmation flag and the antiforgery token - out of it, so the POST arrives
+    without them and the save fails with nothing to show for it. The inputs in the
+    row cells above reach these forms through their form="..." attribute instead,
+    which works from anywhere on the page.
+*@
 <div class="row-forms d-none" aria-hidden="true">
     @if (canAdd)
     {
@@ -313,15 +424,6 @@
                                 <td>NON STICK ON PAD</td>
                                 <td>PROCESS</td>
                             </tr>
-                            <tr>
-                                <td>WB-2026-002</td>
-                                <td>2026-09-10 22:05</td>
-                                <td>WB-12</td>
-                                <td>SOT1210</td>
-                                <td>5000</td>
-                                <td>BOND LIFT</td>
-                                <td>MACHINE</td>
-                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -352,7 +454,7 @@
                 <div class="modal-header">
                     <div>
                         <span class="eyebrow">Delete Validation</span>
-                        <h5 class="modal-title" id="deleteConfirmTitle">Move wirebond record to Trash</h5>
+                        <h5 class="modal-title" id="deleteConfirmTitle">Move record to Trash</h5>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -370,9 +472,56 @@
     </div>
 }
 
-@* The doubled at-sign in the keyframes rule below is Razor escaping: it renders
-   as a single one. A bare at-sign there would be read as a Razor expression. *@
+@*
+    Widths for this grid only.
+
+    site.css sizes the recipe grids, which have five data columns sharing the
+    leftover width. TBLWIREBOND has 28, so left to that rule every column would
+    land at about 35px. Explicit px widths and one wide table instead: the panel
+    already scrolls horizontally, and excel-grid.js still overrides any column a
+    user drags.
+
+    The doubled at-sign in the keyframes rule is Razor escaping - it renders as a
+    single one. A bare at-sign there would be read as a Razor expression.
+*@
 <style>
+    #wireBondTable { width: max(100%, 4691px); }
+    #wireBondTable .col-select { width: 52px; }
+    #wireBondTable .col-sequence { width: 68px; }
+    #wireBondTable .col-action { width: 88px; }
+    #wireBondTable .wb-col-wbocapno { width: 160px; }
+    #wireBondTable .wb-col-wbocapwwk { width: 105px; }
+    #wireBondTable .wb-col-wbdate { width: 185px; }
+    #wireBondTable .wb-col-wbissuedby { width: 125px; }
+    #wireBondTable .wb-col-wbbfg { width: 105px; }
+    #wireBondTable .wb-col-wboperatorid { width: 125px; }
+    #wireBondTable .wb-col-wbprocess { width: 135px; }
+    #wireBondTable .wb-col-wbmachine { width: 135px; }
+    #wireBondTable .wb-col-wbpackage { width: 135px; }
+    #wireBondTable .wb-col-wbsoqty { width: 105px; }
+    #wireBondTable .wb-col-wbdefect { width: 185px; }
+    #wireBondTable .wb-col-wbdefectcat { width: 155px; }
+    #wireBondTable .wb-col-wbdefectothers { width: 175px; }
+    #wireBondTable .wb-col-wbmachineerror { width: 135px; }
+    #wireBondTable .wb-col-wbrcmachineerror { width: 225px; }
+    #wireBondTable .wb-col-wbdiff4m1e { width: 125px; }
+    #wireBondTable .wb-col-wbdiffno { width: 155px; }
+    #wireBondTable .wb-col-wbdifffabsite { width: 115px; }
+    #wireBondTable .wb-col-wbdiffrejectqty { width: 115px; }
+    #wireBondTable .wb-col-wbdiffaffected { width: 185px; }
+    #wireBondTable .wb-col-wbdiffnotaffected { width: 185px; }
+    #wireBondTable .wb-col-wbdiffremarks { width: 225px; }
+    #wireBondTable .wb-col-wbverifiedby { width: 135px; }
+    #wireBondTable .wb-col-wbactiontaken { width: 225px; }
+    #wireBondTable .wb-col-wbdisposition { width: 225px; }
+    #wireBondTable .wb-col-wbremarks { width: 205px; }
+    #wireBondTable .wb-col-lastupdatedby { width: 155px; }
+    #wireBondTable .wb-col-lastupdate { width: 155px; }
+
+    #wireBondTable td .cell-input {
+        min-width: 0;
+    }
+
     .row-just-saved > td {
         animation: wireBondJustSaved 3s ease-out 1;
     }
@@ -389,21 +538,9 @@
     <script>
         window.excelGrid.init({
             tableId: 'wireBondTable',
-            storageKey: 'tblwirebond',
+            storageKey: 'tblwirebond-grid',
             csvInputId: 'wireBondCsvFile',
             templateModalId: 'wireBondTemplateModal'
-        });
-
-        // excel-grid.js resets input[data-original-value] when an edit is
-        // cancelled. This panel also has textareas, which it does not know about.
-        document.querySelectorAll('[data-cancel-edit]').forEach((button) => {
-            button.addEventListener('click', () => {
-                const key = button.getAttribute('data-cancel-edit');
-                const panel = document.querySelector(`[data-edit-panel="${CSS.escape(key)}"]`);
-                panel?.querySelectorAll('textarea[data-original-value]').forEach((field) => {
-                    field.value = field.getAttribute('data-original-value') ?? '';
-                });
-            });
         });
 
         // The empty-grid button is the same action as the toolbar button.
@@ -417,12 +554,38 @@
 }
 
 @functions {
+    // Every column here is in WireBondService.NormalizeSortBy's whitelist, so
+    // every header sorts. Adding one here without adding it there would silently
+    // fall back to lastupdate.
     private static readonly (string Key, string Label)[] SortableColumns = new (string Key, string Label)[]
     {
         ("sequence", "#"),
         ("wbocapno", "Record No"),
         ("wbocapwwk", "Work Week"),
         ("wbdate", "Date"),
+        ("wbissuedby", "Issued By"),
+        ("wbbfg", "BFG"),
+        ("wboperatorid", "Operator ID"),
+        ("wbprocess", "Process"),
+        ("wbmachine", "Machine"),
+        ("wbpackage", "Package"),
+        ("wbsoqty", "SO Qty"),
+        ("wbdefect", "Defect"),
+        ("wbdefectcat", "Defect Category"),
+        ("wbdefectothers", "Defect (Others)"),
+        ("wbmachineerror", "Machine Error"),
+        ("wbrcmachineerror", "Machine Error - Root Cause"),
+        ("wbdiff4m1e", "4M1E"),
+        ("wbdiffno", "Difference No"),
+        ("wbdifffabsite", "Fab Site"),
+        ("wbdiffrejectqty", "Reject Qty"),
+        ("wbdiffaffected", "Affected"),
+        ("wbdiffnotaffected", "Not Affected"),
+        ("wbdiffremarks", "Difference Remarks"),
+        ("wbverifiedby", "Verified By"),
+        ("wbactiontaken", "Action Taken"),
+        ("wbdisposition", "Disposition"),
+        ("wbremarks", "Remarks"),
         ("lastupdatedby", "Last Updated By"),
         ("lastupdate", "Timestamp")
     };

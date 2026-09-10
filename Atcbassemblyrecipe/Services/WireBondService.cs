@@ -570,43 +570,50 @@ namespace Atcbassemblyrecipe.Services
             model.RcMachineError = InputText.CleanOrNull(model.RcMachineError);
         }
 
+        // Every column the grid renders a sort header for. The value reaches an
+        // ORDER BY that cannot be parameterized, so this array - not the caller -
+        // decides what is allowed there. Adding a header in Index.cshtml without
+        // adding the key here silently sorts by lastupdate instead.
+        private static readonly string[] SortableColumns =
+        [
+            "wbocapno", "wbocapwwk", "wbdate", "wbissuedby", "wbbfg", "wboperatorid",
+            "wbprocess", "wbmachine", "wbpackage", "wbsoqty", "wbdefect", "wbdefectcat",
+            "wbdefectothers", "wbmachineerror", "wbrcmachineerror", "wbdiff4m1e",
+            "wbdiffno", "wbdifffabsite", "wbdiffrejectqty", "wbdiffaffected",
+            "wbdiffnotaffected", "wbdiffremarks", "wbverifiedby", "wbactiontaken",
+            "wbdisposition", "wbremarks", "lastupdatedby", "lastupdate"
+        ];
+
         private static string BuildOrderBy(string? sortBy, string? sortDirection)
         {
             var direction = string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
             var nulls = direction == "ASC" ? "NULLS FIRST" : "NULLS LAST";
+            var column = NormalizeSortBy(sortBy);
 
-            return NormalizeSortBy(sortBy) switch
+            return column switch
             {
+                // The grid's own numbering: insertion order, as close as this table
+                // gets to one without a sequence column.
                 "sequence" => $"ROWIDTOCHAR(ROWID) {direction}",
-                "wbocapno" => $"wbocapno {direction} {nulls}, wbdate DESC NULLS LAST",
-                "wbocapwwk" => $"wbocapwwk {direction} {nulls}, wbdate DESC NULLS LAST",
-                "wbdate" => $"wbdate {direction} {nulls}, wbocapno ASC",
-                "wbmachine" => $"wbmachine {direction} {nulls}, wbdate DESC NULLS LAST",
-                "wbpackage" => $"wbpackage {direction} {nulls}, wbdate DESC NULLS LAST",
-                "wbdefect" => $"wbdefect {direction} {nulls}, wbdate DESC NULLS LAST",
-                "lastupdatedby" => $"lastupdatedby {direction} {nulls}, wbdate DESC NULLS LAST",
                 "lastupdate" => $"lastupdate {direction} {nulls}, wbocapno ASC",
-                _ => "lastupdate DESC NULLS LAST, wbocapno ASC"
+                "wbdate" => $"wbdate {direction} {nulls}, wbocapno ASC",
+                // Every other column ties on the date, so equal values still come
+                // back newest first instead of in whatever order Oracle chose.
+                _ => $"{column} {direction} {nulls}, wbdate DESC NULLS LAST"
             };
         }
 
-        // Whitelist, not string concatenation: the value reaches an ORDER BY that
-        // cannot be parameterized, so anything unrecognized falls back.
+        // Whitelist, not string concatenation - see SortableColumns.
         public static string NormalizeSortBy(string? sortBy)
         {
-            return sortBy?.Trim().ToLowerInvariant() switch
+            var value = sortBy?.Trim().ToLowerInvariant() ?? string.Empty;
+
+            if (value == "sequence")
             {
-                "sequence" => "sequence",
-                "wbocapno" => "wbocapno",
-                "wbocapwwk" => "wbocapwwk",
-                "wbdate" => "wbdate",
-                "wbmachine" => "wbmachine",
-                "wbpackage" => "wbpackage",
-                "wbdefect" => "wbdefect",
-                "lastupdatedby" => "lastupdatedby",
-                "lastupdate" => "lastupdate",
-                _ => "lastupdate"
-            };
+                return "sequence";
+            }
+
+            return Array.IndexOf(SortableColumns, value) >= 0 ? value : "lastupdate";
         }
 
         private static string? NormalizeSearch(string? search)
