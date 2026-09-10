@@ -16,6 +16,14 @@
 --      tblwirebond.sql, only kept if you deliberately set it).
 --   3. Nothing is committed until you say COMMIT. Until then only your
 --      own session can see the row.
+--
+-- HOW TO RUN THESE: each numbered block below is one statement followed
+-- by its own COMMIT. Most clients only accept ONE statement at a time,
+-- so highlight the INSERT by itself (WITHOUT the trailing COMMIT), run
+-- it, then run COMMIT on its own. Sending both together gives
+--   ORA-00933: SQL command not properly ended
+-- pointing at the COMMIT line. In SQL Developer, Run Script (F5) runs a
+-- whole ;-separated batch; Run Statement (Ctrl+Enter) does not.
 -- =====================================================================
 
 
@@ -230,6 +238,11 @@ FETCH FIRST 20 ROWS ONLY;
 -- ---------------------------------------------------------------------
 -- Errors you will hit, and what they mean
 --
+--   ORA-00933  SQL command not properly ended
+--              -> two statements sent as one, and the position points at
+--                 the second. Almost always an INSERT run together with
+--                 its trailing COMMIT: run them one at a time, or use
+--                 Run Script (F5) rather than Run Statement (Ctrl+Enter).
 --   ORA-00942  table or view does not exist
 --              -> wrong schema, or run tblwirebond.sql first, or no
 --                 grant. SELECT * FROM all_tables WHERE table_name =

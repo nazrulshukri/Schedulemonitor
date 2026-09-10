@@ -39,7 +39,11 @@ Three things decide whether an insert into this table works:
    `OCAP_WIREBOND_WORKWEEK` sets it from `GET_WWK_APP_CUTOFF`. Listing it just gets
    your value replaced.
 3. **`COMMIT`.** Nothing is visible to anyone else until you commit, and closing the
-   session without committing rolls the insert back.
+   session without committing rolls the insert back. Run it as a **separate**
+   statement — an INSERT and its `COMMIT` sent together give
+   `ORA-00933: SQL command not properly ended`, with the position pointing at the
+   `COMMIT` line. In SQL Developer, Run Script (F5) accepts a `;`-separated batch;
+   Run Statement (Ctrl+Enter) takes one statement only.
 
 ## A bug in the trigger, worth fixing before you load data
 
