@@ -1,0 +1,24 @@
+ORDER OF OPERATIONS - the database change comes first.
+
+1. Back up whatever is in TBLWIREBOND now:
+      CREATE TABLE tblwirebond_bak AS SELECT * FROM tblwirebond;
+
+2. Run Database/tblwirebond.sql. It DROPS and recreates TBLWIREBOND with
+   the new seven columns, and section 4 fixes the CHECK constraints on
+   TBLRECIPEHISTORY and TBLRECIPETRASH.
+
+   SECTION 4 IS NOT OPTIONAL. Without it Add works but Edit and Delete
+   both fail with ORA-02290 and roll back - TBLWIREBOND was never in the
+   allowed table-name list on those two undo tables.
+
+3. Copy the source files over your project.
+
+4. DELETE these two files - nothing references them any more:
+      Views/WireBond/_WireBondFields.cshtml
+      ViewModels/WireBondPanelModel.cs
+
+5. dotnet build, then dotnet run.
+
+Optional: block 3 of Database/tblwirebond-insert.sql copies the existing
+WIREBOND rows out of AWACSRECIPEBYWSTYPE into TBLWIREBOND, so you do not
+have to key them in again. It skips anything already there.

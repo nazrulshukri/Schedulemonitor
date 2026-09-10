@@ -13,11 +13,7 @@ namespace Atcbassemblyrecipe.ViewModels
         public string SortDirection { get; set; } = "desc";
         public bool PromptAdd { get; set; }
 
-        // WSID values from AWACSWSTYPE for WSTYPE = 'WIREBOND', offered as the
-        // Machine pick list. Empty is fine - the field is free text either way.
-        public IReadOnlyList<string> MachineOptions { get; set; } = [];
-
-        // WBOCAPNO of the row that was just inserted or updated. The grid flashes
+        // PRODUCT of the row that was just inserted or updated. The grid flashes
         // it and scrolls to it, so a save visibly lands instead of the user
         // having to look for it.
         public string Highlight { get; set; } = string.Empty;

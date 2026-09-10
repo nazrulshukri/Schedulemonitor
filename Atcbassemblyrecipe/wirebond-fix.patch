@@ -27,7 +27,7 @@
 -        <p>TBLWIREBOND: OCAP records raised on the wire bonders - defect, 4M1E difference, action taken and disposition. The work week is calculated by the database from the OCAP date.</p>
 +        <span class="eyebrow">Operations</span>
 +        <h1>Wirebond</h1>
-+        <p>@Model.TotalRows rows in TBLWIREBOND. Add a row inline, edit it in place, delete it to Trash - the same grid as the recipe pages.</p>
++        <p>Wirebond recipe columns from TBLWIREBOND.</p>
      </div>
  </div>
  
@@ -36,7 +36,7 @@
          <div>
              <label for="search" class="form-label">Search</label>
 -            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Search OCAP no, work week, machine, package, defect, or difference no" />
-+            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Search record no, work week, machine, package, defect, or difference no" />
++            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Search product, recipe, leadframe 12NC, or package" />
          </div>
          <div>
              <label for="pageSize" class="form-label">Rows</label>
@@ -45,67 +45,57 @@
          @if (canAdd)
          {
 -            <button type="button" class="btn btn-primary" id="showAddRow"><partial name="_Icon" model="@("plus")" /> Add OCAP Record</button>
-+            <button type="button" class="btn btn-primary" id="showAddRow"><partial name="_Icon" model="@("plus")" /> Add Record</button>
++            <button type="button" class="btn btn-primary" id="showAddRow"><partial name="_Icon" model="@("plus")" /> Add Recipe</button>
          }
          <button type="button" class="btn btn-outline-secondary" data-template-modal><partial name="_Icon" model="@("template")" /> Template</button>
          <a class="btn btn-outline-secondary" asp-controller="WireBond" asp-action="Export" asp-route-search="@Model.Search" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection"><partial name="_Icon" model="@("export")" /> Export CSV</a>
-@@ -84,17 +86,49 @@
-         <option value="@value"></option>
-     }
- </datalist>
-+@* AWACSWSTYPE.WSID for WSTYPE = 'WIREBOND' - the workstation master the recipe
-+   pages read. Suggestion only: a machine that is not in AWACSWSTYPE still saves,
-+   and an empty or unreachable AWACSWSTYPE renders an empty list, not an error. *@
-+<datalist id="wireBondMachineOptions">
-+    @foreach (var value in Model.MachineOptions)
-+    {
-+        <option value="@value"></option>
-+    }
-+</datalist>
+@@ -58,41 +60,15 @@
+     </div>
+ </section>
  
+-@* Hints, not constraints - TBLWIREBOND has no check constraints and the fields
+-   still accept anything, so a new code does not need a code change. *@
+-<datalist id="wireBondProcessOptions">
+-    @foreach (var value in WireBondOptions.Processes)
+-    {
+-        <option value="@value"></option>
+-    }
+-</datalist>
+-<datalist id="wireBondDefectOptions">
+-    @foreach (var value in WireBondOptions.Defects)
+-    {
+-        <option value="@value"></option>
+-    }
+-</datalist>
+-<datalist id="wireBondCategoryOptions">
+-    @foreach (var value in WireBondOptions.DefectCategories)
+-    {
+-        <option value="@value"></option>
+-    }
+-</datalist>
+-<datalist id="wireBondDifferenceOptions">
+-    @foreach (var value in WireBondOptions.Differences)
+-    {
+-        <option value="@value"></option>
+-    }
+-</datalist>
+-
  <div class="table-responsive data-panel excel-panel">
 -    <table class="table table-hover align-middle excel-table" id="wireBondTable" data-resizable-table="tblwirebond">
-+    <table class="table table-hover align-middle excel-table" id="wireBondTable" data-resizable-table="tblwirebond-grid">
++    <table class="table table-hover align-middle excel-table" id="wireBondTable" data-resizable-table="tblwirebond-recipe">
          <colgroup>
              <col class="col-select" />
              <col class="col-sequence" />
--            <col class="col-product" />
++            <col class="col-package" />
+             <col class="col-product" />
 -            <col class="col-wstype" />
 -            <col class="col-date" />
--            <col class="col-user" />
--            <col class="col-date" />
-+            <col class="wb-col-wbocapno" />
-+            <col class="wb-col-wbocapwwk" />
-+            <col class="wb-col-wbdate" />
-+            <col class="wb-col-wbissuedby" />
-+            <col class="wb-col-wbbfg" />
-+            <col class="wb-col-wboperatorid" />
-+            <col class="wb-col-wbprocess" />
-+            <col class="wb-col-wbmachine" />
-+            <col class="wb-col-wbpackage" />
-+            <col class="wb-col-wbsoqty" />
-+            <col class="wb-col-wbdefect" />
-+            <col class="wb-col-wbdefectcat" />
-+            <col class="wb-col-wbdefectothers" />
-+            <col class="wb-col-wbmachineerror" />
-+            <col class="wb-col-wbrcmachineerror" />
-+            <col class="wb-col-wbdiff4m1e" />
-+            <col class="wb-col-wbdiffno" />
-+            <col class="wb-col-wbdifffabsite" />
-+            <col class="wb-col-wbdiffrejectqty" />
-+            <col class="wb-col-wbdiffaffected" />
-+            <col class="wb-col-wbdiffnotaffected" />
-+            <col class="wb-col-wbdiffremarks" />
-+            <col class="wb-col-wbverifiedby" />
-+            <col class="wb-col-wbactiontaken" />
-+            <col class="wb-col-wbdisposition" />
-+            <col class="wb-col-wbremarks" />
-+            <col class="wb-col-lastupdatedby" />
-+            <col class="wb-col-lastupdate" />
++            <col class="col-leadframe" />
++            <col class="col-recipe" />
+             <col class="col-user" />
+             <col class="col-date" />
              <col class="col-action" />
-             <col class="col-action" />
-         </colgroup>
-@@ -115,17 +149,46 @@
+@@ -115,17 +91,32 @@
          <tbody>
              @if (canAdd)
              {
@@ -122,36 +112,22 @@
 -                        </div>
 +                    <td><input class="form-check-input" type="checkbox" aria-label="New row" disabled /></td>
 +                    <td><span class="cell-muted">New</span></td>
-+                    <td><input name="OcapNo" form="createWireBondForm" class="form-control cell-input" maxlength="100" required placeholder="WB-2026-001" aria-label="Record No" /></td>
-+                    <td><span class="cell-muted">Set by the database</span></td>
-+                    <td><input name="OcapDate" form="createWireBondForm" class="form-control cell-input" type="datetime-local" required aria-label="Date" /></td>
-+                    <td><input name="IssuedBy" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="NX487878" aria-label="Issued By" /></td>
-+                    <td><input name="Bfg" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="BFG1" aria-label="BFG" /></td>
-+                    <td><input name="OperatorId" form="createWireBondForm" class="form-control cell-input" maxlength="50" placeholder="OP1023" aria-label="Operator ID" /></td>
-+                    <td><input name="Process" form="createWireBondForm" class="form-control cell-input" maxlength="100" list="wireBondProcessOptions" value="WIREBOND" placeholder="WIREBOND" aria-label="Process" /></td>
-+                    <td><input name="Machine" form="createWireBondForm" class="form-control cell-input" maxlength="100" list="wireBondMachineOptions" placeholder="WB-07" aria-label="Machine" /></td>
-+                    <td><input name="Package" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="SOT669" aria-label="Package" /></td>
-+                    <td><input name="SoQty" form="createWireBondForm" class="form-control cell-input" type="number" step="1" min="0" placeholder="3000" aria-label="SO Qty" /></td>
-+                    <td><input name="Defect" form="createWireBondForm" class="form-control cell-input" maxlength="100" list="wireBondDefectOptions" placeholder="NON STICK ON PAD" aria-label="Defect" /></td>
-+                    <td><input name="DefectCategory" form="createWireBondForm" class="form-control cell-input" maxlength="100" list="wireBondCategoryOptions" placeholder="PROCESS" aria-label="Defect Category" /></td>
-+                    <td><input name="DefectOthers" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="Only when Defect is OTHERS" aria-label="Defect (Others)" /></td>
-+                    <td><input name="MachineError" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="E-042" aria-label="Machine Error" /></td>
-+                    <td><input name="RcMachineError" form="createWireBondForm" class="form-control cell-input" maxlength="1000" placeholder="Z-axis search level fault" aria-label="Machine Error - Root Cause" /></td>
-+                    <td><input name="Diff4M1E" form="createWireBondForm" class="form-control cell-input" maxlength="100" list="wireBondDifferenceOptions" placeholder="MACHINE" aria-label="4M1E" /></td>
-+                    <td><input name="DiffNo" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="DIFF-2026-0912" aria-label="Difference No" /></td>
-+                    <td><input name="DiffFabSite" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="ATCB" aria-label="Fab Site" /></td>
-+                    <td><input name="DiffRejectQty" form="createWireBondForm" class="form-control cell-input" type="number" step="1" min="0" placeholder="120" aria-label="Reject Qty" /></td>
-+                    <td><input name="DiffAffected" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="LOT2609001" aria-label="Affected" /></td>
-+                    <td><input name="DiffNotAffected" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="LOT2609003" aria-label="Not Affected" /></td>
-+                    <td><input name="DiffRemarks" form="createWireBondForm" class="form-control cell-input" maxlength="2000" placeholder="How the difference was found" aria-label="Difference Remarks" /></td>
-+                    <td><input name="VerifiedBy" form="createWireBondForm" class="form-control cell-input" maxlength="100" placeholder="NX000123" aria-label="Verified By" /></td>
-+                    <td><input name="ActionTaken" form="createWireBondForm" class="form-control cell-input" maxlength="2000" placeholder="Capillary replaced" aria-label="Action Taken" /></td>
-+                    <td><input name="Disposition" form="createWireBondForm" class="form-control cell-input" maxlength="2000" placeholder="Affected lots to 100% visual" aria-label="Disposition" /></td>
-+                    <td><input name="Remarks" form="createWireBondForm" class="form-control cell-input" maxlength="500" placeholder="Raised on night shift" aria-label="Remarks" /></td>
++                    <td>
++                        <input name="Package" form="createWireBondForm" class="form-control cell-input" maxlength="64" placeholder="Package" aria-label="Package" />
++                    </td>
++                    <td>
++                        <input name="Product" form="createWireBondForm" class="form-control cell-input" maxlength="64" placeholder="Product" required aria-label="Product" />
++                    </td>
++                    <td>
++                        <input name="Leadframe12Nc" form="createWireBondForm" class="form-control cell-input" maxlength="16" placeholder="Leadframe 12NC" required aria-label="Leadframe 12NC" />
++                    </td>
++                    <td>
++                        <input name="Recipe" form="createWireBondForm" class="form-control cell-input" maxlength="120" placeholder="Recipe" required aria-label="Recipe" />
++                    </td>
 +                    <td><span class="cell-muted">Current user</span></td>
 +                    <td><span class="cell-muted">Set on save</span></td>
 +                    <td class="text-center">
-+                        <button type="submit" form="createWireBondForm" class="icon-btn icon-save" title="Save new record" aria-label="Save new record">
++                        <button type="submit" form="createWireBondForm" class="icon-btn icon-save" title="Save new recipe" aria-label="Save new recipe">
 +                            <span></span>
 +                        </button>
 +                    </td>
@@ -162,82 +138,56 @@
                      </td>
                  </tr>
              }
-@@ -133,7 +196,13 @@
+@@ -133,7 +124,7 @@
              @if (Model.Rows.Count == 0)
              {
                  <tr>
 -                    <td colspan="9" class="text-center text-muted py-4">No TBLWIREBOND records found.</td>
-+                    <td colspan="32" class="text-center text-muted py-4">
-+                        No rows found.
-+                        @if (canAdd)
-+                        {
-+                            <button type="button" class="btn btn-sm btn-primary ms-2" id="showAddRowEmpty">Add the first record</button>
-+                        }
-+                    </td>
++                    <td colspan="10" class="text-center text-muted py-4">No rows found.</td>
                  </tr>
              }
              else
-@@ -141,18 +210,46 @@
+@@ -141,18 +132,24 @@
                  var rowNumber = ((Model.Page - 1) * Model.PageSize) + 1;
                  foreach (var row in Model.Rows)
                  {
 -                    <tr class="excel-display-row" data-row-id="@row.TblRowId">
+-                        <td><input class="form-check-input" type="checkbox" aria-label="Select @row.OcapNo" /></td>
 +                    // The row that was just saved is flashed and scrolled to, so a
 +                    // save visibly lands instead of the user having to hunt for it.
 +                    var isJustSaved = !string.IsNullOrEmpty(Model.Highlight)
-+                        && string.Equals(row.OcapNo, Model.Highlight, StringComparison.OrdinalIgnoreCase);
++                        && string.Equals(row.Product, Model.Highlight, StringComparison.OrdinalIgnoreCase);
 +
 +                    <tr class="excel-display-row @(isJustSaved ? "row-just-saved" : "")" data-row-id="@row.TblRowId">
-                         <td><input class="form-check-input" type="checkbox" aria-label="Select @row.OcapNo" /></td>
++                        <td><input class="form-check-input" type="checkbox" aria-label="Select @row.Product" /></td>
                          <td>@rowNumber</td>
 -                        <td class="fw-semibold">@row.OcapNo</td>
 -                        <td>@row.OcapWorkWeek</td>
-+                        <td class="fw-semibold" title="@row.OcapNo">@row.OcapNo</td>
-+                        <td title="@row.OcapWorkWeek">@row.OcapWorkWeek</td>
-                         <td>@row.OcapDate?.ToString("yyyy-MM-dd HH:mm")</td>
-+                        <td title="@row.IssuedBy">@row.IssuedBy</td>
-+                        <td title="@row.Bfg">@row.Bfg</td>
-+                        <td title="@row.OperatorId">@row.OperatorId</td>
-+                        <td title="@row.Process">@row.Process</td>
-+                        <td title="@row.Machine">@row.Machine</td>
-+                        <td title="@row.Package">@row.Package</td>
-+                        <td title="@row.SoQty">@row.SoQty</td>
-+                        <td title="@row.Defect">@row.Defect</td>
-+                        <td title="@row.DefectCategory">@row.DefectCategory</td>
-+                        <td title="@row.DefectOthers">@row.DefectOthers</td>
-+                        <td title="@row.MachineError">@row.MachineError</td>
-+                        <td title="@row.RcMachineError">@row.RcMachineError</td>
-+                        <td title="@row.Diff4M1E">@row.Diff4M1E</td>
-+                        <td title="@row.DiffNo">@row.DiffNo</td>
-+                        <td title="@row.DiffFabSite">@row.DiffFabSite</td>
-+                        <td title="@row.DiffRejectQty">@row.DiffRejectQty</td>
-+                        <td title="@row.DiffAffected">@row.DiffAffected</td>
-+                        <td title="@row.DiffNotAffected">@row.DiffNotAffected</td>
-+                        <td title="@row.DiffRemarks">@row.DiffRemarks</td>
-+                        <td title="@row.VerifiedBy">@row.VerifiedBy</td>
-+                        <td title="@row.ActionTaken">@row.ActionTaken</td>
-+                        <td title="@row.Disposition">@row.Disposition</td>
-+                        <td title="@row.Remarks">@row.Remarks</td>
+-                        <td>@row.OcapDate?.ToString("yyyy-MM-dd HH:mm")</td>
++                        <td class="fw-semibold">@row.Package</td>
++                        <td>@row.Product</td>
++                        <td>@row.Leadframe12Nc</td>
++                        <td>@row.Recipe</td>
                          <td title="@row.LastUpdatedBy">@(await Directory.GetDisplayNameAsync(row.LastUpdatedBy))</td>
                          <td>@row.LastUpdate?.ToString("yyyy-MM-dd HH:mm")</td>
                          <td class="text-center">
                              @if (canUpdate)
                              {
 -                                <button type="button" class="icon-btn icon-edit" data-edit-row="@row.TblRowId" title="Edit OCAP record" aria-label="Edit @row.OcapNo">
-+                                <button type="button" class="icon-btn icon-edit" data-edit-row="@row.TblRowId" title="Edit record" aria-label="Edit @row.OcapNo">
++                                <button type="button" class="icon-btn icon-edit" data-edit-row="@row.TblRowId" title="Edit recipe" aria-label="Edit @row.Product">
                                      <span></span>
                                  </button>
                              }
-@@ -160,7 +257,7 @@
+@@ -160,7 +157,7 @@
                          <td class="text-center">
                              @if (canDelete)
                              {
 -                                <button type="button" class="icon-btn icon-delete" data-delete-form="deleteWireBondForm-@row.TblRowId" data-delete-label="@row.OcapNo" title="Move OCAP record to Trash" aria-label="Delete @row.OcapNo">
-+                                <button type="button" class="icon-btn icon-delete" data-delete-form="deleteWireBondForm-@row.TblRowId" data-delete-label="@row.OcapNo" title="Move record to Trash" aria-label="Delete @row.OcapNo">
++                                <button type="button" class="icon-btn icon-delete" data-delete-form="deleteWireBondForm-@row.TblRowId" data-delete-label="@row.Product" title="Move recipe to Trash" aria-label="Delete @row.Product">
                                      <span></span>
                                  </button>
                              }
-@@ -171,12 +268,45 @@
+@@ -171,12 +168,31 @@
                      {
                          var editFormId = $"editWireBondForm-{row.TblRowId}";
                          <tr class="excel-edit-row d-none" data-edit-panel="@row.TblRowId">
@@ -247,49 +197,35 @@
 -                                    <button type="submit" form="@editFormId" class="btn btn-primary"><partial name="_Icon" model="@("save")" /> Save Changes</button>
 -                                    <button type="button" class="btn btn-outline-secondary" data-cancel-edit="@row.TblRowId"><partial name="_Icon" model="@("cancel")" /> Cancel</button>
 -                                </div>
-+                            <td><input class="form-check-input" type="checkbox" aria-label="Editing @row.OcapNo" disabled /></td>
++                            <td><input class="form-check-input" type="checkbox" aria-label="Editing @row.Product" disabled /></td>
 +                            <td><span class="cell-muted">@rowNumber</span></td>
-+                            <td><input name="OcapNo" form="@editFormId" class="form-control cell-input" maxlength="100" required value="@row.OcapNo" data-original-value="@row.OcapNo" aria-label="Record No" /></td>
-+                            <td><span class="cell-muted">@row.OcapWorkWeek</span></td>
-+                            <td><input name="OcapDate" form="@editFormId" class="form-control cell-input" type="datetime-local" required value="@(row.OcapDate?.ToString("yyyy-MM-ddTHH:mm"))" data-original-value="@(row.OcapDate?.ToString("yyyy-MM-ddTHH:mm"))" aria-label="Date" /></td>
-+                            <td><input name="IssuedBy" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.IssuedBy" data-original-value="@row.IssuedBy" aria-label="Issued By" /></td>
-+                            <td><input name="Bfg" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.Bfg" data-original-value="@row.Bfg" aria-label="BFG" /></td>
-+                            <td><input name="OperatorId" form="@editFormId" class="form-control cell-input" maxlength="50" value="@row.OperatorId" data-original-value="@row.OperatorId" aria-label="Operator ID" /></td>
-+                            <td><input name="Process" form="@editFormId" class="form-control cell-input" maxlength="100" list="wireBondProcessOptions" value="@row.Process" data-original-value="@row.Process" aria-label="Process" /></td>
-+                            <td><input name="Machine" form="@editFormId" class="form-control cell-input" maxlength="100" list="wireBondMachineOptions" value="@row.Machine" data-original-value="@row.Machine" aria-label="Machine" /></td>
-+                            <td><input name="Package" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.Package" data-original-value="@row.Package" aria-label="Package" /></td>
-+                            <td><input name="SoQty" form="@editFormId" class="form-control cell-input" type="number" step="1" min="0" value="@row.SoQty" data-original-value="@(row.SoQty?.ToString())" aria-label="SO Qty" /></td>
-+                            <td><input name="Defect" form="@editFormId" class="form-control cell-input" maxlength="100" list="wireBondDefectOptions" value="@row.Defect" data-original-value="@row.Defect" aria-label="Defect" /></td>
-+                            <td><input name="DefectCategory" form="@editFormId" class="form-control cell-input" maxlength="100" list="wireBondCategoryOptions" value="@row.DefectCategory" data-original-value="@row.DefectCategory" aria-label="Defect Category" /></td>
-+                            <td><input name="DefectOthers" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.DefectOthers" data-original-value="@row.DefectOthers" aria-label="Defect (Others)" /></td>
-+                            <td><input name="MachineError" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.MachineError" data-original-value="@row.MachineError" aria-label="Machine Error" /></td>
-+                            <td><input name="RcMachineError" form="@editFormId" class="form-control cell-input" maxlength="1000" value="@row.RcMachineError" data-original-value="@row.RcMachineError" aria-label="Machine Error - Root Cause" /></td>
-+                            <td><input name="Diff4M1E" form="@editFormId" class="form-control cell-input" maxlength="100" list="wireBondDifferenceOptions" value="@row.Diff4M1E" data-original-value="@row.Diff4M1E" aria-label="4M1E" /></td>
-+                            <td><input name="DiffNo" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.DiffNo" data-original-value="@row.DiffNo" aria-label="Difference No" /></td>
-+                            <td><input name="DiffFabSite" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.DiffFabSite" data-original-value="@row.DiffFabSite" aria-label="Fab Site" /></td>
-+                            <td><input name="DiffRejectQty" form="@editFormId" class="form-control cell-input" type="number" step="1" min="0" value="@row.DiffRejectQty" data-original-value="@(row.DiffRejectQty?.ToString())" aria-label="Reject Qty" /></td>
-+                            <td><input name="DiffAffected" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.DiffAffected" data-original-value="@row.DiffAffected" aria-label="Affected" /></td>
-+                            <td><input name="DiffNotAffected" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.DiffNotAffected" data-original-value="@row.DiffNotAffected" aria-label="Not Affected" /></td>
-+                            <td><input name="DiffRemarks" form="@editFormId" class="form-control cell-input" maxlength="2000" value="@row.DiffRemarks" data-original-value="@row.DiffRemarks" aria-label="Difference Remarks" /></td>
-+                            <td><input name="VerifiedBy" form="@editFormId" class="form-control cell-input" maxlength="100" value="@row.VerifiedBy" data-original-value="@row.VerifiedBy" aria-label="Verified By" /></td>
-+                            <td><input name="ActionTaken" form="@editFormId" class="form-control cell-input" maxlength="2000" value="@row.ActionTaken" data-original-value="@row.ActionTaken" aria-label="Action Taken" /></td>
-+                            <td><input name="Disposition" form="@editFormId" class="form-control cell-input" maxlength="2000" value="@row.Disposition" data-original-value="@row.Disposition" aria-label="Disposition" /></td>
-+                            <td><input name="Remarks" form="@editFormId" class="form-control cell-input" maxlength="500" value="@row.Remarks" data-original-value="@row.Remarks" aria-label="Remarks" /></td>
++                            <td>
++                                <input name="Package" form="@editFormId" class="form-control cell-input" maxlength="64" value="@row.Package" data-original-value="@row.Package" aria-label="Package" />
++                            </td>
++                            <td>
++                                <input name="Product" form="@editFormId" class="form-control cell-input" maxlength="64" value="@row.Product" data-original-value="@row.Product" required aria-label="Product" />
++                            </td>
++                            <td>
++                                <input name="Leadframe12Nc" form="@editFormId" class="form-control cell-input" maxlength="16" value="@row.Leadframe12Nc" data-original-value="@row.Leadframe12Nc" required aria-label="Leadframe 12NC" />
++                            </td>
++                            <td>
++                                <input name="Recipe" form="@editFormId" class="form-control cell-input" maxlength="120" value="@row.Recipe" data-original-value="@row.Recipe" required aria-label="Recipe" />
++                            </td>
 +                            <td><span class="cell-muted">Save user</span></td>
 +                            <td><span class="cell-muted">Set on save</span></td>
 +                            <td class="text-center">
-+                                <button type="submit" form="@editFormId" class="icon-btn icon-save" title="Save edit" aria-label="Save @row.OcapNo">
++                                <button type="submit" form="@editFormId" class="icon-btn icon-save" title="Save edit" aria-label="Save @row.Product">
 +                                    <span></span>
 +                                </button>
 +                            </td>
 +                            <td class="text-center">
-+                                <button type="button" class="icon-btn icon-cancel" data-cancel-edit="@row.TblRowId" title="Cancel edit" aria-label="Cancel edit @row.OcapNo">
++                                <button type="button" class="icon-btn icon-cancel" data-cancel-edit="@row.TblRowId" title="Cancel edit" aria-label="Cancel edit @row.Product">
 +                                    <span></span>
 +                                </button>
                              </td>
                          </tr>
                      }
-@@ -188,7 +318,16 @@
+@@ -188,7 +204,16 @@
      </table>
  </div>
  
@@ -307,7 +243,7 @@
  <div class="row-forms d-none" aria-hidden="true">
      @if (canAdd)
      {
-@@ -225,7 +364,7 @@
+@@ -225,7 +250,7 @@
  
  <div class="pagination-bar">
      <span>Showing page @Model.Page of @Model.TotalPages, @Model.TotalRows total rows</span>
@@ -316,19 +252,50 @@
          <ul class="pagination mb-0">
              <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
                  <a class="page-link" asp-controller="WireBond" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection">Prev</a>
-@@ -277,7 +416,7 @@
+@@ -249,7 +274,7 @@
+             <div class="modal-header">
+                 <div>
+                     <span class="eyebrow">CSV Template</span>
+-                    <h5 class="modal-title" id="wireBondTemplateTitle">TBLWIREBOND upload format</h5>
++                    <h5 class="modal-title" id="wireBondTemplateTitle">Wirebond upload format</h5>
+                 </div>
+                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+             </div>
+@@ -257,8 +282,6 @@
+                 <ol class="template-steps">
+                     <li>Download the template below.</li>
+                     <li>Key in the values under the same headers - or delete the header row and key in the values only, in the same left-to-right order.</li>
+-                    <li>Write WBDATE as <code>2026-09-10 14:30</code> or <code>10/09/2026</code>. It is required: the work week is calculated from it.</li>
+-                    <li>Leave the work week out entirely - the database sets it.</li>
+                     <li>In Excel, use Save As and choose CSV (Comma delimited) (*.csv).</li>
+                 </ol>
+ 
+@@ -266,46 +289,29 @@
+                     <table class="table template-preview-table align-middle">
+                         <thead>
+                             <tr>
+-                                <th>OCAPNO</th>
+-                                <th>WBDATE</th>
+-                                <th>MACHINE</th>
+                                 <th>PACKAGE</th>
+-                                <th>SOQTY</th>
+-                                <th>DEFECT</th>
+-                                <th>DEFECTCAT</th>
++                                <th>PRODUCT</th>
++                                <th>LEADFRAME12NC</th>
++                                <th>RECIPE</th>
+                             </tr>
                          </thead>
                          <tbody>
                              <tr>
 -                                <td>OCAP-WB-2026-001</td>
-+                                <td>WB-2026-001</td>
-                                 <td>2026-09-10 14:30</td>
-                                 <td>WB-07</td>
+-                                <td>2026-09-10 14:30</td>
+-                                <td>WB-07</td>
                                  <td>SOT669</td>
-@@ -285,15 +424,6 @@
-                                 <td>NON STICK ON PAD</td>
-                                 <td>PROCESS</td>
-                             </tr>
+-                                <td>3000</td>
+-                                <td>NON STICK ON PAD</td>
+-                                <td>PROCESS</td>
+-                            </tr>
 -                            <tr>
 -                                <td>OCAP-WB-2026-002</td>
 -                                <td>2026-09-10 22:05</td>
@@ -337,82 +304,46 @@
 -                                <td>5000</td>
 -                                <td>BOND LIFT</td>
 -                                <td>MACHINE</td>
--                            </tr>
++                                <td>BUK9K6-40E</td>
++                                <td>934123456789</td>
++                                <td>WB_SOT669_STD</td>
+                             </tr>
                          </tbody>
                      </table>
                  </div>
-@@ -304,7 +434,7 @@
-                     DIFFNO, DIFFREJECTQTY and REMARKS. A header row can additionally name
-                     DEFECTOTHERS, DIFFAFFECTED, DIFFFABSITE, DIFFNOTAFFECTED, DIFFREMARKS,
-                     VERIFIEDBY, ACTIONTAKEN, DISPOSITION, RCMACHINEERROR and MACHINEERROR, so an
+ 
+                 <div class="template-note">
+-                    Required columns: OCAPNO, WBDATE. The full template also carries ISSUEDBY, BFG,
+-                    OPERATORID, PROCESS, MACHINE, PACKAGE, SOQTY, DEFECT, DEFECTCAT, DIFF4M1E,
+-                    DIFFNO, DIFFREJECTQTY and REMARKS. A header row can additionally name
+-                    DEFECTOTHERS, DIFFAFFECTED, DIFFFABSITE, DIFFNOTAFFECTED, DIFFREMARKS,
+-                    VERIFIEDBY, ACTIONTAKEN, DISPOSITION, RCMACHINEERROR and MACHINEERROR, so an
 -                    Export CSV can be edited and uploaded again. An OCAP number that is already in
-+                    Export CSV can be edited and uploaded again. A record no that is already in
-                     the table - or twice in the same file - cancels the whole import.
+-                    the table - or twice in the same file - cancels the whole import.
++                    Required columns: PRODUCT, LEADFRAME12NC, RECIPE. PACKAGE is optional.
++                    The header row itself is optional: a file that starts straight at the values is read
++                    in the column order above. Format LEADFRAME12NC as Text in Excel, otherwise it is
++                    saved as 3.4E+11 and the upload is rejected. A product / leadframe / recipe that is
++                    already in the table - or twice in the same file - cancels the whole import.
                  </div>
              </div>
-@@ -324,7 +454,7 @@
+             <div class="modal-footer">
+@@ -324,7 +330,7 @@
                  <div class="modal-header">
                      <div>
                          <span class="eyebrow">Delete Validation</span>
 -                        <h5 class="modal-title" id="deleteConfirmTitle">Move OCAP record to Trash</h5>
-+                        <h5 class="modal-title" id="deleteConfirmTitle">Move record to Trash</h5>
++                        <h5 class="modal-title" id="deleteConfirmTitle">Move recipe to Trash</h5>
                      </div>
                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                  </div>
-@@ -342,37 +472,120 @@
+@@ -342,37 +348,46 @@
      </div>
  }
  
-+@*
-+    Widths for this grid only.
-+
-+    site.css sizes the recipe grids, which have five data columns sharing the
-+    leftover width. TBLWIREBOND has 28, so left to that rule every column would
-+    land at about 35px. Explicit px widths and one wide table instead: the panel
-+    already scrolls horizontally, and excel-grid.js still overrides any column a
-+    user drags.
-+
-+    The doubled at-sign in the keyframes rule is Razor escaping - it renders as a
-+    single one. A bare at-sign there would be read as a Razor expression.
-+*@
++@* The doubled at-sign in the keyframes rule is Razor escaping: it renders as a
++   single one. A bare at-sign there would be read as a Razor expression. *@
 +<style>
-+    #wireBondTable { width: max(100%, 4691px); }
-+    #wireBondTable .col-select { width: 52px; }
-+    #wireBondTable .col-sequence { width: 68px; }
-+    #wireBondTable .col-action { width: 88px; }
-+    #wireBondTable .wb-col-wbocapno { width: 160px; }
-+    #wireBondTable .wb-col-wbocapwwk { width: 105px; }
-+    #wireBondTable .wb-col-wbdate { width: 185px; }
-+    #wireBondTable .wb-col-wbissuedby { width: 125px; }
-+    #wireBondTable .wb-col-wbbfg { width: 105px; }
-+    #wireBondTable .wb-col-wboperatorid { width: 125px; }
-+    #wireBondTable .wb-col-wbprocess { width: 135px; }
-+    #wireBondTable .wb-col-wbmachine { width: 135px; }
-+    #wireBondTable .wb-col-wbpackage { width: 135px; }
-+    #wireBondTable .wb-col-wbsoqty { width: 105px; }
-+    #wireBondTable .wb-col-wbdefect { width: 185px; }
-+    #wireBondTable .wb-col-wbdefectcat { width: 155px; }
-+    #wireBondTable .wb-col-wbdefectothers { width: 175px; }
-+    #wireBondTable .wb-col-wbmachineerror { width: 135px; }
-+    #wireBondTable .wb-col-wbrcmachineerror { width: 225px; }
-+    #wireBondTable .wb-col-wbdiff4m1e { width: 125px; }
-+    #wireBondTable .wb-col-wbdiffno { width: 155px; }
-+    #wireBondTable .wb-col-wbdifffabsite { width: 115px; }
-+    #wireBondTable .wb-col-wbdiffrejectqty { width: 115px; }
-+    #wireBondTable .wb-col-wbdiffaffected { width: 185px; }
-+    #wireBondTable .wb-col-wbdiffnotaffected { width: 185px; }
-+    #wireBondTable .wb-col-wbdiffremarks { width: 225px; }
-+    #wireBondTable .wb-col-wbverifiedby { width: 135px; }
-+    #wireBondTable .wb-col-wbactiontaken { width: 225px; }
-+    #wireBondTable .wb-col-wbdisposition { width: 225px; }
-+    #wireBondTable .wb-col-wbremarks { width: 205px; }
-+    #wireBondTable .wb-col-lastupdatedby { width: 155px; }
-+    #wireBondTable .wb-col-lastupdate { width: 155px; }
-+
-+    #wireBondTable td .cell-input {
-+        min-width: 0;
-+    }
-+
 +    .row-just-saved > td {
 +        animation: wireBondJustSaved 3s ease-out 1;
 +    }
@@ -430,7 +361,7 @@
          window.excelGrid.init({
              tableId: 'wireBondTable',
 -            storageKey: 'tblwirebond',
-+            storageKey: 'tblwirebond-grid',
++            storageKey: 'tblwirebond-recipe',
              csvInputId: 'wireBondCsvFile',
              templateModalId: 'wireBondTemplateModal'
          });
@@ -445,66 +376,316 @@
 -                    field.value = field.getAttribute('data-original-value') ?? '';
 -                });
 -            });
-+        // The empty-grid button is the same action as the toolbar button.
-+        document.getElementById('showAddRowEmpty')?.addEventListener('click', () => {
-+            document.getElementById('showAddRow')?.click();
-         });
-+
+-        });
 +        // Bring the row that was just saved into view.
 +        document.querySelector('.row-just-saved')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
      </script>
  }
  
  @functions {
-+    // Every column here is in WireBondService.NormalizeSortBy's whitelist, so
-+    // every header sorts. Adding one here without adding it there would silently
-+    // fall back to lastupdate.
++    // Every key here is in WireBondService.NormalizeSortBy's whitelist, so every
++    // header sorts. Adding one here without adding it there would silently fall
++    // back to lastupdate.
      private static readonly (string Key, string Label)[] SortableColumns = new (string Key, string Label)[]
      {
          ("sequence", "#"),
 -        ("wbocapno", "OCAP No"),
-+        ("wbocapno", "Record No"),
-         ("wbocapwwk", "Work Week"),
+-        ("wbocapwwk", "Work Week"),
 -        ("wbdate", "OCAP Date"),
-+        ("wbdate", "Date"),
-+        ("wbissuedby", "Issued By"),
-+        ("wbbfg", "BFG"),
-+        ("wboperatorid", "Operator ID"),
-+        ("wbprocess", "Process"),
-+        ("wbmachine", "Machine"),
-+        ("wbpackage", "Package"),
-+        ("wbsoqty", "SO Qty"),
-+        ("wbdefect", "Defect"),
-+        ("wbdefectcat", "Defect Category"),
-+        ("wbdefectothers", "Defect (Others)"),
-+        ("wbmachineerror", "Machine Error"),
-+        ("wbrcmachineerror", "Machine Error - Root Cause"),
-+        ("wbdiff4m1e", "4M1E"),
-+        ("wbdiffno", "Difference No"),
-+        ("wbdifffabsite", "Fab Site"),
-+        ("wbdiffrejectqty", "Reject Qty"),
-+        ("wbdiffaffected", "Affected"),
-+        ("wbdiffnotaffected", "Not Affected"),
-+        ("wbdiffremarks", "Difference Remarks"),
-+        ("wbverifiedby", "Verified By"),
-+        ("wbactiontaken", "Action Taken"),
-+        ("wbdisposition", "Disposition"),
-+        ("wbremarks", "Remarks"),
++        ("package", "PACKAGE"),
++        ("product", "Product"),
++        ("leadframe12nc", "Leadframe 12NC"),
++        ("recipe", "Recipe"),
          ("lastupdatedby", "Last Updated By"),
          ("lastupdate", "Timestamp")
      };
+--- a/Models/WireBond.cs
++++ b/Models/WireBond.cs
+@@ -1,85 +1,24 @@
+ namespace Atcbassemblyrecipe.Models
+ {
+-    // One row of OCAPSYS.TBLWIREBOND: a wire bond OCAP record - who raised it,
+-    // the machine and package it was raised against, the defect, the 4M1E
+-    // difference behind it, and the disposition that closed it.
++    // One row of OCAPSYS.TBLWIREBOND.
+     //
+-    // Not to be confused with the Wirebond *recipe* page, which is
+-    // AWACSRECIPEBYWSTYPE filtered to WSTYPE = 'WIREBOND'. Different table,
+-    // different module, different data - the name is the only thing they share.
++    // The table was overhauled to the recipe shape: package, product, leadframe
++    // 12NC and recipe, plus the usual TBLROWID / LASTUPDATE / LASTUPDATEDBY
++    // bookkeeping. Same columns as AWACSRECIPEBYWSTYPE minus WSTYPE, because
++    // every row in this table is wirebond by definition - there is nothing to
++    // filter on.
+     //
+-    // TBLWIREBOND has a TBLROWID column, but it is NULL on every row that was
+-    // keyed in by hand before this page existed. So a row is addressed by its
+-    // Oracle ROWID (handed to the page as TblRowId), the way AWACSLF and
+-    // AWACSRECIPEBYWSTYPE already are, and TBLROWID is still filled with
+-    // RAWTOHEX(SYS_GUID()) on insert for the MES side.
++    // Rows are addressed by Oracle ROWID (handed to the page as TblRowId), the
++    // way AWACSLF and AWACSRECIPEBYWSTYPE already are. TBLROWID is still filled
++    // with RAWTOHEX(SYS_GUID()) on insert for the MES side.
+     public class WireBond
+     {
+         public string TblRowId { get; set; } = string.Empty;
+         public DateTime? LastUpdate { get; set; }
+         public string LastUpdatedBy { get; set; } = string.Empty;
+-
+-        public string OcapNo { get; set; } = string.Empty;
+-
+-        // Set by the BEFORE INSERT trigger OCAP_WIREBOND_WORKWEEK, never by the
+-        // app - the form shows it read-only.
+-        public string OcapWorkWeek { get; set; } = string.Empty;
+-
+-        public string IssuedBy { get; set; } = string.Empty;
+-        public string Bfg { get; set; } = string.Empty;
+-        public DateTime? OcapDate { get; set; }
+-        public string OperatorId { get; set; } = string.Empty;
+-        public string Process { get; set; } = string.Empty;
+-        public string Machine { get; set; } = string.Empty;
+         public string Package { get; set; } = string.Empty;
+-        public decimal? SoQty { get; set; }
+-        public string Defect { get; set; } = string.Empty;
+-        public string DefectCategory { get; set; } = string.Empty;
+-        public string DefectOthers { get; set; } = string.Empty;
+-        public string Diff4M1E { get; set; } = string.Empty;
+-        public string DiffAffected { get; set; } = string.Empty;
+-        public string DiffFabSite { get; set; } = string.Empty;
+-        public string DiffNo { get; set; } = string.Empty;
+-        public string DiffNotAffected { get; set; } = string.Empty;
+-        public decimal? DiffRejectQty { get; set; }
+-        public string DiffRemarks { get; set; } = string.Empty;
+-        public string VerifiedBy { get; set; } = string.Empty;
+-        public string ActionTaken { get; set; } = string.Empty;
+-        public string Disposition { get; set; } = string.Empty;
+-        public string Remarks { get; set; } = string.Empty;
+-        public string RcMachineError { get; set; } = string.Empty;
+-        public string MachineError { get; set; } = string.Empty;
+-    }
+-
+-    // The values these columns are keyed in with today. TBLWIREBOND has no check
+-    // constraints, so these are offered as pick-list hints on the form and the
+-    // fields still accept anything - a new defect code does not need a code
+-    // change or a DBA.
+-    public static class WireBondOptions
+-    {
+-        public static readonly string[] Processes = ["WIREBOND"];
+-
+-        public static readonly string[] DefectCategories =
+-        [
+-            "MAN", "MACHINE", "MATERIAL", "METHOD", "ENVIRONMENT", "PROCESS", "OTHERS"
+-        ];
+-
+-        // The 4M1E leg the difference was traced to.
+-        public static readonly string[] Differences =
+-        [
+-            "MAN", "MACHINE", "MATERIAL", "METHOD", "ENVIRONMENT"
+-        ];
+-
+-        public static readonly string[] Defects =
+-        [
+-            "NON STICK ON PAD",
+-            "NON STICK ON LEAD",
+-            "BOND LIFT",
+-            "WIRE SAG",
+-            "BALL SHEAR LOW",
+-            "WIRE SHORT",
+-            "MISSING WIRE",
+-            "OTHERS"
+-        ];
++        public string Product { get; set; } = string.Empty;
++        public string Leadframe12Nc { get; set; } = string.Empty;
++        public string Recipe { get; set; } = string.Empty;
+     }
+ }
+--- a/ViewModels/WireBondInputModel.cs
++++ b/ViewModels/WireBondInputModel.cs
+@@ -2,155 +2,51 @@
+ 
+ namespace Atcbassemblyrecipe.ViewModels
+ {
+-    // One TBLWIREBOND row, used for both the add panel and the inline edit panel.
++    // One TBLWIREBOND row, used for both the add row and the inline edit row.
+     // TblRowId is empty on an add and carries the row's ROWID on an edit.
+     //
+-    // WBOCAPWWK is deliberately absent: the BEFORE INSERT trigger
+-    // OCAP_WIREBOND_WORKWEEK computes the work week from WBDATE, so anything the
+-    // form posted would be overwritten. The grid and the panel show it read-only.
+-    //
+     // StringLength on every field matches the column width in
+     // Database/tblwirebond.sql. Keep the two in step - Oracle answers a value
+     // that is one character too long with ORA-12899, which reaches the user as a
+-    // connection-failure popup rather than "that field is too long".
++    // red popup rather than "that field is too long".
+     public class WireBondInputModel : IValidatableObject
+     {
+         public string? TblRowId { get; set; }
+ 
+-        [Required, StringLength(100)]
+-        [Display(Name = "OCAP No")]
+-        public string OcapNo { get; set; } = string.Empty;
+-
+-        [StringLength(100)]
+-        [Display(Name = "Issued By")]
+-        public string? IssuedBy { get; set; }
+-
+-        [StringLength(100)]
+-        [Display(Name = "BFG")]
+-        public string? Bfg { get; set; }
+-
+-        [Display(Name = "OCAP Date")]
+-        [DataType(DataType.DateTime)]
+-        public DateTime? OcapDate { get; set; }
+-
+-        [StringLength(50)]
+-        [Display(Name = "Operator ID")]
+-        public string? OperatorId { get; set; }
+-
+-        [StringLength(100)]
+-        [Display(Name = "Process")]
+-        public string? Process { get; set; }
+-
+-        [StringLength(100)]
+-        [Display(Name = "Machine")]
+-        public string? Machine { get; set; }
+-
+-        [StringLength(100)]
++        [StringLength(64)]
+         [Display(Name = "Package")]
+         public string? Package { get; set; }
+ 
+-        [Display(Name = "SO Qty")]
+-        [Range(0, 999999999)]
+-        public decimal? SoQty { get; set; }
+-
+-        [StringLength(100)]
+-        [Display(Name = "Defect")]
+-        public string? Defect { get; set; }
+-
+-        [StringLength(100)]
+-        [Display(Name = "Defect Category")]
+-        public string? DefectCategory { get; set; }
+-
+-        [StringLength(100)]
+-        [Display(Name = "Defect (Others)")]
+-        public string? DefectOthers { get; set; }
+-
+-        [StringLength(100)]
+-        [Display(Name = "4M1E")]
+-        public string? Diff4M1E { get; set; }
+-
+-        [StringLength(100)]
+-        [Display(Name = "Affected")]
+-        public string? DiffAffected { get; set; }
+-
+-        [StringLength(100)]
+-        [Display(Name = "Fab Site")]
+-        public string? DiffFabSite { get; set; }
+-
+-        [StringLength(100)]
+-        [Display(Name = "Difference No")]
+-        public string? DiffNo { get; set; }
+-
+-        [StringLength(100)]
+-        [Display(Name = "Not Affected")]
+-        public string? DiffNotAffected { get; set; }
+-
+-        [Display(Name = "Reject Qty")]
+-        [Range(0, 999999999)]
+-        public decimal? DiffRejectQty { get; set; }
+-
+-        [StringLength(2000)]
+-        [Display(Name = "Difference Remarks")]
+-        public string? DiffRemarks { get; set; }
+-
+-        [StringLength(100)]
+-        [Display(Name = "Verified By")]
+-        public string? VerifiedBy { get; set; }
+-
+-        [StringLength(2000)]
+-        [Display(Name = "Action Taken")]
+-        public string? ActionTaken { get; set; }
+-
+-        [StringLength(2000)]
+-        [Display(Name = "Disposition")]
+-        public string? Disposition { get; set; }
+-
+-        [StringLength(500)]
+-        [Display(Name = "Remarks")]
+-        public string? Remarks { get; set; }
+-
+-        [StringLength(1000)]
+-        [Display(Name = "Machine Error - Root Cause")]
+-        public string? RcMachineError { get; set; }
+-
+-        [StringLength(100)]
+-        [Display(Name = "Machine Error")]
+-        public string? MachineError { get; set; }
++        [Required, StringLength(64)]
++        [Display(Name = "Product")]
++        public string Product { get; set; } = string.Empty;
++
++        [Required, StringLength(16)]
++        [Display(Name = "Leadframe 12NC")]
++        public string Leadframe12Nc { get; set; } = string.Empty;
++
++        [Required, StringLength(120)]
++        [Display(Name = "Recipe")]
++        public string Recipe { get; set; } = string.Empty;
+ 
+-        [Display(Name = "I validated this OCAP record")]
++        [Display(Name = "I validated this wirebond recipe")]
+         public bool Confirmed { get; set; }
+ 
+         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+         {
+-            if (string.IsNullOrWhiteSpace(OcapNo))
++            if (string.IsNullOrWhiteSpace(Product))
+             {
+-                yield return new ValidationResult("OCAP No is required.", [nameof(OcapNo)]);
++                yield return new ValidationResult("Product is required.", [nameof(Product)]);
+             }
+ 
+-            // The work week is derived from this date by the database trigger, so a
+-            // row without one lands in the week it was keyed in rather than the
+-            // week it happened. Cheap to insist on it at the point of entry.
+-            if (OcapDate is null)
+-            {
+-                yield return new ValidationResult(
+-                    "OCAP Date is required - the work week is calculated from it.",
+-                    [nameof(OcapDate)]);
+-            }
+-            else if (OcapDate > DateTime.Now.AddDays(1))
++            if (string.IsNullOrWhiteSpace(Leadframe12Nc))
+             {
+-                yield return new ValidationResult(
+-                    "OCAP Date cannot be in the future.",
+-                    [nameof(OcapDate)]);
++                yield return new ValidationResult("Leadframe 12NC is required.", [nameof(Leadframe12Nc)]);
+             }
+ 
+-            // Only meaningful when the defect itself is OTHERS, and the other way
+-            // round a free-text defect with no code is unsearchable.
+-            if (string.Equals(Defect?.Trim(), "OTHERS", StringComparison.OrdinalIgnoreCase)
+-                && string.IsNullOrWhiteSpace(DefectOthers))
++            if (string.IsNullOrWhiteSpace(Recipe))
+             {
+-                yield return new ValidationResult(
+-                    "Defect is OTHERS, so say what the defect was in Defect (Others).",
+-                    [nameof(DefectOthers)]);
++                yield return new ValidationResult("Recipe is required.", [nameof(Recipe)]);
+             }
+ 
+             if (!Confirmed)
 --- a/ViewModels/WireBondViewModel.cs
 +++ b/ViewModels/WireBondViewModel.cs
-@@ -12,6 +12,16 @@
+@@ -12,6 +12,12 @@
          public string SortBy { get; set; } = "lastupdate";
          public string SortDirection { get; set; } = "desc";
          public bool PromptAdd { get; set; }
 +
-+        // WSID values from AWACSWSTYPE for WSTYPE = 'WIREBOND', offered as the
-+        // Machine pick list. Empty is fine - the field is free text either way.
-+        public IReadOnlyList<string> MachineOptions { get; set; } = [];
-+
-+        // WBOCAPNO of the row that was just inserted or updated. The grid flashes
++        // PRODUCT of the row that was just inserted or updated. The grid flashes
 +        // it and scrolls to it, so a save visibly lands instead of the user
 +        // having to look for it.
 +        public string Highlight { get; set; } = string.Empty;
@@ -514,26 +695,90 @@
  }
 --- a/Controllers/WireBondController.cs
 +++ b/Controllers/WireBondController.cs
-@@ -13,11 +13,14 @@
+@@ -8,16 +8,17 @@
+ using Microsoft.AspNetCore.Mvc;
+ using Oracle.ManagedDataAccess.Client;
+ using System.ComponentModel.DataAnnotations;
+-using System.Globalization;
+ using System.Text;
  
  namespace Atcbassemblyrecipe.Controllers
  {
 -    // The TBLWIREBOND OCAP log: one row per wire bond OCAP record.
-+    // The TBLWIREBOND grid: one row per wire bond record. This is THE Wirebond
-+    // page - the one in the sidebar, gated by the single ModuleNames.TableWirebond
-+    // ("Wirebond") grant in TBLACCESS.
++    // The TBLWIREBOND grid: package, product, leadframe 12NC, recipe. This is THE
++    // Wirebond page - the one in the sidebar, gated by the single
++    // ModuleNames.TableWirebond ("Wirebond") grant in TBLACCESS.
      //
 -    // Separate from AwacsController.TableWirebond, which is the WIREBOND *recipe*
 -    // grid over AWACSRECIPEBYWSTYPE. Two different tables that happen to share a
 -    // word, so they are two different modules with their own TBLACCESS grants.
 +    // AwacsController.TableWirebond still exists as a route over
-+    // AWACSRECIPEBYWSTYPE (the WIREBOND *recipe* grid) but is no longer in the
-+    // menu, and it is gated by the same "Wirebond" grant. There is no separate
-+    // "Wirebond OCAP" module - granting "Wirebond" is all a user needs.
++    // AWACSRECIPEBYWSTYPE but is no longer in the menu, and it is gated by the
++    // same "Wirebond" grant. There is no separate "Wirebond OCAP" module.
      [Authorize]
      public class WireBondController : Controller
      {
-@@ -82,7 +85,7 @@
+@@ -28,61 +29,18 @@
+             _wireBondService = wireBondService;
+         }
+ 
+-        // The CSV columns this grid understands. The first block is the template
+-        // order, which is also the order a file with no header row is read in; the
+-        // InTemplate = false block can still be named in a header row, so a full
+-        // export can be edited and uploaded again without trimming columns.
+-        //
+-        // WBOCAPWWK is not here at all - the database trigger owns it.
++        // The CSV columns this grid understands, in template order - which is also
++        // the order a file with no header row is read in.
+         private static readonly CsvColumn[] WireBondCsvColumns =
+         [
+-            new CsvColumn("OCAPNO", true, "OCAP NO", "WBOCAPNO", "OCAP NUMBER"),
+-            new CsvColumn("WBDATE", true, "OCAP DATE", "DATE", "OCAPDATE"),
+-            new CsvColumn("ISSUEDBY", false, "ISSUED BY", "WBISSUEDBY"),
+-            new CsvColumn("BFG", false, "WBBFG"),
+-            new CsvColumn("OPERATORID", false, "OPERATOR ID", "WBOPERATORID", "OPERATOR"),
+-            new CsvColumn("PROCESS", false, "WBPROCESS"),
+-            new CsvColumn("MACHINE", false, "WBMACHINE"),
+-            new CsvColumn("PACKAGE", false, "WBPACKAGE", "PKG"),
+-            new CsvColumn("SOQTY", false, "SO QTY", "WBSOQTY", "QTY"),
+-            new CsvColumn("DEFECT", false, "WBDEFECT"),
+-            new CsvColumn("DEFECTCAT", false, "DEFECT CATEGORY", "WBDEFECTCAT", "CATEGORY"),
+-            new CsvColumn("DIFF4M1E", false, "4M1E", "WBDIFF4M1E"),
+-            new CsvColumn("DIFFNO", false, "DIFFERENCE NO", "WBDIFFNO"),
+-            new CsvColumn("DIFFREJECTQTY", false, "REJECT QTY", "WBDIFFREJECTQTY"),
+-            new CsvColumn("REMARKS", false, "WBREMARKS"),
+-            new CsvColumn("DEFECTOTHERS", false, "WBDEFECTOTHERS") { InTemplate = false },
+-            new CsvColumn("DIFFAFFECTED", false, "AFFECTED", "WBDIFFAFFECTED") { InTemplate = false },
+-            new CsvColumn("DIFFFABSITE", false, "FAB SITE", "WBDIFFFABSITE") { InTemplate = false },
+-            new CsvColumn("DIFFNOTAFFECTED", false, "NOT AFFECTED", "WBDIFFNOTAFFECTED") { InTemplate = false },
+-            new CsvColumn("DIFFREMARKS", false, "WBDIFFREMARKS") { InTemplate = false },
+-            new CsvColumn("VERIFIEDBY", false, "VERIFIED BY", "WBVERIFIEDBY") { InTemplate = false },
+-            new CsvColumn("ACTIONTAKEN", false, "ACTION TAKEN", "WBACTIONTAKEN") { InTemplate = false },
+-            new CsvColumn("DISPOSITION", false, "WBDISPOSITION") { InTemplate = false },
+-            new CsvColumn("RCMACHINEERROR", false, "WBRCMACHINEERROR", "MACHINE ERROR ROOT CAUSE") { InTemplate = false },
+-            new CsvColumn("MACHINEERROR", false, "WBMACHINEERROR", "MACHINE ERROR") { InTemplate = false }
+-        ];
+-
+-        // The date shapes a plant CSV actually arrives in. Parsed exactly rather
+-        // than by the server locale, so 09/10/2026 cannot silently become
+-        // September on one machine and October on another.
+-        private static readonly string[] DateFormats =
+-        [
+-            "yyyy-MM-dd HH:mm:ss",
+-            "yyyy-MM-dd HH:mm",
+-            "yyyy-MM-dd",
+-            "yyyy/MM/dd HH:mm",
+-            "yyyy/MM/dd",
+-            "dd-MM-yyyy HH:mm",
+-            "dd-MM-yyyy",
+-            "dd/MM/yyyy HH:mm",
+-            "dd/MM/yyyy",
+-            "dd-MMM-yyyy HH:mm",
+-            "dd-MMM-yyyy"
++            new CsvColumn("PACKAGE", false, "PKG"),
++            new CsvColumn("PRODUCT", true, "DEVICE"),
++            new CsvColumn("LEADFRAME12NC", true, "LEADFRAME 12NC", "LF12NC", "LEADFRAME"),
++            new CsvColumn("RECIPE", true, "RECIPE NAME")
          ];
  
          [ModuleAccess(ModuleNames.TableWirebond, ModuleAction.View)]
@@ -542,7 +787,7 @@
          {
              var normalizedSortBy = WireBondService.NormalizeSortBy(sortBy);
              var normalizedSortDirection = NormalizeSortDirection(sortDirection);
-@@ -90,7 +93,8 @@
+@@ -90,7 +48,8 @@
              {
                  SortBy = normalizedSortBy,
                  SortDirection = normalizedSortDirection,
@@ -552,125 +797,323 @@
              };
  
              try
-@@ -101,6 +105,10 @@
-                 model.Page = result.Page;
-                 model.PageSize = result.PageSize;
-                 model.TotalRows = result.TotalRows;
-+
-+                // Never fatal: an unreadable AWACSWSTYPE just means no machine
-+                // suggestions, and the service already answers with an empty list.
-+                model.MachineOptions = await _wireBondService.GetMachineOptionsAsync();
-             }
-             catch (Exception ex) when (ex is OracleException or InvalidOperationException)
-             {
-@@ -115,7 +123,7 @@
+@@ -114,8 +73,8 @@
+         public IActionResult DownloadTemplate()
          {
              const string csv =
-                 "OCAPNO,WBDATE,ISSUEDBY,BFG,OPERATORID,PROCESS,MACHINE,PACKAGE,SOQTY,DEFECT,DEFECTCAT,DIFF4M1E,DIFFNO,DIFFREJECTQTY,REMARKS\r\n"
+-                "OCAPNO,WBDATE,ISSUEDBY,BFG,OPERATORID,PROCESS,MACHINE,PACKAGE,SOQTY,DEFECT,DEFECTCAT,DIFF4M1E,DIFFNO,DIFFREJECTQTY,REMARKS\r\n"
 -                + "OCAP-WB-2026-001,2026-09-10 14:30,NX487878,BFG1,OP1023,WIREBOND,WB-07,SOT669,3000,NON STICK ON PAD,PROCESS,MACHINE,DIFF-2026-0912,120,Raised on night shift\r\n";
-+                + "WB-2026-001,2026-09-10 14:30,NX487878,BFG1,OP1023,WIREBOND,WB-07,SOT669,3000,NON STICK ON PAD,PROCESS,MACHINE,DIFF-2026-0912,120,Raised on night shift\r\n";
++                "PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE\r\n"
++                + "SOT669,BUK9K6-40E,934123456789,WB_SOT669_STD\r\n";
              return File(Encoding.UTF8.GetBytes(csv), "text/csv", "tblwirebond-template.csv");
          }
  
-@@ -240,7 +248,7 @@
-                 // duplicate pair. Caught here instead.
-                 if (!string.IsNullOrWhiteSpace(ocapNo) && !seenOcapNumbers.Add(InputText.CleanUpper(ocapNo)))
+@@ -126,41 +85,15 @@
+             {
+                 var rows = await _wireBondService.GetForExportAsync(search, sortBy, sortDirection);
+                 var builder = new StringBuilder();
+-                builder.AppendLine(
+-                    "OCAPNO,OCAPWWK,WBDATE,ISSUEDBY,BFG,OPERATORID,PROCESS,MACHINE,PACKAGE,SOQTY,"
+-                    + "DEFECT,DEFECTCAT,DEFECTOTHERS,DIFF4M1E,DIFFAFFECTED,DIFFFABSITE,DIFFNO,"
+-                    + "DIFFNOTAFFECTED,DIFFREJECTQTY,DIFFREMARKS,VERIFIEDBY,ACTIONTAKEN,DISPOSITION,"
+-                    + "REMARKS,RCMACHINEERROR,MACHINEERROR,Last Updated By,Timestamp");
++                builder.AppendLine("PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE,Last Updated By,Timestamp");
+ 
+                 foreach (var row in rows)
                  {
+                     builder
+-                        .Append(EscapeCsv(row.OcapNo)).Append(',')
+-                        .Append(EscapeCsv(row.OcapWorkWeek)).Append(',')
+-                        .Append(EscapeCsv(row.OcapDate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty)).Append(',')
+-                        .Append(EscapeCsv(row.IssuedBy)).Append(',')
+-                        .Append(EscapeCsv(row.Bfg)).Append(',')
+-                        .Append(EscapeCsv(row.OperatorId)).Append(',')
+-                        .Append(EscapeCsv(row.Process)).Append(',')
+-                        .Append(EscapeCsv(row.Machine)).Append(',')
+                         .Append(EscapeCsv(row.Package)).Append(',')
+-                        .Append(EscapeCsv(row.SoQty?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)).Append(',')
+-                        .Append(EscapeCsv(row.Defect)).Append(',')
+-                        .Append(EscapeCsv(row.DefectCategory)).Append(',')
+-                        .Append(EscapeCsv(row.DefectOthers)).Append(',')
+-                        .Append(EscapeCsv(row.Diff4M1E)).Append(',')
+-                        .Append(EscapeCsv(row.DiffAffected)).Append(',')
+-                        .Append(EscapeCsv(row.DiffFabSite)).Append(',')
+-                        .Append(EscapeCsv(row.DiffNo)).Append(',')
+-                        .Append(EscapeCsv(row.DiffNotAffected)).Append(',')
+-                        .Append(EscapeCsv(row.DiffRejectQty?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)).Append(',')
+-                        .Append(EscapeCsv(row.DiffRemarks)).Append(',')
+-                        .Append(EscapeCsv(row.VerifiedBy)).Append(',')
+-                        .Append(EscapeCsv(row.ActionTaken)).Append(',')
+-                        .Append(EscapeCsv(row.Disposition)).Append(',')
+-                        .Append(EscapeCsv(row.Remarks)).Append(',')
+-                        .Append(EscapeCsv(row.RcMachineError)).Append(',')
+-                        .Append(EscapeCsv(row.MachineError)).Append(',')
++                        .Append(EscapeCsv(row.Product)).Append(',')
++                        .Append(EscapeCsv(row.Leadframe12Nc)).Append(',')
++                        .Append(EscapeCsv(row.Recipe)).Append(',')
+                         .Append(EscapeCsv(row.LastUpdatedBy)).Append(',')
+                         .Append(EscapeCsv(row.LastUpdate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty))
+                         .AppendLine();
+@@ -210,70 +143,39 @@
+ 
+             var importErrors = new List<string>();
+             var pendingRows = new List<WireBondInputModel>();
+-            var seenOcapNumbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
++            var seenRecipes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+ 
+             foreach (var row in read.Rows)
+             {
+-                var dateText = row["WBDATE"];
+-                if (!TryParseDate(dateText, out var ocapDate))
+-                {
+-                    importErrors.Add($"Line {row.LineNumber}: WBDATE '{dateText}' is not a date. Use 2026-09-10 14:30 or 10/09/2026.");
+-                    continue;
+-                }
++                var leadframe = row["LEADFRAME12NC"];
+ 
+-                if (!TryParseNumber(row["SOQTY"], out var soQty))
++                // Excel turns a long numeric 12NC into 3.4E+11 on save. Caught here
++                // rather than stored as the literal text "3.4E+11".
++                if (CsvImportReader.LooksLikeExcelScientificNumber(leadframe))
+                 {
+-                    importErrors.Add($"Line {row.LineNumber}: SOQTY '{row["SOQTY"]}' is not a number.");
+-                    continue;
+-                }
+-
+-                if (!TryParseNumber(row["DIFFREJECTQTY"], out var rejectQty))
+-                {
+-                    importErrors.Add($"Line {row.LineNumber}: DIFFREJECTQTY '{row["DIFFREJECTQTY"]}' is not a number.");
+-                    continue;
+-                }
+-
+-                var ocapNo = row["OCAPNO"];
+-
+-                // Two rows in one file carrying the same OCAP number would both
+-                // pass the database check (neither is committed yet) and land as a
+-                // duplicate pair. Caught here instead.
+-                if (!string.IsNullOrWhiteSpace(ocapNo) && !seenOcapNumbers.Add(InputText.CleanUpper(ocapNo)))
+-                {
 -                    importErrors.Add($"Line {row.LineNumber}: OCAP No {ocapNo} appears more than once in this file.");
-+                    importErrors.Add($"Line {row.LineNumber}: Record No {ocapNo} appears more than once in this file.");
++                    importErrors.Add($"Line {row.LineNumber}: LEADFRAME12NC '{leadframe}' was saved by Excel as a number. Format that column as Text and save again.");
                      continue;
                  }
  
-@@ -342,8 +350,12 @@
+                 var model = new WireBondInputModel
+                 {
+-                    OcapNo = ocapNo,
+-                    OcapDate = ocapDate,
+-                    IssuedBy = row["ISSUEDBY"],
+-                    Bfg = row["BFG"],
+-                    OperatorId = row["OPERATORID"],
+-                    Process = row["PROCESS"],
+-                    Machine = row["MACHINE"],
+                     Package = row["PACKAGE"],
+-                    SoQty = soQty,
+-                    Defect = row["DEFECT"],
+-                    DefectCategory = row["DEFECTCAT"],
+-                    DefectOthers = row["DEFECTOTHERS"],
+-                    Diff4M1E = row["DIFF4M1E"],
+-                    DiffAffected = row["DIFFAFFECTED"],
+-                    DiffFabSite = row["DIFFFABSITE"],
+-                    DiffNo = row["DIFFNO"],
+-                    DiffNotAffected = row["DIFFNOTAFFECTED"],
+-                    DiffRejectQty = rejectQty,
+-                    DiffRemarks = row["DIFFREMARKS"],
+-                    VerifiedBy = row["VERIFIEDBY"],
+-                    ActionTaken = row["ACTIONTAKEN"],
+-                    Disposition = row["DISPOSITION"],
+-                    Remarks = row["REMARKS"],
+-                    RcMachineError = row["RCMACHINEERROR"],
+-                    MachineError = row["MACHINEERROR"],
++                    Product = row["PRODUCT"],
++                    Leadframe12Nc = leadframe,
++                    Recipe = row["RECIPE"],
+                     Confirmed = true
+                 };
+ 
++                // Two rows in one file carrying the same recipe would both pass the
++                // database check (neither is committed yet) and land as a duplicate
++                // pair. Caught here instead.
++                var key = $"{InputText.CleanUpper(model.Product)}|{InputText.CleanUpper(model.Leadframe12Nc)}|{InputText.CleanUpper(model.Recipe)}";
++                if (!seenRecipes.Add(key))
++                {
++                    importErrors.Add($"Line {row.LineNumber}: {model.Product} / {model.Leadframe12Nc} / {model.Recipe} appears more than once in this file.");
++                    continue;
++                }
++
+                 var validationResults = new List<ValidationResult>();
+                 if (!Validator.TryValidateObject(model, new ValidationContext(model), validationResults, true))
+                 {
+@@ -342,8 +244,12 @@
              TempData["PopupType"] = result.Success ? "success" : "danger";
              TempData["PopupMessage"] = result.Message;
  
 +            // No search, no page number and the default sort (lastupdate desc), so
 +            // the row that was just inserted is the first row of the grid. highlight
-+            // flashes it and scrolls to it. model.OcapNo is the value the service
++            // flashes it and scrolls to it. model.Product is the value the service
 +            // actually stored - CreateAsync normalizes the model in place.
              return result.Success
 -                ? RedirectToAction(nameof(Index))
-+                ? RedirectToAction(nameof(Index), new { highlight = model.OcapNo })
++                ? RedirectToAction(nameof(Index), new { highlight = model.Product })
                  : RedirectToAction(nameof(Index), new { promptAdd = true });
          }
  
-@@ -373,7 +385,9 @@
+@@ -373,7 +279,9 @@
  
              TempData["PopupType"] = result.Success ? "success" : "danger";
              TempData["PopupMessage"] = result.Message;
 -            return RedirectToAction(nameof(Index));
 +            return result.Success
-+                ? RedirectToAction(nameof(Index), new { highlight = model.OcapNo })
++                ? RedirectToAction(nameof(Index), new { highlight = model.Product })
 +                : RedirectToAction(nameof(Index));
          }
  
          [HttpPost]
---- a/Services/WireBondService.cs
-+++ b/Services/WireBondService.cs
-@@ -10,6 +10,7 @@
-     {
-         Task<PagedResult<WireBond>> GetAsync(string? search, int page, int pageSize, string? sortBy, string? sortDirection);
-         Task<IReadOnlyList<WireBond>> GetForExportAsync(string? search, string? sortBy, string? sortDirection);
-+        Task<IReadOnlyList<string>> GetMachineOptionsAsync();
-         Task<(bool Success, string Message)> CreateAsync(WireBondInputModel model, string userName);
-         Task<(bool Success, int Inserted, string Message)> CreateManyAsync(IReadOnlyList<WireBondInputModel> models, string userName);
-         Task<(bool Success, string Message)> UpdateAsync(WireBondInputModel model, string userName);
-@@ -154,6 +155,51 @@
-             return rows;
+@@ -405,47 +313,6 @@
+             return RedirectToAction(nameof(Index));
          }
  
-+        // The wire bonders as AWACSWSTYPE knows them: WSID for WSTYPE 'WIREBOND'.
-+        // Offered as the Machine pick list on the add and edit panels so a machine
-+        // keyed in here matches the workstation master the recipe pages read.
-+        //
-+        // Deliberately swallows database errors instead of surfacing them. This is
-+        // a convenience list, and AWACSWSTYPE is a different table than the one
-+        // this page owns - if it is missing, empty, or not granted to the app
-+        // account, the Machine field simply stays free text. Failing the whole
-+        // grid over a dropdown would be a worse trade.
-+        public async Task<IReadOnlyList<string>> GetMachineOptionsAsync()
-+        {
-+            var values = new List<string>();
-+
-+            try
-+            {
-+                await using var connection = _connectionFactory.CreateConnection();
-+                await connection.OpenAsync();
-+
-+                await using var command = connection.CreateCommand();
-+                command.BindByName = true;
-+                command.CommandText = """
-+                    SELECT DISTINCT wsid
-+                    FROM awacswstype
-+                    WHERE UPPER(wstype) = 'WIREBOND'
-+                      AND wsid IS NOT NULL
-+                    ORDER BY wsid
-+                    """;
-+
-+                await using var reader = await command.ExecuteReaderTracedAsync();
-+                while (await reader.ReadAsync())
-+                {
-+                    if (!reader.IsDBNull(0))
-+                    {
-+                        values.Add(reader.GetString(0));
-+                    }
-+                }
-+            }
-+            catch (Exception ex) when (ex is OracleException or InvalidOperationException)
-+            {
-+                return [];
-+            }
-+
-+            return values;
-+        }
-+
-         public async Task<(bool Success, string Message)> CreateAsync(WireBondInputModel model, string userName)
+-        // Empty is allowed - most of these columns are optional. Only a value that
+-        // is present and unparseable is an error.
+-        private static bool TryParseDate(string? text, out DateTime? value)
+-        {
+-            value = null;
+-            if (string.IsNullOrWhiteSpace(text))
+-            {
+-                return true;
+-            }
+-
+-            if (DateTime.TryParseExact(text.Trim(), DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+-            {
+-                value = parsed;
+-                return true;
+-            }
+-
+-            return false;
+-        }
+-
+-        private static bool TryParseNumber(string? text, out decimal? value)
+-        {
+-            value = null;
+-            if (string.IsNullOrWhiteSpace(text))
+-            {
+-                return true;
+-            }
+-
+-            if (CsvImportReader.LooksLikeExcelScientificNumber(text))
+-            {
+-                return false;
+-            }
+-
+-            if (decimal.TryParse(text.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
+-            {
+-                value = parsed;
+-                return true;
+-            }
+-
+-            return false;
+-        }
+-
+         private static string HeaderlessNote(CsvImportResult read)
          {
-             Normalize(model);
-@@ -524,43 +570,50 @@
-             model.RcMachineError = InputText.CleanOrNull(model.RcMachineError);
-         }
+             return read.HadHeaderRow
+@@ -456,8 +323,8 @@
+         // DatabaseErrorMessage.Build answers every OracleException with the same
+         // "check the password, VPN and service name" text. That is right for a
+         // connection failure and actively misleading for anything else: an
+-        // ORA-00904 or ORA-00942 raised by this page's own SQL would read as if
+-        // the database were unreachable, and the grid would just look empty. Real
++        // ORA-00904 or ORA-02290 raised by this page's own SQL would read as if the
++        // database were unreachable, and the grid would just look empty. Real
+         // connection errors keep the original wording; everything else says what
+         // Oracle actually said.
+         private static string Describe(Exception ex)
+--- a/Services/WireBondService.cs
++++ b/Services/WireBondService.cs
+@@ -16,65 +16,55 @@
+         Task<(bool Success, string Message)> DeleteAsync(string tblRowId, string userName);
+     }
+ 
+-    // TBLWIREBOND is the wire bond OCAP log: one row per OCAP record raised on a
+-    // wire bonder. It is a pre-existing OCAP table this app does not own, so its
+-    // shape is taken as given - no primary key, no NOT NULL, no check constraints.
++    // TBLWIREBOND: the wirebond recipe table. Package, product, leadframe 12NC
++    // and recipe, plus TBLROWID / LASTUPDATE / LASTUPDATEDBY. Same shape as
++    // AWACSRECIPEBYWSTYPE minus WSTYPE - every row here is wirebond, so there is
++    // nothing to filter on and no WSTYPE to carry around.
+     //
+-    // Two consequences worth knowing before reading further:
++    // Two things worth knowing before reading further:
+     //
+-    //   - Rows are addressed by Oracle ROWID, not by the TBLROWID column. TBLROWID
+-    //     is NULL on every row keyed in by hand before this page existed, so
+-    //     keying off it would leave those rows uneditable. New rows still get a
+-    //     RAWTOHEX(SYS_GUID()) TBLROWID for the MES side.
+-    //   - WBOCAPWWK is never written here. The BEFORE INSERT trigger
+-    //     OCAP_WIREBOND_WORKWEEK derives it from WBDATE. That trigger does not
+-    //     fire on UPDATE, so a saved edit that moves WBDATE leaves the work week
+-    //     on the week the record was first raised - which is the OCAP number's
+-    //     week, and what the reports key off.
++    //   - PACKAGE is a reserved word in Oracle. It must be written "PACKAGE",
++    //     double-quoted and uppercase, everywhere it appears in SQL. Unquoted or
++    //     lowercase raises ORA-00904. The bind variable is :package, which is
++    //     fine - the rule is about the identifier, not the placeholder.
++    //   - Rows are addressed by Oracle ROWID, not by the TBLROWID column, so a
++    //     row keyed in by hand with a NULL TBLROWID is still editable. New rows
++    //     still get a RAWTOHEX(SYS_GUID()) TBLROWID for the MES side.
+     public class WireBondService : IWireBondService
+     {
+         // Order matters: ReadRow reads by index.
+         private const string SelectColumns = """
+-            ROWIDTOCHAR(ROWID), lastupdate, lastupdatedby, wbocapno, wbocapwwk,
+-            wbissuedby, wbbfg, wbdate, wboperatorid, wbprocess, wbmachine,
+-            wbpackage, wbsoqty, wbdefect, wbdefectcat, wbdefectothers, wbdiff4m1e,
+-            wbdiffaffected, wbdifffabsite, wbdiffno, wbdiffnotaffected,
+-            wbdiffrejectqty, wbdiffremarks, wbverifiedby, wbactiontaken,
+-            wbdisposition, wbremarks, wbrcmachineerror, wbmachineerror
++            ROWIDTOCHAR(ROWID), lastupdate, lastupdatedby, "PACKAGE", product,
++            leadframe12nc, recipe
+             """;
+ 
+         private const string FilterSql = """
+             WHERE (:search IS NULL
+-                   OR UPPER(wbocapno) LIKE :search
+-                   OR UPPER(wbocapwwk) LIKE :search
+-                   OR UPPER(wbmachine) LIKE :search
+-                   OR UPPER(wbpackage) LIKE :search
+-                   OR UPPER(wbdefect) LIKE :search
+-                   OR UPPER(wbdefectcat) LIKE :search
+-                   OR UPPER(wbdiffno) LIKE :search
+-                   OR UPPER(wbissuedby) LIKE :search
+-                   OR UPPER(wbverifiedby) LIKE :search
+-                   OR UPPER(wboperatorid) LIKE :search
++                   OR UPPER("PACKAGE") LIKE :search
++                   OR UPPER(product) LIKE :search
++                   OR UPPER(leadframe12nc) LIKE :search
++                   OR UPPER(recipe) LIKE :search
+                    OR UPPER(lastupdatedby) LIKE :search)
+             """;
+ 
+         private const string InsertSql = """
+             INSERT INTO tblwirebond
+-                (tblrowid, lastupdate, lastupdatedby, wbocapno, wbissuedby, wbbfg,
+-                 wbdate, wboperatorid, wbprocess, wbmachine, wbpackage, wbsoqty,
+-                 wbdefect, wbdefectcat, wbdefectothers, wbdiff4m1e, wbdiffaffected,
+-                 wbdifffabsite, wbdiffno, wbdiffnotaffected, wbdiffrejectqty,
+-                 wbdiffremarks, wbverifiedby, wbactiontaken, wbdisposition,
+-                 wbremarks, wbrcmachineerror, wbmachineerror)
++                (tblrowid, lastupdate, lastupdatedby, "PACKAGE", product,
++                 leadframe12nc, recipe)
+             VALUES
+-                (RAWTOHEX(SYS_GUID()), SYSDATE, :lastupdatedby, :wbocapno, :wbissuedby, :wbbfg,
+-                 :wbdate, :wboperatorid, :wbprocess, :wbmachine, :wbpackage, :wbsoqty,
+-                 :wbdefect, :wbdefectcat, :wbdefectothers, :wbdiff4m1e, :wbdiffaffected,
+-                 :wbdifffabsite, :wbdiffno, :wbdiffnotaffected, :wbdiffrejectqty,
+-                 :wbdiffremarks, :wbverifiedby, :wbactiontaken, :wbdisposition,
+-                 :wbremarks, :wbrcmachineerror, :wbmachineerror)
++                (RAWTOHEX(SYS_GUID()), SYSDATE, :lastupdatedby, :package, :product,
++                 :leadframe12nc, :recipe)
+             """;
  
 +        // Every column the grid renders a sort header for. The value reaches an
 +        // ORDER BY that cannot be parameterized, so this array - not the caller -
@@ -678,14 +1121,276 @@
 +        // adding the key here silently sorts by lastupdate instead.
 +        private static readonly string[] SortableColumns =
 +        [
-+            "wbocapno", "wbocapwwk", "wbdate", "wbissuedby", "wbbfg", "wboperatorid",
-+            "wbprocess", "wbmachine", "wbpackage", "wbsoqty", "wbdefect", "wbdefectcat",
-+            "wbdefectothers", "wbmachineerror", "wbrcmachineerror", "wbdiff4m1e",
-+            "wbdiffno", "wbdifffabsite", "wbdiffrejectqty", "wbdiffaffected",
-+            "wbdiffnotaffected", "wbdiffremarks", "wbverifiedby", "wbactiontaken",
-+            "wbdisposition", "wbremarks", "lastupdatedby", "lastupdate"
++            "package", "product", "leadframe12nc", "recipe", "lastupdatedby", "lastupdate"
 +        ];
 +
+         private readonly IOracleConnectionFactory _connectionFactory;
+         private readonly IRecipeAuditRepository _auditRepository;
+ 
+@@ -164,10 +154,10 @@
+ 
+             try
+             {
+-                if (await OcapNoExistsAsync(connection, transaction, model.OcapNo))
++                if (await RecipeExistsAsync(connection, transaction, model))
+                 {
+                     await transaction.RollbackAsync();
+-                    return (false, $"TBLWIREBOND already has a record for OCAP No {model.OcapNo}. Edit that row instead of adding a second one.");
++                    return (false, $"TBLWIREBOND already has {model.Product} / {model.Leadframe12Nc} / {model.Recipe}. Edit that row instead of adding a second one.");
+                 }
+ 
+                 await using var command = connection.CreateCommand();
+@@ -177,18 +167,14 @@
+                 AddWriteParameters(command, model, userName);
+ 
+                 var inserted = await command.ExecuteNonQueryTracedAsync();
+-                if (inserted != 1 || !await OcapNoExistsAsync(connection, transaction, model.OcapNo))
++                if (inserted != 1 || !await RecipeExistsAsync(connection, transaction, model))
+                 {
+                     await transaction.RollbackAsync();
+                     return (false, "Insert verification failed. Insert was rolled back.");
+                 }
+ 
+-                var workWeek = await ReadWorkWeekAsync(connection, transaction, model.OcapNo);
+-
+                 await transaction.CommitAsync();
+-                return (true, string.IsNullOrWhiteSpace(workWeek)
+-                    ? $"TBLWIREBOND record {model.OcapNo} inserted and verified."
+-                    : $"TBLWIREBOND record {model.OcapNo} inserted and verified. Work week {workWeek} was set by the database.");
++                return (true, $"TBLWIREBOND row {model.Product} inserted and verified.");
+             }
+             catch
+             {
+@@ -215,10 +201,10 @@
+                 {
+                     Normalize(model);
+ 
+-                    if (await OcapNoExistsAsync(connection, transaction, model.OcapNo))
++                    if (await RecipeExistsAsync(connection, transaction, model))
+                     {
+                         await transaction.RollbackAsync();
+-                        return (false, 0, $"Import cancelled. OCAP No {model.OcapNo} is already in TBLWIREBOND. No rows were uploaded.");
++                        return (false, 0, $"Import cancelled. {model.Product} / {model.Leadframe12Nc} / {model.Recipe} is already in TBLWIREBOND. No rows were uploaded.");
+                     }
+ 
+                     await using var command = connection.CreateCommand();
+@@ -273,36 +259,14 @@
+                 await using var command = connection.CreateCommand();
+                 command.BindByName = true;
+                 command.Transaction = transaction;
+-                // wbocapwwk is left alone on purpose - see the class comment.
+                 command.CommandText = """
+                     UPDATE tblwirebond
+                     SET lastupdate = SYSDATE,
+                         lastupdatedby = :lastupdatedby,
+-                        wbocapno = :wbocapno,
+-                        wbissuedby = :wbissuedby,
+-                        wbbfg = :wbbfg,
+-                        wbdate = :wbdate,
+-                        wboperatorid = :wboperatorid,
+-                        wbprocess = :wbprocess,
+-                        wbmachine = :wbmachine,
+-                        wbpackage = :wbpackage,
+-                        wbsoqty = :wbsoqty,
+-                        wbdefect = :wbdefect,
+-                        wbdefectcat = :wbdefectcat,
+-                        wbdefectothers = :wbdefectothers,
+-                        wbdiff4m1e = :wbdiff4m1e,
+-                        wbdiffaffected = :wbdiffaffected,
+-                        wbdifffabsite = :wbdifffabsite,
+-                        wbdiffno = :wbdiffno,
+-                        wbdiffnotaffected = :wbdiffnotaffected,
+-                        wbdiffrejectqty = :wbdiffrejectqty,
+-                        wbdiffremarks = :wbdiffremarks,
+-                        wbverifiedby = :wbverifiedby,
+-                        wbactiontaken = :wbactiontaken,
+-                        wbdisposition = :wbdisposition,
+-                        wbremarks = :wbremarks,
+-                        wbrcmachineerror = :wbrcmachineerror,
+-                        wbmachineerror = :wbmachineerror
++                        "PACKAGE" = :package,
++                        product = :product,
++                        leadframe12nc = :leadframe12nc,
++                        recipe = :recipe
+                     WHERE ROWID = CHARTOROWID(:tblrowid)
+                     """;
+                 AddWriteParameters(command, model, userName);
+@@ -322,14 +286,14 @@
+                     connection,
+                     transaction,
+                     AuditedTableNames.WireBond,
+-                    $"OCAP {model.OcapNo}",
++                    $"{model.Product} / {model.Leadframe12Nc}",
+                     model.TblRowId,
+                     oldValues,
+                     newValues,
+                     userName);
+ 
+                 await transaction.CommitAsync();
+-                return (true, $"TBLWIREBOND record {model.OcapNo} updated and verified. The previous values are on the Change History page if this needs to be reverted.");
++                return (true, $"TBLWIREBOND row {model.Product} updated and verified. The previous values are on the Change History page if this needs to be reverted.");
+             }
+             catch
+             {
+@@ -359,7 +323,7 @@
+                     connection,
+                     transaction,
+                     AuditedTableNames.WireBond,
+-                    $"OCAP {rowData.GetValueOrDefault("WBOCAPNO")} ({rowData.GetValueOrDefault("WBMACHINE")})",
++                    $"{rowData.GetValueOrDefault("PRODUCT")} / {rowData.GetValueOrDefault("LEADFRAME12NC")}",
+                     rowData,
+                     userName);
+ 
+@@ -377,7 +341,7 @@
+                 }
+ 
+                 await transaction.CommitAsync();
+-                return (true, "TBLWIREBOND record moved to Trash. Open Trash to restore it if this was a mistake.");
++                return (true, "TBLWIREBOND row moved to Trash. Open Trash to restore it if this was a mistake.");
+             }
+             catch
+             {
+@@ -400,17 +364,24 @@
+             return Convert.ToInt32(await command.ExecuteScalarTracedAsync());
+         }
+ 
+-        // An OCAP number identifies one record, so a second row carrying the same
+-        // number is a duplicate. The table has no unique constraint to lean on -
+-        // this check is the only thing standing between a double-submit and two
+-        // rows nobody can tell apart.
+-        private static async Task<bool> OcapNoExistsAsync(OracleConnection connection, OracleTransaction transaction, string ocapNo)
++        // Product + leadframe + recipe is what makes a row unique here. The table
++        // has no unique constraint to lean on - this check is the only thing
++        // standing between a double-submit and two rows nobody can tell apart.
++        private static async Task<bool> RecipeExistsAsync(OracleConnection connection, OracleTransaction transaction, WireBondInputModel model)
+         {
+             await using var command = connection.CreateCommand();
+             command.BindByName = true;
+             command.Transaction = transaction;
+-            command.CommandText = "SELECT COUNT(1) FROM tblwirebond WHERE UPPER(wbocapno) = UPPER(:wbocapno)";
+-            command.Parameters.Add(new OracleParameter("wbocapno", ocapNo));
++            command.CommandText = """
++                SELECT COUNT(1)
++                FROM tblwirebond
++                WHERE UPPER(product) = UPPER(:product)
++                  AND UPPER(leadframe12nc) = UPPER(:leadframe12nc)
++                  AND UPPER(recipe) = UPPER(:recipe)
++                """;
++            command.Parameters.Add(new OracleParameter("product", model.Product));
++            command.Parameters.Add(new OracleParameter("leadframe12nc", model.Leadframe12Nc));
++            command.Parameters.Add(new OracleParameter("recipe", model.Recipe));
+ 
+             return Convert.ToInt32(await command.ExecuteScalarTracedAsync()) > 0;
+         }
+@@ -426,51 +397,13 @@
+             return Convert.ToInt32(await command.ExecuteScalarTracedAsync()) == 1;
+         }
+ 
+-        // Reads back what the trigger put in WBOCAPWWK, so the success popup can
+-        // show it instead of leaving the user to refresh and look.
+-        private static async Task<string> ReadWorkWeekAsync(OracleConnection connection, OracleTransaction transaction, string ocapNo)
+-        {
+-            await using var command = connection.CreateCommand();
+-            command.BindByName = true;
+-            command.Transaction = transaction;
+-            command.CommandText = "SELECT MAX(wbocapwwk) FROM tblwirebond WHERE UPPER(wbocapno) = UPPER(:wbocapno)";
+-            command.Parameters.Add(new OracleParameter("wbocapno", ocapNo));
+-
+-            var value = await command.ExecuteScalarTracedAsync();
+-            return value is null or DBNull ? string.Empty : value.ToString() ?? string.Empty;
+-        }
+-
+         private static void AddWriteParameters(OracleCommand command, WireBondInputModel model, string userName)
+         {
+             command.Parameters.Add(new OracleParameter("lastupdatedby", userName));
+-            command.Parameters.Add(new OracleParameter("wbocapno", model.OcapNo));
+-            command.Parameters.Add(Text("wbissuedby", model.IssuedBy));
+-            command.Parameters.Add(Text("wbbfg", model.Bfg));
+-            command.Parameters.Add(new OracleParameter("wbdate", OracleDbType.Date)
+-            {
+-                Value = model.OcapDate.HasValue ? (object)model.OcapDate.Value : DBNull.Value
+-            });
+-            command.Parameters.Add(Text("wboperatorid", model.OperatorId));
+-            command.Parameters.Add(Text("wbprocess", model.Process));
+-            command.Parameters.Add(Text("wbmachine", model.Machine));
+-            command.Parameters.Add(Text("wbpackage", model.Package));
+-            command.Parameters.Add(Number("wbsoqty", model.SoQty));
+-            command.Parameters.Add(Text("wbdefect", model.Defect));
+-            command.Parameters.Add(Text("wbdefectcat", model.DefectCategory));
+-            command.Parameters.Add(Text("wbdefectothers", model.DefectOthers));
+-            command.Parameters.Add(Text("wbdiff4m1e", model.Diff4M1E));
+-            command.Parameters.Add(Text("wbdiffaffected", model.DiffAffected));
+-            command.Parameters.Add(Text("wbdifffabsite", model.DiffFabSite));
+-            command.Parameters.Add(Text("wbdiffno", model.DiffNo));
+-            command.Parameters.Add(Text("wbdiffnotaffected", model.DiffNotAffected));
+-            command.Parameters.Add(Number("wbdiffrejectqty", model.DiffRejectQty));
+-            command.Parameters.Add(Text("wbdiffremarks", model.DiffRemarks));
+-            command.Parameters.Add(Text("wbverifiedby", model.VerifiedBy));
+-            command.Parameters.Add(Text("wbactiontaken", model.ActionTaken));
+-            command.Parameters.Add(Text("wbdisposition", model.Disposition));
+-            command.Parameters.Add(Text("wbremarks", model.Remarks));
+-            command.Parameters.Add(Text("wbrcmachineerror", model.RcMachineError));
+-            command.Parameters.Add(Text("wbmachineerror", model.MachineError));
++            command.Parameters.Add(Text("package", model.Package));
++            command.Parameters.Add(new OracleParameter("product", model.Product));
++            command.Parameters.Add(new OracleParameter("leadframe12nc", model.Leadframe12Nc));
++            command.Parameters.Add(new OracleParameter("recipe", model.Recipe));
+         }
+ 
+         private static OracleParameter Text(string name, string? value)
+@@ -481,86 +414,49 @@
+             };
+         }
+ 
+-        // An empty number box posts as null, not as 0 - the column stays NULL
+-        // rather than claiming a quantity of zero was counted.
+-        private static OracleParameter Number(string name, decimal? value)
+-        {
+-            return new OracleParameter(name, OracleDbType.Decimal)
+-            {
+-                Value = value.HasValue ? (object)value.Value : DBNull.Value
+-            };
+-        }
+-
++        // Everything here is a code, not a sentence, so it is stored upper-cased:
++        // the duplicate check and the search box cannot then be defeated by
++        // "sot669" vs "SOT669".
+         private static void Normalize(WireBondInputModel model)
+         {
+             model.TblRowId = model.TblRowId?.Trim();
+-
+-            // Code-like columns are stored upper-cased so the duplicate check and
+-            // the search box cannot be defeated by "wb-07" vs "WB-07".
+-            model.OcapNo = InputText.CleanUpper(model.OcapNo);
+-            model.IssuedBy = InputText.CleanUpperOrNull(model.IssuedBy);
+-            model.Bfg = InputText.CleanUpperOrNull(model.Bfg);
+-            model.OperatorId = InputText.CleanUpperOrNull(model.OperatorId);
+-            model.Process = InputText.CleanUpperOrNull(model.Process);
+-            model.Machine = InputText.CleanUpperOrNull(model.Machine);
+             model.Package = InputText.CleanUpperOrNull(model.Package);
+-            model.Defect = InputText.CleanUpperOrNull(model.Defect);
+-            model.DefectCategory = InputText.CleanUpperOrNull(model.DefectCategory);
+-            model.Diff4M1E = InputText.CleanUpperOrNull(model.Diff4M1E);
+-            model.DiffFabSite = InputText.CleanUpperOrNull(model.DiffFabSite);
+-            model.DiffNo = InputText.CleanUpperOrNull(model.DiffNo);
+-            model.DiffAffected = InputText.CleanUpperOrNull(model.DiffAffected);
+-            model.DiffNotAffected = InputText.CleanUpperOrNull(model.DiffNotAffected);
+-            model.VerifiedBy = InputText.CleanUpperOrNull(model.VerifiedBy);
+-            model.MachineError = InputText.CleanUpperOrNull(model.MachineError);
+-
+-            // Free text keeps the case it was typed in - these are sentences a
+-            // person wrote, not codes anything matches on.
+-            model.DefectOthers = InputText.CleanOrNull(model.DefectOthers);
+-            model.DiffRemarks = InputText.CleanOrNull(model.DiffRemarks);
+-            model.ActionTaken = InputText.CleanOrNull(model.ActionTaken);
+-            model.Disposition = InputText.CleanOrNull(model.Disposition);
+-            model.Remarks = InputText.CleanOrNull(model.Remarks);
+-            model.RcMachineError = InputText.CleanOrNull(model.RcMachineError);
++            model.Product = InputText.CleanUpper(model.Product);
++            model.Leadframe12Nc = InputText.CleanUpper(model.Leadframe12Nc);
++            model.Recipe = InputText.CleanUpper(model.Recipe);
+         }
+ 
          private static string BuildOrderBy(string? sortBy, string? sortDirection)
          {
              var direction = string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
@@ -705,12 +1410,14 @@
 -                "wbpackage" => $"wbpackage {direction} {nulls}, wbdate DESC NULLS LAST",
 -                "wbdefect" => $"wbdefect {direction} {nulls}, wbdate DESC NULLS LAST",
 -                "lastupdatedby" => $"lastupdatedby {direction} {nulls}, wbdate DESC NULLS LAST",
-                 "lastupdate" => $"lastupdate {direction} {nulls}, wbocapno ASC",
+-                "lastupdate" => $"lastupdate {direction} {nulls}, wbocapno ASC",
 -                _ => "lastupdate DESC NULLS LAST, wbocapno ASC"
-+                "wbdate" => $"wbdate {direction} {nulls}, wbocapno ASC",
-+                // Every other column ties on the date, so equal values still come
-+                // back newest first instead of in whatever order Oracle chose.
-+                _ => $"{column} {direction} {nulls}, wbdate DESC NULLS LAST"
++                "lastupdate" => $"lastupdate {direction} {nulls}, product ASC",
++                // PACKAGE stays quoted - it is a reserved word.
++                "package" => $"\"PACKAGE\" {direction} {nulls}, product ASC",
++                // Every other column ties on the timestamp, so equal values still
++                // come back newest first instead of in whatever order Oracle chose.
++                _ => $"{column} {direction} {nulls}, lastupdate DESC NULLS LAST"
              };
          }
  
@@ -742,6 +1449,54 @@
          }
  
          private static string? NormalizeSearch(string? search)
+@@ -575,32 +471,10 @@
+                 TblRowId = ReadString(reader, 0),
+                 LastUpdate = ReadDate(reader, 1),
+                 LastUpdatedBy = ReadString(reader, 2),
+-                OcapNo = ReadString(reader, 3),
+-                OcapWorkWeek = ReadString(reader, 4),
+-                IssuedBy = ReadString(reader, 5),
+-                Bfg = ReadString(reader, 6),
+-                OcapDate = ReadDate(reader, 7),
+-                OperatorId = ReadString(reader, 8),
+-                Process = ReadString(reader, 9),
+-                Machine = ReadString(reader, 10),
+-                Package = ReadString(reader, 11),
+-                SoQty = ReadNumber(reader, 12),
+-                Defect = ReadString(reader, 13),
+-                DefectCategory = ReadString(reader, 14),
+-                DefectOthers = ReadString(reader, 15),
+-                Diff4M1E = ReadString(reader, 16),
+-                DiffAffected = ReadString(reader, 17),
+-                DiffFabSite = ReadString(reader, 18),
+-                DiffNo = ReadString(reader, 19),
+-                DiffNotAffected = ReadString(reader, 20),
+-                DiffRejectQty = ReadNumber(reader, 21),
+-                DiffRemarks = ReadString(reader, 22),
+-                VerifiedBy = ReadString(reader, 23),
+-                ActionTaken = ReadString(reader, 24),
+-                Disposition = ReadString(reader, 25),
+-                Remarks = ReadString(reader, 26),
+-                RcMachineError = ReadString(reader, 27),
+-                MachineError = ReadString(reader, 28)
++                Package = ReadString(reader, 3),
++                Product = ReadString(reader, 4),
++                Leadframe12Nc = ReadString(reader, 5),
++                Recipe = ReadString(reader, 6)
+             };
+         }
+ 
+@@ -613,10 +487,5 @@
+         {
+             return reader.IsDBNull(index) ? null : reader.GetDateTime(index);
+         }
+-
+-        private static decimal? ReadNumber(OracleDataReader reader, int index)
+-        {
+-            return reader.IsDBNull(index) ? null : reader.GetDecimal(index);
+-        }
+     }
+ }
 --- a/Models/AppModule.cs
 +++ b/Models/AppModule.cs
 @@ -13,7 +13,8 @@
@@ -774,6 +1529,513 @@
          // by ROWID like the two above rather than by a key half the table lacks.
          private static readonly AuditedTable WireBond =
              new(AuditedTableNames.WireBond, "ROWID = CHARTOROWID(:row_key)");
+--- a/Database/tblwirebond.sql
++++ b/Database/tblwirebond.sql
+@@ -1,50 +1,39 @@
+ -- =====================================================================
+--- OCAPSYS.TBLWIREBOND - table + work-week trigger.
++-- OCAPSYS.TBLWIREBOND - the wirebond recipe table.
+ -- RUN THIS ONCE against the OCAPSYS schema.
+ --
+--- One row = one wire bond OCAP record: who raised it, the machine and
+--- package it was raised against, the defect, the 4M1E difference that
+--- caused it, and the disposition/action taken to close it.
+---
+--- The DROP below is destructive. On a database that already holds
+--- production rows, skip straight to the CREATE OR REPLACE TRIGGER part,
+--- or export the rows first:
++-- One row = one wirebond recipe: package, product, leadframe 12NC and
++-- the recipe name. Same shape as AWACSRECIPEBYWSTYPE minus WSTYPE -
++-- every row in this table is wirebond, so there is nothing to filter on.
++--
++-- THE DROP BELOW IS DESTRUCTIVE and this script REPLACES the old OCAP
++-- shape of the table (WBOCAPNO, WBOCAPWWK, WBDATE and the rest). Keep a
++-- copy of whatever is in there first:
+ --   CREATE TABLE tblwirebond_bak AS SELECT * FROM tblwirebond;
++--
++-- Run section 4 as well, or Edit and Delete on the page will fail.
+ -- =====================================================================
+ 
++
++-- ---------------------------------------------------------------------
++-- 1. The table
++--
++-- PACKAGE is a RESERVED WORD in Oracle. It must be double-quoted and
++-- uppercase - "PACKAGE" - everywhere it appears, here and in every
++-- query. Unquoted or lowercase raises ORA-00904. This is the same thing
++-- AWACSRECIPEBYWSTYPE does.
++-- ---------------------------------------------------------------------
+ DROP TABLE OCAPSYS.TBLWIREBOND CASCADE CONSTRAINTS;
+ 
+ CREATE TABLE OCAPSYS.TBLWIREBOND
+ (
+-  TBLROWID           VARCHAR2(50 BYTE),    -- row key: RAWTOHEX(SYS_GUID()), same as AWACSWSTYPE
+-  LASTUPDATE         DATE,                 -- SYSDATE on every write
+-  LASTUPDATEDBY      VARCHAR2(50 BYTE),    -- sAMAccountName, e.g. NX487878
+-  WBOCAPNO           VARCHAR2(100 BYTE),   -- OCAP number - the business identifier of the record
+-  WBOCAPWWK          VARCHAR2(100 BYTE),   -- work week: SET BY THE TRIGGER, never insert it yourself
+-  WBISSUEDBY         VARCHAR2(100 BYTE),
+-  WBBFG              VARCHAR2(100 BYTE),
+-  WBDATE             DATE,                 -- when the OCAP happened (not when the row was keyed in)
+-  WBOPERATORID       VARCHAR2(50 BYTE),
+-  WBPROCESS          VARCHAR2(100 BYTE),
+-  WBMACHINE          VARCHAR2(100 BYTE),
+-  WBPACKAGE          VARCHAR2(100 BYTE),
+-  WBSOQTY            INTEGER,
+-  WBDEFECT           VARCHAR2(100 BYTE),
+-  WBDEFECTCAT        VARCHAR2(100 BYTE),
+-  WBDEFECTOTHERS     VARCHAR2(100 BYTE),
+-  WBDIFF4M1E         VARCHAR2(100 BYTE),
+-  WBDIFFAFFECTED     VARCHAR2(100 BYTE),
+-  WBDIFFFABSITE      VARCHAR2(100 BYTE),
+-  WBDIFFNO           VARCHAR2(100 BYTE),
+-  WBDIFFNOTAFFECTED  VARCHAR2(100 BYTE),
+-  WBDIFFREJECTQTY    INTEGER,
+-  WBDIFFREMARKS      VARCHAR2(2000 BYTE),
+-  WBVERIFIEDBY       VARCHAR2(100 BYTE),
+-  WBACTIONTAKEN      VARCHAR2(2000 BYTE),
+-  WBDISPOSITION      VARCHAR2(2000 BYTE),
+-  WBREMARKS          VARCHAR2(500 BYTE),
+-  WBRCMACHINEERROR   VARCHAR2(1000 BYTE),
+-  WBMACHINEERROR     VARCHAR2(100 BYTE)
++  TBLROWID       VARCHAR2(50 BYTE),   -- row key: RAWTOHEX(SYS_GUID()), same as AWACSWSTYPE
++  LASTUPDATE     DATE,                -- SYSDATE on every write
++  LASTUPDATEDBY  VARCHAR2(50 BYTE),   -- sAMAccountName, e.g. NX487878
++  "PACKAGE"      VARCHAR2(64 BYTE),   -- optional
++  PRODUCT        VARCHAR2(64 BYTE),
++  LEADFRAME12NC  VARCHAR2(16 BYTE),
++  RECIPE         VARCHAR2(120 BYTE)
+ )
+ TABLESPACE OCAPSYS_DAT
+ PCTFREE    10
+@@ -62,52 +51,65 @@
+ NOCOMPRESS
+ NOCACHE;
+ 
++
+ -- ---------------------------------------------------------------------
+--- Work-week trigger
++-- 2. The old work-week trigger is gone with the old columns
+ --
+--- Fixed against the original version, which called
+---   get_wwk_app_cutoff(to_date(sysdate, 'DD-MM-YYYY-HH24:MI:SS'))
+--- SYSDATE is already a DATE. TO_DATE wants a string, so Oracle first
+--- converts SYSDATE to text using the session's NLS_DATE_FORMAT (default
+--- 'DD-MON-RR' -> '10-SEP-26') and then tries to read that text back with
+--- the 'DD-MM-YYYY-HH24:MI:SS' mask. That raises ORA-01843 / ORA-01861 and
+--- FAILS THE WHOLE INSERT on any session whose NLS_DATE_FORMAT does not
+--- happen to match the mask. Passing SYSDATE straight through is both
+--- correct and NLS-independent.
+---
+--- TO_CHAR is explicit about the NUMBER -> VARCHAR2 column conversion, and
+--- NVL keeps a work week that the caller supplied on purpose (a backdated
+--- record being keyed in late) instead of overwriting it with this week.
+--- Drop the NVL if the trigger should always win.
+--- ---------------------------------------------------------------------
+-CREATE OR REPLACE TRIGGER OCAPSYS.OCAP_WIREBOND_WORKWEEK
+-BEFORE INSERT
+-ON OCAPSYS.TBLWIREBOND
+-FOR EACH ROW
+-DECLARE
+-   workweek NUMBER;
+-BEGIN
+-   workweek := get_wwk_app_cutoff(NVL(:NEW.WBDATE, SYSDATE));
+-   :NEW.WBOCAPWWK := NVL(:NEW.WBOCAPWWK, TO_CHAR(workweek));
+-END;
+-/
+-
+--- ---------------------------------------------------------------------
+--- Optional, recommended. The table as created has no primary key, no
+--- NOT NULL and no unique constraint, so nothing stops a duplicate or an
+--- all-NULL row. Run these only after confirming the existing data is
+--- clean, and only with DBA agreement:
+---
+--- ALTER TABLE OCAPSYS.TBLWIREBOND MODIFY (TBLROWID NOT NULL);
+--- ALTER TABLE OCAPSYS.TBLWIREBOND
+---   ADD CONSTRAINT pk_tblwirebond PRIMARY KEY (TBLROWID);
+--- CREATE UNIQUE INDEX ix_tblwirebond_ocapno
+---   ON OCAPSYS.TBLWIREBOND (WBOCAPNO);
+--- CREATE INDEX ix_tblwirebond_wwk
+---   ON OCAPSYS.TBLWIREBOND (WBOCAPWWK, WBDATE);
+--- ---------------------------------------------------------------------
+-
+--- Quick check that it worked:
+--- SELECT table_name FROM all_tables WHERE table_name = 'TBLWIREBOND';
+--- SELECT trigger_name, status FROM all_triggers
+---  WHERE trigger_name = 'OCAP_WIREBOND_WORKWEEK';
++-- OCAP_WIREBOND_WORKWEEK filled WBOCAPWWK from WBDATE. Neither column
++-- exists any more, so the trigger cannot compile and would fail every
++-- insert with ORA-04098. The DROP TABLE above already removed it; this
++-- is here so nobody puts it back.
++-- ---------------------------------------------------------------------
++-- DROP TRIGGER OCAPSYS.OCAP_WIREBOND_WORKWEEK;
++
++
++-- ---------------------------------------------------------------------
++-- 3. Indexes. Optional, recommended.
++--
++-- The app checks for a duplicate product/leadframe/recipe before every
++-- insert, but nothing in the database stops one - add the unique index
++-- only after confirming the existing rows are clean.
++-- ---------------------------------------------------------------------
++-- CREATE INDEX ix_tblwirebond_product ON OCAPSYS.TBLWIREBOND (PRODUCT);
++-- CREATE INDEX ix_tblwirebond_lf      ON OCAPSYS.TBLWIREBOND (LEADFRAME12NC);
++-- CREATE UNIQUE INDEX ix_tblwirebond_recipe
++--   ON OCAPSYS.TBLWIREBOND (PRODUCT, LEADFRAME12NC, RECIPE);
++
++
++-- ---------------------------------------------------------------------
++-- 4. REQUIRED: let the undo tables accept TBLWIREBOND rows
++--
++-- Edit copies the old row into TBLRECIPEHISTORY and Delete copies the
++-- whole row into TBLRECIPETRASH, both inside the same transaction as the
++-- write itself. Both tables carry a CHECK constraint listing which table
++-- names are allowed, and TBLWIREBOND was never in it - so every Edit and
++-- every Delete on this page fails with
++--   ORA-02290: check constraint (OCAPSYS.CK_TBLRECIPEHISTORY_TABLE) violated
++-- and rolls back. Nothing is lost, but nothing saves either.
++--
++-- These two statements replace the constraint with one that includes it.
++-- Run them once. Database/tblrecipeaudit.sql carries the same list for a
++-- fresh install.
++-- ---------------------------------------------------------------------
++ALTER TABLE OCAPSYS.TBLRECIPEHISTORY DROP CONSTRAINT ck_tblrecipehistory_table;
++
++ALTER TABLE OCAPSYS.TBLRECIPEHISTORY ADD CONSTRAINT ck_tblrecipehistory_table
++    CHECK (table_name IN ('AWACSWSTYPE', 'AWACSRECIPEBYWSTYPE', 'AWACSLF', 'TBLWIREBOND'));
++
++ALTER TABLE OCAPSYS.TBLRECIPETRASH DROP CONSTRAINT ck_tblrecipetrash_table;
++
++ALTER TABLE OCAPSYS.TBLRECIPETRASH ADD CONSTRAINT ck_tblrecipetrash_table
++    CHECK (table_name IN ('AWACSWSTYPE', 'AWACSRECIPEBYWSTYPE', 'AWACSLF', 'TBLWIREBOND'));
++
++
++-- ---------------------------------------------------------------------
++-- 5. Quick check that it all worked
++-- ---------------------------------------------------------------------
++SELECT column_name, data_type, data_length
++FROM   all_tab_columns
++WHERE  table_name = 'TBLWIREBOND'
++ORDER  BY column_id;
++
++SELECT constraint_name, search_condition
++FROM   all_constraints
++WHERE  constraint_name IN ('CK_TBLRECIPEHISTORY_TABLE', 'CK_TBLRECIPETRASH_TABLE');
+--- a/Database/tblwirebond-insert.sql
++++ b/Database/tblwirebond-insert.sql
+@@ -1,26 +1,19 @@
+ -- =====================================================================
+--- OCAPSYS.TBLWIREBOND - how to insert values.
+---
+--- Copy the pattern you need. Every example is complete and runnable in
+--- SQL Developer / SQL*Plus as the OCAPSYS user (drop the OCAPSYS.
+--- prefix if you connect as OCAPSYS; keep it if you connect as someone
+--- else who has INSERT granted).
++-- OCAPSYS.TBLWIREBOND - how to insert values by hand.
+ --
+ -- Three rules for this table:
+---   1. TBLROWID is a normal VARCHAR2(50) column, NOT the Oracle ROWID
+---      pseudo-column. Fill it with RAWTOHEX(SYS_GUID()) - the same thing
+---      the web app does for AWACSWSTYPE. Never write ROWID in an INSERT.
+---   2. Do NOT list WBOCAPWWK. The BEFORE INSERT trigger
+---      OCAP_WIREBOND_WORKWEEK computes it from the date on the row. Anything
+---      you pass is replaced (or, with the NVL variant in
+---      tblwirebond.sql, only kept if you deliberately set it).
++--   1. PACKAGE is a reserved word in Oracle. Write it "PACKAGE" -
++--      double-quoted and uppercase - or you get ORA-00904.
++--   2. TBLROWID is a normal VARCHAR2(50) column, NOT the Oracle ROWID
++--      pseudo-column. Fill it with RAWTOHEX(SYS_GUID()), the same thing
++--      the web app does. Never write ROWID in an INSERT.
+ --   3. Nothing is committed until you say COMMIT. Until then only your
+ --      own session can see the row.
+ --
+--- HOW TO RUN THESE: each numbered block below is one statement followed
+--- by its own COMMIT. Most clients only accept ONE statement at a time,
+--- so highlight the INSERT by itself (WITHOUT the trailing COMMIT), run
+--- it, then run COMMIT on its own. Sending both together gives
++-- HOW TO RUN THESE: each block is one statement followed by its own
++-- COMMIT. Most clients only accept ONE statement at a time, so highlight
++-- the INSERT by itself (WITHOUT the trailing COMMIT), run it, then run
++-- COMMIT on its own. Sending both together gives
+ --   ORA-00933: SQL command not properly ended
+ -- pointing at the COMMIT line. In SQL Developer, Run Script (F5) runs a
+ -- whole ;-separated batch; Run Statement (Ctrl+Enter) does not.
+@@ -28,242 +21,66 @@
+ 
+ 
+ -- ---------------------------------------------------------------------
+--- 1. The everyday insert - only the columns actually keyed in
++-- 1. One row
+ -- ---------------------------------------------------------------------
+ INSERT INTO OCAPSYS.TBLWIREBOND
+-    (TBLROWID, LASTUPDATE, LASTUPDATEDBY,
+-     WBOCAPNO, WBISSUEDBY, WBBFG, WBDATE,
+-     WBOPERATORID, WBPROCESS, WBMACHINE, WBPACKAGE, WBSOQTY,
+-     WBDEFECT, WBDEFECTCAT)
++    (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT, LEADFRAME12NC, RECIPE)
+ VALUES
+-    (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878',
+-     'OCAP-WB-2026-001', 'NX487878', 'BFG1',
+-     TO_DATE('2026-09-10 14:30', 'YYYY-MM-DD HH24:MI'),
+-     'OP1023', 'WIREBOND', 'WB-07', 'SOT669', 3000,
+-     'NON STICK ON PAD', 'PROCESS');
++    (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', 'SOT669',
++     'BUK9K6-40E', '934123456789', 'WB_SOT669_STD');
+ 
+ COMMIT;
+ 
+ 
+ -- ---------------------------------------------------------------------
+--- 2. The full insert - every column, so nothing is forgotten on a
+---    record that goes all the way through to disposition
+--- ---------------------------------------------------------------------
+-INSERT INTO OCAPSYS.TBLWIREBOND
+-    (TBLROWID,
+-     LASTUPDATE,
+-     LASTUPDATEDBY,
+-     WBOCAPNO,
+-     WBISSUEDBY,
+-     WBBFG,
+-     WBDATE,
+-     WBOPERATORID,
+-     WBPROCESS,
+-     WBMACHINE,
+-     WBPACKAGE,
+-     WBSOQTY,
+-     WBDEFECT,
+-     WBDEFECTCAT,
+-     WBDEFECTOTHERS,
+-     WBDIFF4M1E,
+-     WBDIFFAFFECTED,
+-     WBDIFFFABSITE,
+-     WBDIFFNO,
+-     WBDIFFNOTAFFECTED,
+-     WBDIFFREJECTQTY,
+-     WBDIFFREMARKS,
+-     WBVERIFIEDBY,
+-     WBACTIONTAKEN,
+-     WBDISPOSITION,
+-     WBREMARKS,
+-     WBRCMACHINEERROR,
+-     WBMACHINEERROR)
+-VALUES
+-    (RAWTOHEX(SYS_GUID()),
+-     SYSDATE,
+-     'NX487878',
+-     'OCAP-WB-2026-002',
+-     'NX021557',
+-     'BFG2',
+-     TO_DATE('2026-09-10 22:05', 'YYYY-MM-DD HH24:MI'),
+-     'OP1044',
+-     'WIREBOND',
+-     'WB-12',
+-     'SOT1210',
+-     5000,
+-     'BOND LIFT',
+-     'MACHINE',
+-     NULL,                                   -- WBDEFECTOTHERS: only when WBDEFECT is "OTHERS"
+-     'MACHINE',                              -- WBDIFF4M1E: MAN / MACHINE / MATERIAL / METHOD / ENVIRONMENT
+-     'LOT2609001,LOT2609002',
+-     'ATCB',
+-     'DIFF-2026-0912',
+-     'LOT2609003',
+-     120,
+-     'Bond lift found on 2 of 5 lots after capillary change.',
+-     'NX000123',
+-     'Capillary replaced, machine requalified with 30 units BPT.',
+-     'Affected lots to 100% visual inspection, not-affected lots released.',
+-     'Raised on night shift.',
+-     'E-042 Z-axis search level fault',       -- WBRCMACHINEERROR: root cause detail, up to 1000 chars
+-     'E-042');                                -- WBMACHINEERROR: the machine error code itself
+-
+-COMMIT;
+-
+-
+--- ---------------------------------------------------------------------
+--- 3. Several rows in one statement - INSERT ALL
+---    (Oracle has no multi-row VALUES (...),(...) syntax.)
+---    All rows commit or none do, and the trigger still fires per row.
++-- 2. Several at once
+ -- ---------------------------------------------------------------------
+ INSERT ALL
+     INTO OCAPSYS.TBLWIREBOND
+-        (TBLROWID, LASTUPDATE, LASTUPDATEDBY, WBOCAPNO, WBDATE,
+-         WBMACHINE, WBPACKAGE, WBSOQTY, WBDEFECT, WBDEFECTCAT)
+-    VALUES
+-        (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', 'OCAP-WB-2026-003',
+-         TO_DATE('2026-09-08', 'YYYY-MM-DD'), 'WB-03', 'SOT669', 3000,
+-         'NON STICK ON LEAD', 'PROCESS')
+-    INTO OCAPSYS.TBLWIREBOND
+-        (TBLROWID, LASTUPDATE, LASTUPDATEDBY, WBOCAPNO, WBDATE,
+-         WBMACHINE, WBPACKAGE, WBSOQTY, WBDEFECT, WBDEFECTCAT)
++        (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT, LEADFRAME12NC, RECIPE)
+     VALUES
+-        (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', 'OCAP-WB-2026-004',
+-         TO_DATE('2026-09-09', 'YYYY-MM-DD'), 'WB-05', 'SOT1235', 4500,
+-         'WIRE SAG', 'MACHINE')
++        (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', 'SOT1210',
++         'PSMN012-30YLD', '934198765432', 'WB_SOT1210_STD')
+     INTO OCAPSYS.TBLWIREBOND
+-        (TBLROWID, LASTUPDATE, LASTUPDATEDBY, WBOCAPNO, WBDATE,
+-         WBMACHINE, WBPACKAGE, WBSOQTY, WBDEFECT, WBDEFECTCAT)
++        (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT, LEADFRAME12NC, RECIPE)
+     VALUES
+-        (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', 'OCAP-WB-2026-005',
+-         TO_DATE('2026-09-09', 'YYYY-MM-DD'), 'WB-05', 'SOT1235', 4500,
+-         'BALL SHEAR LOW', 'MATERIAL')
++        (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', 'SOT1235',
++         'PSMN4R0-40YS', '934111222333', 'WB_SOT1235_STD')
+ SELECT 1 FROM dual;
+ 
+ COMMIT;
+ 
+ 
+ -- ---------------------------------------------------------------------
+--- 4. Bind variables - the form the web app and any parameterized client
+---    should use. Never build an INSERT by pasting user text into the
+---    string; a name with an apostrophe breaks it and it is an injection
+---    hole. With Oracle.ManagedDataAccess set command.BindByName = true,
+---    then add one OracleParameter per name below.
+--- ---------------------------------------------------------------------
+-INSERT INTO tblwirebond
+-    (tblrowid, lastupdate, lastupdatedby,
+-     wbocapno, wbissuedby, wbbfg, wbdate,
+-     wboperatorid, wbprocess, wbmachine, wbpackage, wbsoqty,
+-     wbdefect, wbdefectcat, wbdefectothers,
+-     wbdiff4m1e, wbdiffaffected, wbdifffabsite, wbdiffno,
+-     wbdiffnotaffected, wbdiffrejectqty, wbdiffremarks,
+-     wbverifiedby, wbactiontaken, wbdisposition, wbremarks,
+-     wbrcmachineerror, wbmachineerror)
+-VALUES
+-    (RAWTOHEX(SYS_GUID()), SYSDATE, :lastupdatedby,
+-     :wbocapno, :wbissuedby, :wbbfg, :wbdate,
+-     :wboperatorid, :wbprocess, :wbmachine, :wbpackage, :wbsoqty,
+-     :wbdefect, :wbdefectcat, :wbdefectothers,
+-     :wbdiff4m1e, :wbdiffaffected, :wbdifffabsite, :wbdiffno,
+-     :wbdiffnotaffected, :wbdiffrejectqty, :wbdiffremarks,
+-     :wbverifiedby, :wbactiontaken, :wbdisposition, :wbremarks,
+-     :wbrcmachineerror, :wbmachineerror);
+-
+-
+--- ---------------------------------------------------------------------
+--- 5. Bulk load from a staging table (an uploaded spreadsheet landed in
+---    TBLWIREBOND_STG with matching column names). The trigger fills
+---    WBOCAPWWK for each row, so it is not selected here either.
++-- 3. Copy the existing WIREBOND recipes out of AWACSRECIPEBYWSTYPE
++--
++-- If the wirebond recipes are already on the old recipe grid, this moves
++-- them across instead of keying them in again. Skips anything already in
++-- TBLWIREBOND, so it is safe to re-run.
+ -- ---------------------------------------------------------------------
+ -- INSERT INTO OCAPSYS.TBLWIREBOND
+---     (TBLROWID, LASTUPDATE, LASTUPDATEDBY, WBOCAPNO, WBISSUEDBY, WBBFG,
+---      WBDATE, WBOPERATORID, WBPROCESS, WBMACHINE, WBPACKAGE, WBSOQTY,
+---      WBDEFECT, WBDEFECTCAT)
+--- SELECT RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878',
+---        s.wbocapno, s.wbissuedby, s.wbbfg,
+---        TO_DATE(s.wbdate_text, 'YYYY-MM-DD HH24:MI'),
+---        s.wboperatorid, 'WIREBOND', s.wbmachine, s.wbpackage,
+---        TO_NUMBER(s.wbsoqty_text),
+---        s.wbdefect, s.wbdefectcat
+--- FROM   OCAPSYS.TBLWIREBOND_STG s
+--- WHERE  s.wbocapno IS NOT NULL
+---   AND  NOT EXISTS (SELECT 1 FROM OCAPSYS.TBLWIREBOND t
+---                    WHERE t.wbocapno = s.wbocapno);
++--     (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT, LEADFRAME12NC, RECIPE)
++-- SELECT RAWTOHEX(SYS_GUID()), NVL(a.lastupdate, SYSDATE), a.lastupdatedby,
++--        a."PACKAGE", a.product, a.leadframe12nc, a.recipe
++-- FROM   OCAPSYS.AWACSRECIPEBYWSTYPE a
++-- WHERE  a.wstype = 'WIREBOND'
++--   AND  NOT EXISTS (SELECT 1
++--                    FROM   OCAPSYS.TBLWIREBOND w
++--                    WHERE  UPPER(w.product)       = UPPER(a.product)
++--                      AND  UPPER(w.leadframe12nc) = UPPER(a.leadframe12nc)
++--                      AND  UPPER(w.recipe)        = UPPER(a.recipe));
+ -- COMMIT;
+ 
+ 
+ -- ---------------------------------------------------------------------
+--- 6. Check what landed, before and after COMMIT
++-- 4. What the page will show
+ -- ---------------------------------------------------------------------
+-SELECT tblrowid,
+-       wbocapno,
+-       wbocapwwk,          -- filled by the trigger
+-       TO_CHAR(wbdate, 'YYYY-MM-DD HH24:MI') AS wbdate,
+-       wbmachine,
+-       wbpackage,
+-       wbsoqty,
+-       wbdefect,
+-       wbdefectcat,
++SELECT ROWIDTOCHAR(ROWID) AS row_handle,
++       "PACKAGE",
++       product,
++       leadframe12nc,
++       recipe,
+        lastupdatedby,
+        TO_CHAR(lastupdate, 'YYYY-MM-DD HH24:MI:SS') AS lastupdate
+ FROM   OCAPSYS.TBLWIREBOND
+-ORDER  BY lastupdate DESC NULLS LAST
+-FETCH FIRST 20 ROWS ONLY;
+-
+--- Undo everything since the last COMMIT:
+--- ROLLBACK;
+-
+-
+--- ---------------------------------------------------------------------
+--- 7. Correcting a row you already inserted
+---
+---    Always address the row by its TBLROWID, never by WBOCAPNO alone -
+---    there is no unique constraint on WBOCAPNO, so a typo could update
+---    more rows than you meant. Check the row count before committing.
+---
+---    NOTE: the work-week trigger is BEFORE INSERT only. An UPDATE does
+---    not recompute WBOCAPWWK; set it yourself if WBDATE moves.
+--- ---------------------------------------------------------------------
+--- UPDATE OCAPSYS.TBLWIREBOND
+---    SET wbactiontaken = 'Capillary replaced and requalified.',
+---        wbdisposition = 'Affected lots 100% inspected, released.',
+---        wbverifiedby  = 'NX000123',
+---        lastupdate    = SYSDATE,
+---        lastupdatedby = 'NX487878'
+---  WHERE tblrowid = 'PUT-THE-TBLROWID-HERE';
+--- -- rows updated should be 1
+--- COMMIT;
+-
+-
+--- ---------------------------------------------------------------------
+--- Errors you will hit, and what they mean
+---
+---   ORA-00933  SQL command not properly ended
+---              -> two statements sent as one, and the position points at
+---                 the second. Almost always an INSERT run together with
+---                 its trailing COMMIT: run them one at a time, or use
+---                 Run Script (F5) rather than Run Statement (Ctrl+Enter).
+---   ORA-00942  table or view does not exist
+---              -> wrong schema, or run tblwirebond.sql first, or no
+---                 grant. SELECT * FROM all_tables WHERE table_name =
+---                 'TBLWIREBOND';
+---   ORA-01843  not a valid month
+---   ORA-01861  literal does not match format string
+---              -> a date passed as a bare string ('10/09/2026'). Always
+---                 TO_DATE with an explicit mask, or bind a real date.
+---                 Also the symptom of the unfixed trigger described in
+---                 tblwirebond.sql.
+---   ORA-12899  value too large for column
+---              -> WBREMARKS is 500, WBRCMACHINEERROR 1000,
+---                 WBDIFFREMARKS/WBACTIONTAKEN/WBDISPOSITION 2000, most
+---                 of the rest 100.
+---   ORA-01722  invalid number
+---              -> text in WBSOQTY or WBDIFFREJECTQTY (both INTEGER).
+---   ORA-01756  quoted string not properly terminated
+---              -> an apostrophe in free text. Double it ('Won''t bond')
+---                 or use bind variables as in section 4.
+---   ORA-04098  trigger is invalid and failed re-validation
+---              -> GET_WWK_APP_CUTOFF is missing or not granted to this
+---                 schema. SELECT object_name, status FROM all_objects
+---                 WHERE object_name = 'GET_WWK_APP_CUTOFF';
+--- ---------------------------------------------------------------------
++ORDER  BY lastupdate DESC NULLS LAST;
 --- a/Database/tblwirebond-access.sql
 +++ b/Database/tblwirebond-access.sql
 @@ -1,5 +1,5 @@
@@ -879,9 +2141,39 @@
 -WHERE  UPPER(module_name) IN ('WIREBOND OCAP', 'WIREBOND')
 +WHERE  UPPER(module_name) IN ('WIREBOND', 'WIREBOND OCAP')
  ORDER  BY user_id, module_name;
+--- a/Database/tblrecipeaudit.sql
++++ b/Database/tblrecipeaudit.sql
+@@ -10,7 +10,8 @@
+ --                   transaction, and if the copy fails the delete is
+ --                   rolled back with it.
+ --
+--- Both cover AWACSWSTYPE, AWACSRECIPEBYWSTYPE and AWACSLF. The snapshot is
++-- Both cover AWACSWSTYPE, AWACSRECIPEBYWSTYPE, AWACSLF and TBLWIREBOND. The
++-- snapshot is
+ -- the whole row as JSON, read from the data dictionary at run time, so
+ -- adding a column to one of those MES tables needs no change here.
+ --
+@@ -32,7 +33,7 @@
+     reverted_date DATE,
+     CONSTRAINT pk_tblrecipehistory PRIMARY KEY (history_id),
+     CONSTRAINT ck_tblrecipehistory_table
+-        CHECK (table_name IN ('AWACSWSTYPE', 'AWACSRECIPEBYWSTYPE', 'AWACSLF')),
++        CHECK (table_name IN ('AWACSWSTYPE', 'AWACSRECIPEBYWSTYPE', 'AWACSLF', 'TBLWIREBOND')),
+     CONSTRAINT ck_tblrecipehistory_reverted
+         CHECK (reverted IN ('Y', 'N'))
+ );
+@@ -52,7 +53,7 @@
+     restored_date DATE,
+     CONSTRAINT pk_tblrecipetrash PRIMARY KEY (trash_id),
+     CONSTRAINT ck_tblrecipetrash_table
+-        CHECK (table_name IN ('AWACSWSTYPE', 'AWACSRECIPEBYWSTYPE', 'AWACSLF')),
++        CHECK (table_name IN ('AWACSWSTYPE', 'AWACSRECIPEBYWSTYPE', 'AWACSLF', 'TBLWIREBOND')),
+     CONSTRAINT ck_tblrecipetrash_restored
+         CHECK (restored IN ('Y', 'N'))
+ );
 --- a/README.md
 +++ b/README.md
-@@ -1,54 +1,128 @@
+@@ -1,103 +1,148 @@
 -# Wirebond OCAP page (OCAPSYS.TBLWIREBOND)
 +# Wirebond page (OCAPSYS.TBLWIREBOND)
  
@@ -889,61 +2181,68 @@
 -`OCAPSYS.TBLWIREBOND` — the wire bond OCAP log. The existing **Wirebond** page is
 -unchanged: it stays the WIREBOND *recipe* grid over `AWACSRECIPEBYWSTYPE`. Two
 -tables, two modules, two grants.
-+The **Wirebond** page of the ATCB Assembly Recipe app: one grid over
-+`OCAPSYS.TBLWIREBOND`, with add, edit and delete straight from the page.
++The **Wirebond** page: one recipe grid over `OCAPSYS.TBLWIREBOND`, the same
++shape as the Sawing and Marker grids.
  
 -Route: `/WireBond/Index`. Sidebar: **Operations → Wirebond OCAP**.
 +Route: `/WireBond/Index`. Sidebar: **Operations → Wirebond**.
-+
-+There is exactly one Wirebond page and one Wirebond module now. The old
-+"Wirebond OCAP" name is gone — see *What changed* below.
-+
-+## What changed in this drop
-+
-+**1. The page could not build at all.** `Views/WireBond/Index.cshtml` asked for
-+`ModuleNames.WireBondOcap`:
-+
-+```cshtml
-+var permission = await Access.GetAsync(ModuleNames.WireBondOcap);   // does not exist
-+```
-+
-+`Models/AppModule.cs` never declared that constant — it only has
-+`TableWirebond = "Wirebond"`, which is what `WireBondController` already
-+enforces with `[ModuleAccess(...)]`. Razor views are compiled by the build in
-+.NET 6 and later, so this was a hard compile error: `dotnet build` failed, and
-+with no build there was no Add button, no Edit button, no Delete button and no
-+insert. That one line is now:
-+
-+```cshtml
-+var permission = await Access.GetAsync(ModuleNames.TableWirebond);  // same constant the controller enforces
-+```
-+
-+**2. "OCAP" is gone from the page.** Title, sidebar entry, panel headings,
-+buttons, the delete dialog and the grid headers now read *Wirebond* and
-+*Record No* instead of *Wirebond OCAP* and *OCAP No*. The database column names
-+are untouched (`WBOCAPNO`, `WBOCAPWWK`, …) and so are the CSV headers
-+(`OCAPNO`, `WBDATE`, …), so existing CSV files and any MES code still work.
-+
-+**3. A saved row is visibly a saved row.** After a successful add or edit the
-+page returns to the grid sorted newest-first, flashes the row that was written
-+and scrolls it into view.
-+
-+**4. Machine is a pick list, from AWACSWSTYPE.** The Machine field on the add
-+and edit panels now suggests `AWACSWSTYPE.WSID` where `WSTYPE = 'WIREBOND'`, so
-+a machine keyed in here matches the workstation master the recipe pages read.
-+It is a suggestion only — a machine that is not in AWACSWSTYPE still saves, and
-+if AWACSWSTYPE is empty or unreadable the list is simply empty. It never fails
-+the page.
-+
-+**5. `Database/tblwirebond-access.sql` granted a module that does not exist.**
-+It wrote `MODULE_NAME = 'Wirebond OCAP'`. Nothing in the app reads that name, so
-+a user granted it saw nothing. It now writes `'Wirebond'`, and carries a repair
-+block for rows that were already inserted with the old name.
  
- ## Install
+-## Install
++Ten columns, and only these ten:
++
++| | # | PACKAGE | Product | Leadframe 12NC | Recipe | Last Updated By | Timestamp | Edit | Delete |
++|---|---|---|---|---|---|---|---|---|---|
++
++No WSTYPE column — every row in this table is wirebond, so there is nothing to
++filter on.
++
++## The database change comes first
++
++`Database/tblwirebond.sql` rebuilds TBLWIREBOND to match. **It drops the
++table**, so take a copy of whatever is in there first:
++
++```sql
++CREATE TABLE tblwirebond_bak AS SELECT * FROM tblwirebond;
++```
++
++The new shape:
++
++| Column | Type | |
++|---|---|---|
++| `TBLROWID` | `VARCHAR2(50)` | `RAWTOHEX(SYS_GUID())` on insert, for the MES side |
++| `LASTUPDATE` | `DATE` | `SYSDATE` on every write |
++| `LASTUPDATEDBY` | `VARCHAR2(50)` | sAMAccountName, e.g. `NX487878` |
++| `"PACKAGE"` | `VARCHAR2(64)` | optional |
++| `PRODUCT` | `VARCHAR2(64)` | required |
++| `LEADFRAME12NC` | `VARCHAR2(16)` | required |
++| `RECIPE` | `VARCHAR2(120)` | required |
++
++**`PACKAGE` is a reserved word in Oracle.** It has to be written `"PACKAGE"` —
++double-quoted and uppercase — everywhere it appears, or Oracle answers
++ORA-00904. `AWACSRECIPEBYWSTYPE` already does this; the app now does it too.
  
 -Copy the files over the project, keeping the folder structure:
-+Copy these files over the project, keeping the folder structure:
++The old OCAP columns (`WBOCAPNO`, `WBOCAPWWK`, `WBDATE`, the 4M1E and
++disposition fields) are gone, and so is the `OCAP_WIREBOND_WORKWEEK` trigger —
++it derived `WBOCAPWWK` from `WBDATE`, and neither column exists any more.
++
++### Section 4 of that script is not optional
++
++Edit copies the old row into `TBLRECIPEHISTORY`; Delete copies the whole row
++into `TBLRECIPETRASH`. Both happen inside the same transaction as the write.
++Both tables carry a CHECK constraint listing which table names are allowed:
++
++```sql
++CHECK (table_name IN ('AWACSWSTYPE', 'AWACSRECIPEBYWSTYPE', 'AWACSLF'))
++```
++
++`TBLWIREBOND` was never in that list. So **every Edit and every Delete on this
++page fails** with `ORA-02290: check constraint violated` and rolls back — while
++Add works fine, which is what makes it hard to spot. Section 4 replaces both
++constraints with a list that includes `TBLWIREBOND`, and
++`Database/tblrecipeaudit.sql` carries the same list for a fresh install.
++
++## Install
  
  | File | |
  |---|---|
@@ -964,17 +2263,9 @@
 -
 -`wirebond-ocap.patch` is the same five changed files as a diff against the
 -original project, if you would rather review the changes than overwrite.
-+| `Views/WireBond/Index.cshtml` | changed — **the build fix**, plus the renaming and the row flash |
-+| `Views/WireBond/_WireBondFields.cshtml` | changed — renaming, Machine pick list |
-+| `ViewModels/WireBondViewModel.cs` | changed — `MachineOptions`, `Highlight` |
-+| `Controllers/WireBondController.cs` | changed — loads the machine list, redirects with `highlight` |
-+| `Services/WireBondService.cs` | changed — `GetMachineOptionsAsync()` |
-+| `Models/AppModule.cs` | changed — module description wording only |
-+| `Database/tblwirebond-access.sql` | changed — grants `'Wirebond'`, repairs `'Wirebond OCAP'` |
-+| `Database/tblwirebond-check.sql` | new — diagnose a save that did not appear |
- 
- Then:
- 
+-
+-Then:
+-
 -1. Run `Database/tblwirebond.sql` once, if TBLWIREBOND and its trigger are not
 -   already in place. If the table already holds rows, run only the
 -   `CREATE OR REPLACE TRIGGER` part — the corrected trigger matters, see below.
@@ -986,48 +2277,56 @@
 -returns full permission to the SuperAdmin role before it looks at TBLACCESS.
 -Everyone else needs a grant — tick the boxes on the **Wirebond OCAP** row in
 -Access Management, or run `Database/tblwirebond-access.sql`.
-+1. `dotnet build`
-+2. `dotnet run` (or F5 in Visual Studio)
-+3. Sign in and open **Operations → Wirebond**.
++| `Models/WireBond.cs` | rewritten — 7 properties |
++| `ViewModels/WireBondInputModel.cs` | rewritten — package, product, leadframe, recipe |
++| `ViewModels/WireBondViewModel.cs` | rewritten |
++| `Services/WireBondService.cs` | rewritten |
++| `Controllers/WireBondController.cs` | rewritten |
++| `Views/WireBond/Index.cshtml` | rewritten — the ten-column grid |
++| `Database/tblwirebond.sql` | rewritten — **run this** |
++| `Database/tblrecipeaudit.sql` | changed — TBLWIREBOND added to both CHECK constraints |
++| `Database/tblwirebond-insert.sql` | rewritten — by-hand inserts, plus a copy-from-AWACSRECIPEBYWSTYPE block |
++| `Database/tblwirebond-check.sql` | rewritten — diagnose a save that did nothing |
++| `Database/tblwirebond-access.sql` | changed — grants `'Wirebond'`, repairs `'Wirebond OCAP'` |
++| `Models/AppModule.cs` | changed — module description wording |
 +
-+Rows already in `TBLWIREBOND` appear immediately, including any inserted by
-+hand in SQL Developer.
++Delete these two — nothing references them any more:
 +
-+## Testing it end to end
++- `Views/WireBond/_WireBondFields.cshtml`
++- `ViewModels/WireBondPanelModel.cs`
 +
-+1. Open **Operations → Wirebond**. An empty table shows *No TBLWIREBOND records
-+   found* with an **Add the first record** button.
-+2. Click **Add Wirebond Record**. Fill **Record No** and **Date** — those two
-+   are required, everything else is optional.
-+3. **Save Wirebond Record**. A green popup names the row and the work week the
-+   database calculated, and the grid comes back with that row at the top,
-+   flashed amber.
-+4. Check the database sees the same thing:
++Then: run `Database/tblwirebond.sql`, `dotnet build`, `dotnet run`.
++
++## Testing it
++
++1. **Operations → Wirebond** → **Add Recipe**. A `New` row opens at the top of
++   the grid with an input in each column.
++2. Product, Leadframe 12NC and Recipe are required; Package is optional.
++3. Click the 💾 icon under **Edit**. The row saves, the grid comes back with it
++   at the top, flashed amber.
++4. Check the database:
 +   ```sql
-+   SELECT wbocapno, wbocapwwk, lastupdatedby, wbdate
++   SELECT "PACKAGE", product, leadframe12nc, recipe, lastupdatedby
 +   FROM   OCAPSYS.TBLWIREBOND
-+   ORDER  BY lastupdate DESC NULLS LAST
-+   FETCH FIRST 5 ROWS ONLY;
++   ORDER  BY lastupdate DESC NULLS LAST FETCH FIRST 5 ROWS ONLY;
 +   ```
-+5. Click the pencil on that row, change a field, **Save Changes** — same flash,
-+   and the old values are on the Change History page.
-+6. Click the bin, type `DELETE` in the dialog, confirm. The row goes to Trash
-+   and can be restored from the Recycle Bin.
++5. Pencil icon → edit in place → 💾. The old values land on the Change History
++   page.
++6. Bin icon → type `DELETE` → confirm. The row goes to Trash and can be
++   restored from the Recycle Bin.
 +
-+If a save does not appear, run `Database/tblwirebond-check.sql`. Block 1 answers
-+the only question that matters first: is the row in the table? If it is, the
-+problem is page permissions (block 5). If it is not, the insert never
-+committed (blocks 2–4).
++If a save does nothing, run `Database/tblwirebond-check.sql`. Block 1 checks the
++table shape, block 2 whether the row is there, **block 3 the CHECK constraint
++that breaks Edit and Delete**, block 4 the user's grants.
 +
 +## Permissions
 +
 +A Super Admin needs no grant: `AccessEvaluator.GetAsync` returns full permission
 +to the SuperAdmin role before it ever looks at `TBLACCESS`.
 +
-+Everybody else needs one `TBLACCESS` row with `MODULE_NAME = 'Wirebond'` —
-+tick the boxes on the **Wirebond** row in Access Management, or run
-+`Database/tblwirebond-access.sql`. The tier decides which buttons render *and*
-+which POSTs the server accepts:
++Everybody else needs one `TBLACCESS` row with `MODULE_NAME = 'Wirebond'` — tick
++the boxes on the **Wirebond** row in Access Management, or run
++`Database/tblwirebond-access.sql`.
 +
 +| ACCESS_LEVEL | View | Add | Edit | Delete |
 +|---|---|---|---|---|
@@ -1042,26 +2341,44 @@
  
 -- **Grid**: OCAP No, Work Week, OCAP Date, Last Updated By, Timestamp. Sortable
 -  on every column, searchable across OCAP no, work week, machine, package,
-+- **Grid**: Record No, Work Week, Date, Last Updated By, Timestamp. Sortable on
-+  every column, searchable across record no, work week, machine, package,
-   defect, category, difference no, issued by, verified by, operator and last
-   updated by. 25/50/100 rows per page.
- - **Add / Edit**: all 25 writable columns in one full-width panel, grouped as
-@@ -65,8 +139,8 @@
-   uploaded again. Dates are parsed against a fixed list of formats, never the
-   server locale, so `10/09/2026` cannot mean September on one machine and
-   October on another.
+-  defect, category, difference no, issued by, verified by, operator and last
+-  updated by. 25/50/100 rows per page.
+-- **Add / Edit**: all 25 writable columns in one full-width panel, grouped as
+-  identity → defect → difference → closure. The 28-column table will not fit as
+-  inline cells, so the panel is one `<td colspan="9">` — the `excel-grid.js`
+-  contract (`#addRow`, `[data-row-id]`, `[data-edit-panel]`, `[data-edit-row]`,
+-  `[data-cancel-edit]`) is otherwise unchanged, and column resizing, the CSV
+-  picker, the template modal and the DELETE-phrase confirmation all still work.
++- **Grid**: PACKAGE, Product, Leadframe 12NC, Recipe, Last Updated By,
++  Timestamp. Every header sorts, search covers all four data columns plus the
++  updating user. 25/50/100 rows per page, with column resizing.
++- **Add / Edit**: one inline row, an input per column, 💾 to save and ✕ to
++  cancel — the same interaction as the Sawing grid.
+ - **Delete**: moves the row to Trash first, so it can be restored from the
+-  Recycle Bin — the same undo path as the other grids.
+-- **CSV**: template download, export of all 28 columns, and import. Required
+-  columns are `OCAPNO` and `WBDATE`; a header row is optional, and a header row
+-  may name the columns the template leaves out, so an export can be edited and
+-  uploaded again. Dates are parsed against a fixed list of formats, never the
+-  server locale, so `10/09/2026` cannot mean September on one machine and
+-  October on another.
 -- **Validation**: OCAP No required; OCAP Date required and not in the future;
 -  `Defect = OTHERS` requires Defect (Others); a duplicate OCAP No is refused
-+- **Validation**: Record No required; Date required and not in the future;
-+  `Defect = OTHERS` requires Defect (Others); a duplicate record no is refused
-   (the table has no unique constraint, so this check is the only guard), and a
-   number repeated inside one CSV file cancels the import.
- 
-@@ -82,22 +156,19 @@
- **`WBOCAPWWK` is never written by the app.** The `BEFORE INSERT` trigger
- `OCAP_WIREBOND_WORKWEEK` derives it, so the form shows it read-only and the
- success popup reads back what the database chose. That trigger does not fire on
+-  (the table has no unique constraint, so this check is the only guard), and a
+-  number repeated inside one CSV file cancels the import.
+-
+-## Three things about this table worth knowing
+-
+-**Rows are addressed by Oracle ROWID, not by `TBLROWID`.** `TBLWIREBOND` has a
+-`TBLROWID` column, but it is NULL on every row keyed in before this page
+-existed. Keying off it would have left exactly the rows you already inserted
+-uneditable, so the page uses `ROWID` — the same handle `AWACSLF` and
+-`AWACSRECIPEBYWSTYPE` already use. New rows still get a `RAWTOHEX(SYS_GUID())`
+-`TBLROWID` for the MES side.
+-
+-**`WBOCAPWWK` is never written by the app.** The `BEFORE INSERT` trigger
+-`OCAP_WIREBOND_WORKWEEK` derives it, so the form shows it read-only and the
+-success popup reads back what the database chose. That trigger does not fire on
 -UPDATE, so editing a saved record's OCAP date leaves the work week on the week
 -the record was first raised — which is what the OCAP number belongs to.
 -
@@ -1078,176 +2395,25 @@
 -.NET 10 SDK. Every field name, bind variable, column name and reader index was
 -cross-checked against the table DDL and the models, but run `dotnet build`
 -before trusting it.
-+UPDATE, so editing a saved record's date leaves the work week on the week the
-+record was first raised.
- 
+-
 -Nothing here changes the existing Wirebond recipe page, its module, or its
 -grants.
-+**The trigger can block every insert.** It calls `get_wwk_app_cutoff`. If that
-+function is missing from the schema, or not granted to it, the trigger is
-+INVALID and every insert fails with ORA-04098 — which the page reports in a red
-+popup. Block 4 of `Database/tblwirebond-check.sql` installs a fail-safe version
-+that calls the function through dynamic SQL and falls back to the ISO week of
-+the row's own date, so a broken work-week function can never cost you a record.
++  Recycle Bin.
++- **CSV**: template, export and import. Required columns `PRODUCT`,
++  `LEADFRAME12NC`, `RECIPE`; `PACKAGE` optional; the header row is optional. A
++  `LEADFRAME12NC` that Excel saved as `3.4E+11` is rejected rather than stored.
++- **Duplicates**: product + leadframe + recipe must be unique. The table has no
++  unique constraint, so this check before every insert is the only guard; the
++  same product/leadframe/recipe twice in one CSV cancels the whole import.
 +
 +## Not compiled here
 +
 +Written against the source; the container had no .NET 10 SDK to build with.
-+Every field name, bind variable, column name, reader index and Razor construct
-+was cross-checked by hand against the table DDL, the models and the existing
-+pages — but run `dotnet build` before trusting it.
---- a/Database/tblwirebond-check.sql
-+++ b/Database/tblwirebond-check.sql
-@@ -0,0 +1,149 @@
-+-- =====================================================================
-+-- TBLWIREBOND - "I saved a row on the page and nothing appeared"
-+--
-+-- Run the blocks in order as the OCAPSYS user (or as an account with
-+-- SELECT on OCAPSYS). Each block is one statement: in SQL Developer use
-+-- Run Statement (Ctrl+Enter) on the block you want, or Run Script (F5)
-+-- for the whole file.
-+--
-+-- The page inserts with LASTUPDATE = SYSDATE and sorts newest first, so
-+-- a successful save is always the FIRST row of the grid. If block 1
-+-- finds the row but the grid does not show it, the problem is the page
-+-- (permissions - see block 5). If block 1 finds nothing, the insert
-+-- never committed - blocks 2 and 3 say why.
-+-- =====================================================================
-+
-+
-+-- ---------------------------------------------------------------------
-+-- 1. Is the row actually there? Newest 20, same order as the page.
-+-- ---------------------------------------------------------------------
-+SELECT TO_CHAR(lastupdate, 'YYYY-MM-DD HH24:MI:SS') AS lastupdate,
-+       lastupdatedby,
-+       wbocapno,
-+       wbocapwwk,
-+       TO_CHAR(wbdate, 'YYYY-MM-DD HH24:MI') AS wbdate,
-+       wbmachine,
-+       wbpackage,
-+       wbdefect,
-+       tblrowid
-+FROM   OCAPSYS.TBLWIREBOND
-+ORDER  BY lastupdate DESC NULLS LAST
-+FETCH FIRST 20 ROWS ONLY;
-+
-+
-+-- ---------------------------------------------------------------------
-+-- 2. Is the work-week trigger healthy?
-+--
-+-- STATUS must be ENABLED and VALID. An INVALID trigger fails EVERY
-+-- insert with ORA-04098, and the page shows that text in a red popup.
-+-- The usual cause is that GET_WWK_APP_CUTOFF does not exist in this
-+-- schema (or is not granted to it), which is a compile-time failure the
-+-- trigger body cannot catch.
-+-- ---------------------------------------------------------------------
-+SELECT trigger_name, status, table_name
-+FROM   all_triggers
-+WHERE  trigger_name = 'OCAP_WIREBOND_WORKWEEK';
-+
-+SELECT object_name, object_type, status
-+FROM   all_objects
-+WHERE  object_name = 'OCAP_WIREBOND_WORKWEEK';
-+
-+
-+-- ---------------------------------------------------------------------
-+-- 3. Does the work-week function the trigger calls exist here?
-+--    No rows back = the trigger in tblwirebond.sql cannot compile.
-+--    Fix it with block 4.
-+-- ---------------------------------------------------------------------
-+SELECT owner, object_name, object_type, status
-+FROM   all_objects
-+WHERE  object_name = 'GET_WWK_APP_CUTOFF';
-+
-+
-+-- ---------------------------------------------------------------------
-+-- 4. FAIL-SAFE WORK-WEEK TRIGGER (optional but recommended)
-+--
-+-- Same behaviour as the trigger in tblwirebond.sql, with one difference:
-+-- GET_WWK_APP_CUTOFF is called through dynamic SQL, so a missing,
-+-- invalid or un-granted function can never stop an insert. When the
-+-- function cannot be called the work week falls back to the ISO week of
-+-- the row's own date (e.g. 2026 week 37 -> '202637').
-+--
-+-- A work week the caller supplied on purpose is still kept.
-+--
-+-- Run this whole block as a script (F5) - it ends with the / on its own
-+-- line, which is what tells the client the PL/SQL body is finished.
-+-- ---------------------------------------------------------------------
-+CREATE OR REPLACE TRIGGER OCAPSYS.OCAP_WIREBOND_WORKWEEK
-+BEFORE INSERT
-+ON OCAPSYS.TBLWIREBOND
-+FOR EACH ROW
-+DECLARE
-+   v_when     DATE := NVL(:NEW.WBDATE, SYSDATE);
-+   v_workweek NUMBER;
-+   v_text     VARCHAR2(100);
-+BEGIN
-+   -- A work week that was passed in deliberately (a backdated record being
-+   -- keyed in late) wins. Drop this IF if the trigger should always win.
-+   IF :NEW.WBOCAPWWK IS NOT NULL THEN
-+      RETURN;
-+   END IF;
-+
-+   BEGIN
-+      EXECUTE IMMEDIATE 'BEGIN :r := get_wwk_app_cutoff(:d); END;'
-+        USING OUT v_workweek, IN v_when;
-+      v_text := TO_CHAR(v_workweek);
-+   EXCEPTION
-+      WHEN OTHERS THEN
-+         -- Missing function, no grant, bad NLS date handling inside it -
-+         -- none of that is a reason to reject the record.
-+         v_text := NULL;
-+   END;
-+
-+   :NEW.WBOCAPWWK := NVL(v_text,
-+                         TO_CHAR(v_when, 'IYYY') || TO_CHAR(v_when, 'IW'));
-+END;
-+/
-+
-+-- Confirm it compiled clean (no rows back = no errors):
-+SELECT line, position, text
-+FROM   all_errors
-+WHERE  name = 'OCAP_WIREBOND_WORKWEEK'
-+ORDER  BY sequence;
-+
-+
-+-- ---------------------------------------------------------------------
-+-- 5. Can the signed-in user actually see the Add / Edit / Delete
-+--    buttons? Super Admins always can. Everyone else needs a row here
-+--    with MODULE_NAME 'Wirebond':
-+--      READ  = view only (no Add / Edit / Delete)
-+--      WRITE = view + add + update
-+--      ADMIN = view + add + update + delete
-+--    Replace NX487878 with the login id that is having the problem.
-+-- ---------------------------------------------------------------------
-+SELECT user_id, user_name, role_name, module_name, access_level, status
-+FROM   OCAPSYS.TBLACCESS
-+WHERE  user_id = 'NX487878'
-+ORDER  BY module_name;
-+
-+
-+-- ---------------------------------------------------------------------
-+-- 6. End-to-end test insert, then thrown away. If this raises an error,
-+--    the page would have raised the same one. If it succeeds, the write
-+--    path is fine and the problem is access (block 5).
-+--
-+--    Run the three statements one at a time.
-+-- ---------------------------------------------------------------------
-+INSERT INTO OCAPSYS.TBLWIREBOND
-+    (TBLROWID, LASTUPDATE, LASTUPDATEDBY, WBOCAPNO, WBDATE,
-+     WBPROCESS, WBMACHINE, WBPACKAGE, WBSOQTY, WBDEFECT, WBDEFECTCAT)
-+VALUES
-+    (RAWTOHEX(SYS_GUID()), SYSDATE, 'TESTUSER', 'WB-SELFTEST-001', SYSDATE,
-+     'WIREBOND', 'WB-07', 'SOT669', 3000, 'NON STICK ON PAD', 'PROCESS');
-+
-+-- The trigger should have filled WBOCAPWWK on the row above:
-+SELECT wbocapno, wbocapwwk, TO_CHAR(wbdate, 'YYYY-MM-DD HH24:MI') AS wbdate
-+FROM   OCAPSYS.TBLWIREBOND
-+WHERE  wbocapno = 'WB-SELFTEST-001';
-+
-+-- Put the table back the way it was:
-+ROLLBACK;
++Every identifier, bind variable, column name, reader index and Razor construct
++was cross-checked by hand: `row.*` in the view matches `WireBond` exactly, the
++input `name=` values match `WireBondInputModel` exactly, the sort keys match the
++service whitelist exactly, and colgroup / header / add row / display row / edit
++row are 10 cells each. Run `dotnet build` before trusting it.
 --- a/Views/WireBond/_WireBondFields.cshtml
 +++ b/Views/WireBond/_WireBondFields.cshtml
 @@ -1,217 +0,0 @@
@@ -1494,3 +2660,92 @@
 -        public bool IsEdit => Row is not null;
 -    }
 -}
+--- a/Database/tblwirebond-check.sql
++++ b/Database/tblwirebond-check.sql
+@@ -0,0 +1,86 @@
++-- =====================================================================
++-- TBLWIREBOND - "I saved a row on the page and nothing happened"
++--
++-- Run the blocks in order as the OCAPSYS user. Each block is one
++-- statement: in SQL Developer use Run Statement (Ctrl+Enter) on the one
++-- you want, or Run Script (F5) for the whole file.
++-- =====================================================================
++
++
++-- ---------------------------------------------------------------------
++-- 1. Is the table the new shape?
++--
++-- Expect exactly: TBLROWID, LASTUPDATE, LASTUPDATEDBY, PACKAGE, PRODUCT,
++-- LEADFRAME12NC, RECIPE. If you still see WBOCAPNO / WBDATE, the app is
++-- reading columns that are not there and every query fails with
++-- ORA-00904 - run Database/tblwirebond.sql.
++-- ---------------------------------------------------------------------
++SELECT column_id, column_name, data_type, data_length
++FROM   all_tab_columns
++WHERE  table_name = 'TBLWIREBOND'
++ORDER  BY column_id;
++
++
++-- ---------------------------------------------------------------------
++-- 2. Is the row actually there? Newest 20, same order as the page.
++-- ---------------------------------------------------------------------
++SELECT TO_CHAR(lastupdate, 'YYYY-MM-DD HH24:MI:SS') AS lastupdate,
++       lastupdatedby,
++       "PACKAGE",
++       product,
++       leadframe12nc,
++       recipe
++FROM   OCAPSYS.TBLWIREBOND
++ORDER  BY lastupdate DESC NULLS LAST
++FETCH FIRST 20 ROWS ONLY;
++
++
++-- ---------------------------------------------------------------------
++-- 3. THE ONE THAT BREAKS EDIT AND DELETE
++--
++-- Edit copies the old row into TBLRECIPEHISTORY, Delete copies the whole
++-- row into TBLRECIPETRASH, both in the same transaction as the write.
++-- Both tables CHECK the table name against a fixed list. If TBLWIREBOND
++-- is not in that list, every Edit and every Delete on the page fails with
++--   ORA-02290: check constraint (...) violated
++-- and rolls back - Add still works, which is what makes it confusing.
++--
++-- Both rows below must mention TBLWIREBOND. If they do not, run section 4
++-- of Database/tblwirebond.sql.
++-- ---------------------------------------------------------------------
++SELECT constraint_name, search_condition
++FROM   all_constraints
++WHERE  constraint_name IN ('CK_TBLRECIPEHISTORY_TABLE', 'CK_TBLRECIPETRASH_TABLE');
++
++
++-- ---------------------------------------------------------------------
++-- 4. Can the signed-in user see the Add / Edit / Delete buttons?
++--
++-- Super Admins always can. Everyone else needs a row here with
++-- MODULE_NAME 'Wirebond':
++--   READ  = view only    WRITE = view + add + update
++--   ADMIN = view + add + update + delete
++-- Replace NX487878 with the login id that is having the problem.
++-- ---------------------------------------------------------------------
++SELECT user_id, user_name, role_name, module_name, access_level, status
++FROM   OCAPSYS.TBLACCESS
++WHERE  user_id = 'NX487878'
++ORDER  BY module_name;
++
++
++-- ---------------------------------------------------------------------
++-- 5. End-to-end test, then thrown away. If this raises an error, the
++--    page would have raised the same one. Run one statement at a time.
++-- ---------------------------------------------------------------------
++INSERT INTO OCAPSYS.TBLWIREBOND
++    (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "PACKAGE", PRODUCT, LEADFRAME12NC, RECIPE)
++VALUES
++    (RAWTOHEX(SYS_GUID()), SYSDATE, 'TESTUSER', 'SOT669',
++     'SELFTEST-PRODUCT', '934000000000', 'WB_SELFTEST');
++
++SELECT "PACKAGE", product, leadframe12nc, recipe
++FROM   OCAPSYS.TBLWIREBOND
++WHERE  product = 'SELFTEST-PRODUCT';
++
++-- Put the table back the way it was:
++ROLLBACK;

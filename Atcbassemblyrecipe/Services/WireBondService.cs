@@ -10,71 +10,60 @@ namespace Atcbassemblyrecipe.Services
     {
         Task<PagedResult<WireBond>> GetAsync(string? search, int page, int pageSize, string? sortBy, string? sortDirection);
         Task<IReadOnlyList<WireBond>> GetForExportAsync(string? search, string? sortBy, string? sortDirection);
-        Task<IReadOnlyList<string>> GetMachineOptionsAsync();
         Task<(bool Success, string Message)> CreateAsync(WireBondInputModel model, string userName);
         Task<(bool Success, int Inserted, string Message)> CreateManyAsync(IReadOnlyList<WireBondInputModel> models, string userName);
         Task<(bool Success, string Message)> UpdateAsync(WireBondInputModel model, string userName);
         Task<(bool Success, string Message)> DeleteAsync(string tblRowId, string userName);
     }
 
-    // TBLWIREBOND is the wire bond OCAP log: one row per OCAP record raised on a
-    // wire bonder. It is a pre-existing OCAP table this app does not own, so its
-    // shape is taken as given - no primary key, no NOT NULL, no check constraints.
+    // TBLWIREBOND: the wirebond recipe table. Package, product, leadframe 12NC
+    // and recipe, plus TBLROWID / LASTUPDATE / LASTUPDATEDBY. Same shape as
+    // AWACSRECIPEBYWSTYPE minus WSTYPE - every row here is wirebond, so there is
+    // nothing to filter on and no WSTYPE to carry around.
     //
-    // Two consequences worth knowing before reading further:
+    // Two things worth knowing before reading further:
     //
-    //   - Rows are addressed by Oracle ROWID, not by the TBLROWID column. TBLROWID
-    //     is NULL on every row keyed in by hand before this page existed, so
-    //     keying off it would leave those rows uneditable. New rows still get a
-    //     RAWTOHEX(SYS_GUID()) TBLROWID for the MES side.
-    //   - WBOCAPWWK is never written here. The BEFORE INSERT trigger
-    //     OCAP_WIREBOND_WORKWEEK derives it from WBDATE. That trigger does not
-    //     fire on UPDATE, so a saved edit that moves WBDATE leaves the work week
-    //     on the week the record was first raised - which is the OCAP number's
-    //     week, and what the reports key off.
+    //   - PACKAGE is a reserved word in Oracle. It must be written "PACKAGE",
+    //     double-quoted and uppercase, everywhere it appears in SQL. Unquoted or
+    //     lowercase raises ORA-00904. The bind variable is :package, which is
+    //     fine - the rule is about the identifier, not the placeholder.
+    //   - Rows are addressed by Oracle ROWID, not by the TBLROWID column, so a
+    //     row keyed in by hand with a NULL TBLROWID is still editable. New rows
+    //     still get a RAWTOHEX(SYS_GUID()) TBLROWID for the MES side.
     public class WireBondService : IWireBondService
     {
         // Order matters: ReadRow reads by index.
         private const string SelectColumns = """
-            ROWIDTOCHAR(ROWID), lastupdate, lastupdatedby, wbocapno, wbocapwwk,
-            wbissuedby, wbbfg, wbdate, wboperatorid, wbprocess, wbmachine,
-            wbpackage, wbsoqty, wbdefect, wbdefectcat, wbdefectothers, wbdiff4m1e,
-            wbdiffaffected, wbdifffabsite, wbdiffno, wbdiffnotaffected,
-            wbdiffrejectqty, wbdiffremarks, wbverifiedby, wbactiontaken,
-            wbdisposition, wbremarks, wbrcmachineerror, wbmachineerror
+            ROWIDTOCHAR(ROWID), lastupdate, lastupdatedby, "PACKAGE", product,
+            leadframe12nc, recipe
             """;
 
         private const string FilterSql = """
             WHERE (:search IS NULL
-                   OR UPPER(wbocapno) LIKE :search
-                   OR UPPER(wbocapwwk) LIKE :search
-                   OR UPPER(wbmachine) LIKE :search
-                   OR UPPER(wbpackage) LIKE :search
-                   OR UPPER(wbdefect) LIKE :search
-                   OR UPPER(wbdefectcat) LIKE :search
-                   OR UPPER(wbdiffno) LIKE :search
-                   OR UPPER(wbissuedby) LIKE :search
-                   OR UPPER(wbverifiedby) LIKE :search
-                   OR UPPER(wboperatorid) LIKE :search
+                   OR UPPER("PACKAGE") LIKE :search
+                   OR UPPER(product) LIKE :search
+                   OR UPPER(leadframe12nc) LIKE :search
+                   OR UPPER(recipe) LIKE :search
                    OR UPPER(lastupdatedby) LIKE :search)
             """;
 
         private const string InsertSql = """
             INSERT INTO tblwirebond
-                (tblrowid, lastupdate, lastupdatedby, wbocapno, wbissuedby, wbbfg,
-                 wbdate, wboperatorid, wbprocess, wbmachine, wbpackage, wbsoqty,
-                 wbdefect, wbdefectcat, wbdefectothers, wbdiff4m1e, wbdiffaffected,
-                 wbdifffabsite, wbdiffno, wbdiffnotaffected, wbdiffrejectqty,
-                 wbdiffremarks, wbverifiedby, wbactiontaken, wbdisposition,
-                 wbremarks, wbrcmachineerror, wbmachineerror)
+                (tblrowid, lastupdate, lastupdatedby, "PACKAGE", product,
+                 leadframe12nc, recipe)
             VALUES
-                (RAWTOHEX(SYS_GUID()), SYSDATE, :lastupdatedby, :wbocapno, :wbissuedby, :wbbfg,
-                 :wbdate, :wboperatorid, :wbprocess, :wbmachine, :wbpackage, :wbsoqty,
-                 :wbdefect, :wbdefectcat, :wbdefectothers, :wbdiff4m1e, :wbdiffaffected,
-                 :wbdifffabsite, :wbdiffno, :wbdiffnotaffected, :wbdiffrejectqty,
-                 :wbdiffremarks, :wbverifiedby, :wbactiontaken, :wbdisposition,
-                 :wbremarks, :wbrcmachineerror, :wbmachineerror)
+                (RAWTOHEX(SYS_GUID()), SYSDATE, :lastupdatedby, :package, :product,
+                 :leadframe12nc, :recipe)
             """;
+
+        // Every column the grid renders a sort header for. The value reaches an
+        // ORDER BY that cannot be parameterized, so this array - not the caller -
+        // decides what is allowed there. Adding a header in Index.cshtml without
+        // adding the key here silently sorts by lastupdate instead.
+        private static readonly string[] SortableColumns =
+        [
+            "package", "product", "leadframe12nc", "recipe", "lastupdatedby", "lastupdate"
+        ];
 
         private readonly IOracleConnectionFactory _connectionFactory;
         private readonly IRecipeAuditRepository _auditRepository;
@@ -155,51 +144,6 @@ namespace Atcbassemblyrecipe.Services
             return rows;
         }
 
-        // The wire bonders as AWACSWSTYPE knows them: WSID for WSTYPE 'WIREBOND'.
-        // Offered as the Machine pick list on the add and edit panels so a machine
-        // keyed in here matches the workstation master the recipe pages read.
-        //
-        // Deliberately swallows database errors instead of surfacing them. This is
-        // a convenience list, and AWACSWSTYPE is a different table than the one
-        // this page owns - if it is missing, empty, or not granted to the app
-        // account, the Machine field simply stays free text. Failing the whole
-        // grid over a dropdown would be a worse trade.
-        public async Task<IReadOnlyList<string>> GetMachineOptionsAsync()
-        {
-            var values = new List<string>();
-
-            try
-            {
-                await using var connection = _connectionFactory.CreateConnection();
-                await connection.OpenAsync();
-
-                await using var command = connection.CreateCommand();
-                command.BindByName = true;
-                command.CommandText = """
-                    SELECT DISTINCT wsid
-                    FROM awacswstype
-                    WHERE UPPER(wstype) = 'WIREBOND'
-                      AND wsid IS NOT NULL
-                    ORDER BY wsid
-                    """;
-
-                await using var reader = await command.ExecuteReaderTracedAsync();
-                while (await reader.ReadAsync())
-                {
-                    if (!reader.IsDBNull(0))
-                    {
-                        values.Add(reader.GetString(0));
-                    }
-                }
-            }
-            catch (Exception ex) when (ex is OracleException or InvalidOperationException)
-            {
-                return [];
-            }
-
-            return values;
-        }
-
         public async Task<(bool Success, string Message)> CreateAsync(WireBondInputModel model, string userName)
         {
             Normalize(model);
@@ -210,10 +154,10 @@ namespace Atcbassemblyrecipe.Services
 
             try
             {
-                if (await OcapNoExistsAsync(connection, transaction, model.OcapNo))
+                if (await RecipeExistsAsync(connection, transaction, model))
                 {
                     await transaction.RollbackAsync();
-                    return (false, $"TBLWIREBOND already has a record for OCAP No {model.OcapNo}. Edit that row instead of adding a second one.");
+                    return (false, $"TBLWIREBOND already has {model.Product} / {model.Leadframe12Nc} / {model.Recipe}. Edit that row instead of adding a second one.");
                 }
 
                 await using var command = connection.CreateCommand();
@@ -223,18 +167,14 @@ namespace Atcbassemblyrecipe.Services
                 AddWriteParameters(command, model, userName);
 
                 var inserted = await command.ExecuteNonQueryTracedAsync();
-                if (inserted != 1 || !await OcapNoExistsAsync(connection, transaction, model.OcapNo))
+                if (inserted != 1 || !await RecipeExistsAsync(connection, transaction, model))
                 {
                     await transaction.RollbackAsync();
                     return (false, "Insert verification failed. Insert was rolled back.");
                 }
 
-                var workWeek = await ReadWorkWeekAsync(connection, transaction, model.OcapNo);
-
                 await transaction.CommitAsync();
-                return (true, string.IsNullOrWhiteSpace(workWeek)
-                    ? $"TBLWIREBOND record {model.OcapNo} inserted and verified."
-                    : $"TBLWIREBOND record {model.OcapNo} inserted and verified. Work week {workWeek} was set by the database.");
+                return (true, $"TBLWIREBOND row {model.Product} inserted and verified.");
             }
             catch
             {
@@ -261,10 +201,10 @@ namespace Atcbassemblyrecipe.Services
                 {
                     Normalize(model);
 
-                    if (await OcapNoExistsAsync(connection, transaction, model.OcapNo))
+                    if (await RecipeExistsAsync(connection, transaction, model))
                     {
                         await transaction.RollbackAsync();
-                        return (false, 0, $"Import cancelled. OCAP No {model.OcapNo} is already in TBLWIREBOND. No rows were uploaded.");
+                        return (false, 0, $"Import cancelled. {model.Product} / {model.Leadframe12Nc} / {model.Recipe} is already in TBLWIREBOND. No rows were uploaded.");
                     }
 
                     await using var command = connection.CreateCommand();
@@ -319,36 +259,14 @@ namespace Atcbassemblyrecipe.Services
                 await using var command = connection.CreateCommand();
                 command.BindByName = true;
                 command.Transaction = transaction;
-                // wbocapwwk is left alone on purpose - see the class comment.
                 command.CommandText = """
                     UPDATE tblwirebond
                     SET lastupdate = SYSDATE,
                         lastupdatedby = :lastupdatedby,
-                        wbocapno = :wbocapno,
-                        wbissuedby = :wbissuedby,
-                        wbbfg = :wbbfg,
-                        wbdate = :wbdate,
-                        wboperatorid = :wboperatorid,
-                        wbprocess = :wbprocess,
-                        wbmachine = :wbmachine,
-                        wbpackage = :wbpackage,
-                        wbsoqty = :wbsoqty,
-                        wbdefect = :wbdefect,
-                        wbdefectcat = :wbdefectcat,
-                        wbdefectothers = :wbdefectothers,
-                        wbdiff4m1e = :wbdiff4m1e,
-                        wbdiffaffected = :wbdiffaffected,
-                        wbdifffabsite = :wbdifffabsite,
-                        wbdiffno = :wbdiffno,
-                        wbdiffnotaffected = :wbdiffnotaffected,
-                        wbdiffrejectqty = :wbdiffrejectqty,
-                        wbdiffremarks = :wbdiffremarks,
-                        wbverifiedby = :wbverifiedby,
-                        wbactiontaken = :wbactiontaken,
-                        wbdisposition = :wbdisposition,
-                        wbremarks = :wbremarks,
-                        wbrcmachineerror = :wbrcmachineerror,
-                        wbmachineerror = :wbmachineerror
+                        "PACKAGE" = :package,
+                        product = :product,
+                        leadframe12nc = :leadframe12nc,
+                        recipe = :recipe
                     WHERE ROWID = CHARTOROWID(:tblrowid)
                     """;
                 AddWriteParameters(command, model, userName);
@@ -368,14 +286,14 @@ namespace Atcbassemblyrecipe.Services
                     connection,
                     transaction,
                     AuditedTableNames.WireBond,
-                    $"OCAP {model.OcapNo}",
+                    $"{model.Product} / {model.Leadframe12Nc}",
                     model.TblRowId,
                     oldValues,
                     newValues,
                     userName);
 
                 await transaction.CommitAsync();
-                return (true, $"TBLWIREBOND record {model.OcapNo} updated and verified. The previous values are on the Change History page if this needs to be reverted.");
+                return (true, $"TBLWIREBOND row {model.Product} updated and verified. The previous values are on the Change History page if this needs to be reverted.");
             }
             catch
             {
@@ -405,7 +323,7 @@ namespace Atcbassemblyrecipe.Services
                     connection,
                     transaction,
                     AuditedTableNames.WireBond,
-                    $"OCAP {rowData.GetValueOrDefault("WBOCAPNO")} ({rowData.GetValueOrDefault("WBMACHINE")})",
+                    $"{rowData.GetValueOrDefault("PRODUCT")} / {rowData.GetValueOrDefault("LEADFRAME12NC")}",
                     rowData,
                     userName);
 
@@ -423,7 +341,7 @@ namespace Atcbassemblyrecipe.Services
                 }
 
                 await transaction.CommitAsync();
-                return (true, "TBLWIREBOND record moved to Trash. Open Trash to restore it if this was a mistake.");
+                return (true, "TBLWIREBOND row moved to Trash. Open Trash to restore it if this was a mistake.");
             }
             catch
             {
@@ -446,17 +364,24 @@ namespace Atcbassemblyrecipe.Services
             return Convert.ToInt32(await command.ExecuteScalarTracedAsync());
         }
 
-        // An OCAP number identifies one record, so a second row carrying the same
-        // number is a duplicate. The table has no unique constraint to lean on -
-        // this check is the only thing standing between a double-submit and two
-        // rows nobody can tell apart.
-        private static async Task<bool> OcapNoExistsAsync(OracleConnection connection, OracleTransaction transaction, string ocapNo)
+        // Product + leadframe + recipe is what makes a row unique here. The table
+        // has no unique constraint to lean on - this check is the only thing
+        // standing between a double-submit and two rows nobody can tell apart.
+        private static async Task<bool> RecipeExistsAsync(OracleConnection connection, OracleTransaction transaction, WireBondInputModel model)
         {
             await using var command = connection.CreateCommand();
             command.BindByName = true;
             command.Transaction = transaction;
-            command.CommandText = "SELECT COUNT(1) FROM tblwirebond WHERE UPPER(wbocapno) = UPPER(:wbocapno)";
-            command.Parameters.Add(new OracleParameter("wbocapno", ocapNo));
+            command.CommandText = """
+                SELECT COUNT(1)
+                FROM tblwirebond
+                WHERE UPPER(product) = UPPER(:product)
+                  AND UPPER(leadframe12nc) = UPPER(:leadframe12nc)
+                  AND UPPER(recipe) = UPPER(:recipe)
+                """;
+            command.Parameters.Add(new OracleParameter("product", model.Product));
+            command.Parameters.Add(new OracleParameter("leadframe12nc", model.Leadframe12Nc));
+            command.Parameters.Add(new OracleParameter("recipe", model.Recipe));
 
             return Convert.ToInt32(await command.ExecuteScalarTracedAsync()) > 0;
         }
@@ -472,51 +397,13 @@ namespace Atcbassemblyrecipe.Services
             return Convert.ToInt32(await command.ExecuteScalarTracedAsync()) == 1;
         }
 
-        // Reads back what the trigger put in WBOCAPWWK, so the success popup can
-        // show it instead of leaving the user to refresh and look.
-        private static async Task<string> ReadWorkWeekAsync(OracleConnection connection, OracleTransaction transaction, string ocapNo)
-        {
-            await using var command = connection.CreateCommand();
-            command.BindByName = true;
-            command.Transaction = transaction;
-            command.CommandText = "SELECT MAX(wbocapwwk) FROM tblwirebond WHERE UPPER(wbocapno) = UPPER(:wbocapno)";
-            command.Parameters.Add(new OracleParameter("wbocapno", ocapNo));
-
-            var value = await command.ExecuteScalarTracedAsync();
-            return value is null or DBNull ? string.Empty : value.ToString() ?? string.Empty;
-        }
-
         private static void AddWriteParameters(OracleCommand command, WireBondInputModel model, string userName)
         {
             command.Parameters.Add(new OracleParameter("lastupdatedby", userName));
-            command.Parameters.Add(new OracleParameter("wbocapno", model.OcapNo));
-            command.Parameters.Add(Text("wbissuedby", model.IssuedBy));
-            command.Parameters.Add(Text("wbbfg", model.Bfg));
-            command.Parameters.Add(new OracleParameter("wbdate", OracleDbType.Date)
-            {
-                Value = model.OcapDate.HasValue ? (object)model.OcapDate.Value : DBNull.Value
-            });
-            command.Parameters.Add(Text("wboperatorid", model.OperatorId));
-            command.Parameters.Add(Text("wbprocess", model.Process));
-            command.Parameters.Add(Text("wbmachine", model.Machine));
-            command.Parameters.Add(Text("wbpackage", model.Package));
-            command.Parameters.Add(Number("wbsoqty", model.SoQty));
-            command.Parameters.Add(Text("wbdefect", model.Defect));
-            command.Parameters.Add(Text("wbdefectcat", model.DefectCategory));
-            command.Parameters.Add(Text("wbdefectothers", model.DefectOthers));
-            command.Parameters.Add(Text("wbdiff4m1e", model.Diff4M1E));
-            command.Parameters.Add(Text("wbdiffaffected", model.DiffAffected));
-            command.Parameters.Add(Text("wbdifffabsite", model.DiffFabSite));
-            command.Parameters.Add(Text("wbdiffno", model.DiffNo));
-            command.Parameters.Add(Text("wbdiffnotaffected", model.DiffNotAffected));
-            command.Parameters.Add(Number("wbdiffrejectqty", model.DiffRejectQty));
-            command.Parameters.Add(Text("wbdiffremarks", model.DiffRemarks));
-            command.Parameters.Add(Text("wbverifiedby", model.VerifiedBy));
-            command.Parameters.Add(Text("wbactiontaken", model.ActionTaken));
-            command.Parameters.Add(Text("wbdisposition", model.Disposition));
-            command.Parameters.Add(Text("wbremarks", model.Remarks));
-            command.Parameters.Add(Text("wbrcmachineerror", model.RcMachineError));
-            command.Parameters.Add(Text("wbmachineerror", model.MachineError));
+            command.Parameters.Add(Text("package", model.Package));
+            command.Parameters.Add(new OracleParameter("product", model.Product));
+            command.Parameters.Add(new OracleParameter("leadframe12nc", model.Leadframe12Nc));
+            command.Parameters.Add(new OracleParameter("recipe", model.Recipe));
         }
 
         private static OracleParameter Text(string name, string? value)
@@ -527,62 +414,17 @@ namespace Atcbassemblyrecipe.Services
             };
         }
 
-        // An empty number box posts as null, not as 0 - the column stays NULL
-        // rather than claiming a quantity of zero was counted.
-        private static OracleParameter Number(string name, decimal? value)
-        {
-            return new OracleParameter(name, OracleDbType.Decimal)
-            {
-                Value = value.HasValue ? (object)value.Value : DBNull.Value
-            };
-        }
-
+        // Everything here is a code, not a sentence, so it is stored upper-cased:
+        // the duplicate check and the search box cannot then be defeated by
+        // "sot669" vs "SOT669".
         private static void Normalize(WireBondInputModel model)
         {
             model.TblRowId = model.TblRowId?.Trim();
-
-            // Code-like columns are stored upper-cased so the duplicate check and
-            // the search box cannot be defeated by "wb-07" vs "WB-07".
-            model.OcapNo = InputText.CleanUpper(model.OcapNo);
-            model.IssuedBy = InputText.CleanUpperOrNull(model.IssuedBy);
-            model.Bfg = InputText.CleanUpperOrNull(model.Bfg);
-            model.OperatorId = InputText.CleanUpperOrNull(model.OperatorId);
-            model.Process = InputText.CleanUpperOrNull(model.Process);
-            model.Machine = InputText.CleanUpperOrNull(model.Machine);
             model.Package = InputText.CleanUpperOrNull(model.Package);
-            model.Defect = InputText.CleanUpperOrNull(model.Defect);
-            model.DefectCategory = InputText.CleanUpperOrNull(model.DefectCategory);
-            model.Diff4M1E = InputText.CleanUpperOrNull(model.Diff4M1E);
-            model.DiffFabSite = InputText.CleanUpperOrNull(model.DiffFabSite);
-            model.DiffNo = InputText.CleanUpperOrNull(model.DiffNo);
-            model.DiffAffected = InputText.CleanUpperOrNull(model.DiffAffected);
-            model.DiffNotAffected = InputText.CleanUpperOrNull(model.DiffNotAffected);
-            model.VerifiedBy = InputText.CleanUpperOrNull(model.VerifiedBy);
-            model.MachineError = InputText.CleanUpperOrNull(model.MachineError);
-
-            // Free text keeps the case it was typed in - these are sentences a
-            // person wrote, not codes anything matches on.
-            model.DefectOthers = InputText.CleanOrNull(model.DefectOthers);
-            model.DiffRemarks = InputText.CleanOrNull(model.DiffRemarks);
-            model.ActionTaken = InputText.CleanOrNull(model.ActionTaken);
-            model.Disposition = InputText.CleanOrNull(model.Disposition);
-            model.Remarks = InputText.CleanOrNull(model.Remarks);
-            model.RcMachineError = InputText.CleanOrNull(model.RcMachineError);
+            model.Product = InputText.CleanUpper(model.Product);
+            model.Leadframe12Nc = InputText.CleanUpper(model.Leadframe12Nc);
+            model.Recipe = InputText.CleanUpper(model.Recipe);
         }
-
-        // Every column the grid renders a sort header for. The value reaches an
-        // ORDER BY that cannot be parameterized, so this array - not the caller -
-        // decides what is allowed there. Adding a header in Index.cshtml without
-        // adding the key here silently sorts by lastupdate instead.
-        private static readonly string[] SortableColumns =
-        [
-            "wbocapno", "wbocapwwk", "wbdate", "wbissuedby", "wbbfg", "wboperatorid",
-            "wbprocess", "wbmachine", "wbpackage", "wbsoqty", "wbdefect", "wbdefectcat",
-            "wbdefectothers", "wbmachineerror", "wbrcmachineerror", "wbdiff4m1e",
-            "wbdiffno", "wbdifffabsite", "wbdiffrejectqty", "wbdiffaffected",
-            "wbdiffnotaffected", "wbdiffremarks", "wbverifiedby", "wbactiontaken",
-            "wbdisposition", "wbremarks", "lastupdatedby", "lastupdate"
-        ];
 
         private static string BuildOrderBy(string? sortBy, string? sortDirection)
         {
@@ -595,11 +437,12 @@ namespace Atcbassemblyrecipe.Services
                 // The grid's own numbering: insertion order, as close as this table
                 // gets to one without a sequence column.
                 "sequence" => $"ROWIDTOCHAR(ROWID) {direction}",
-                "lastupdate" => $"lastupdate {direction} {nulls}, wbocapno ASC",
-                "wbdate" => $"wbdate {direction} {nulls}, wbocapno ASC",
-                // Every other column ties on the date, so equal values still come
-                // back newest first instead of in whatever order Oracle chose.
-                _ => $"{column} {direction} {nulls}, wbdate DESC NULLS LAST"
+                "lastupdate" => $"lastupdate {direction} {nulls}, product ASC",
+                // PACKAGE stays quoted - it is a reserved word.
+                "package" => $"\"PACKAGE\" {direction} {nulls}, product ASC",
+                // Every other column ties on the timestamp, so equal values still
+                // come back newest first instead of in whatever order Oracle chose.
+                _ => $"{column} {direction} {nulls}, lastupdate DESC NULLS LAST"
             };
         }
 
@@ -628,32 +471,10 @@ namespace Atcbassemblyrecipe.Services
                 TblRowId = ReadString(reader, 0),
                 LastUpdate = ReadDate(reader, 1),
                 LastUpdatedBy = ReadString(reader, 2),
-                OcapNo = ReadString(reader, 3),
-                OcapWorkWeek = ReadString(reader, 4),
-                IssuedBy = ReadString(reader, 5),
-                Bfg = ReadString(reader, 6),
-                OcapDate = ReadDate(reader, 7),
-                OperatorId = ReadString(reader, 8),
-                Process = ReadString(reader, 9),
-                Machine = ReadString(reader, 10),
-                Package = ReadString(reader, 11),
-                SoQty = ReadNumber(reader, 12),
-                Defect = ReadString(reader, 13),
-                DefectCategory = ReadString(reader, 14),
-                DefectOthers = ReadString(reader, 15),
-                Diff4M1E = ReadString(reader, 16),
-                DiffAffected = ReadString(reader, 17),
-                DiffFabSite = ReadString(reader, 18),
-                DiffNo = ReadString(reader, 19),
-                DiffNotAffected = ReadString(reader, 20),
-                DiffRejectQty = ReadNumber(reader, 21),
-                DiffRemarks = ReadString(reader, 22),
-                VerifiedBy = ReadString(reader, 23),
-                ActionTaken = ReadString(reader, 24),
-                Disposition = ReadString(reader, 25),
-                Remarks = ReadString(reader, 26),
-                RcMachineError = ReadString(reader, 27),
-                MachineError = ReadString(reader, 28)
+                Package = ReadString(reader, 3),
+                Product = ReadString(reader, 4),
+                Leadframe12Nc = ReadString(reader, 5),
+                Recipe = ReadString(reader, 6)
             };
         }
 
@@ -665,11 +486,6 @@ namespace Atcbassemblyrecipe.Services
         private static DateTime? ReadDate(OracleDataReader reader, int index)
         {
             return reader.IsDBNull(index) ? null : reader.GetDateTime(index);
-        }
-
-        private static decimal? ReadNumber(OracleDataReader reader, int index)
-        {
-            return reader.IsDBNull(index) ? null : reader.GetDecimal(index);
         }
     }
 }

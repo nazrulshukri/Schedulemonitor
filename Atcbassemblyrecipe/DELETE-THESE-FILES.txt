@@ -1,8 +1,0 @@
-Two files are no longer used and should be deleted from your project:
-
-  Views/WireBond/_WireBondFields.cshtml
-  ViewModels/WireBondPanelModel.cs
-
-They were the big stacked add/edit panel. The grid is now inline rows, so
-nothing references them any more. Leaving them in place does no harm - they
-just will not be used - but deleting them keeps the project clean.

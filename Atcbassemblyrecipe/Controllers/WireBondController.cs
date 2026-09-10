@@ -8,19 +8,17 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Oracle.ManagedDataAccess.Client;
 using System.ComponentModel.DataAnnotations;
-using System.Globalization;
 using System.Text;
 
 namespace Atcbassemblyrecipe.Controllers
 {
-    // The TBLWIREBOND grid: one row per wire bond record. This is THE Wirebond
-    // page - the one in the sidebar, gated by the single ModuleNames.TableWirebond
-    // ("Wirebond") grant in TBLACCESS.
+    // The TBLWIREBOND grid: package, product, leadframe 12NC, recipe. This is THE
+    // Wirebond page - the one in the sidebar, gated by the single
+    // ModuleNames.TableWirebond ("Wirebond") grant in TBLACCESS.
     //
     // AwacsController.TableWirebond still exists as a route over
-    // AWACSRECIPEBYWSTYPE (the WIREBOND *recipe* grid) but is no longer in the
-    // menu, and it is gated by the same "Wirebond" grant. There is no separate
-    // "Wirebond OCAP" module - granting "Wirebond" is all a user needs.
+    // AWACSRECIPEBYWSTYPE but is no longer in the menu, and it is gated by the
+    // same "Wirebond" grant. There is no separate "Wirebond OCAP" module.
     [Authorize]
     public class WireBondController : Controller
     {
@@ -31,57 +29,14 @@ namespace Atcbassemblyrecipe.Controllers
             _wireBondService = wireBondService;
         }
 
-        // The CSV columns this grid understands. The first block is the template
-        // order, which is also the order a file with no header row is read in; the
-        // InTemplate = false block can still be named in a header row, so a full
-        // export can be edited and uploaded again without trimming columns.
-        //
-        // WBOCAPWWK is not here at all - the database trigger owns it.
+        // The CSV columns this grid understands, in template order - which is also
+        // the order a file with no header row is read in.
         private static readonly CsvColumn[] WireBondCsvColumns =
         [
-            new CsvColumn("OCAPNO", true, "OCAP NO", "WBOCAPNO", "OCAP NUMBER"),
-            new CsvColumn("WBDATE", true, "OCAP DATE", "DATE", "OCAPDATE"),
-            new CsvColumn("ISSUEDBY", false, "ISSUED BY", "WBISSUEDBY"),
-            new CsvColumn("BFG", false, "WBBFG"),
-            new CsvColumn("OPERATORID", false, "OPERATOR ID", "WBOPERATORID", "OPERATOR"),
-            new CsvColumn("PROCESS", false, "WBPROCESS"),
-            new CsvColumn("MACHINE", false, "WBMACHINE"),
-            new CsvColumn("PACKAGE", false, "WBPACKAGE", "PKG"),
-            new CsvColumn("SOQTY", false, "SO QTY", "WBSOQTY", "QTY"),
-            new CsvColumn("DEFECT", false, "WBDEFECT"),
-            new CsvColumn("DEFECTCAT", false, "DEFECT CATEGORY", "WBDEFECTCAT", "CATEGORY"),
-            new CsvColumn("DIFF4M1E", false, "4M1E", "WBDIFF4M1E"),
-            new CsvColumn("DIFFNO", false, "DIFFERENCE NO", "WBDIFFNO"),
-            new CsvColumn("DIFFREJECTQTY", false, "REJECT QTY", "WBDIFFREJECTQTY"),
-            new CsvColumn("REMARKS", false, "WBREMARKS"),
-            new CsvColumn("DEFECTOTHERS", false, "WBDEFECTOTHERS") { InTemplate = false },
-            new CsvColumn("DIFFAFFECTED", false, "AFFECTED", "WBDIFFAFFECTED") { InTemplate = false },
-            new CsvColumn("DIFFFABSITE", false, "FAB SITE", "WBDIFFFABSITE") { InTemplate = false },
-            new CsvColumn("DIFFNOTAFFECTED", false, "NOT AFFECTED", "WBDIFFNOTAFFECTED") { InTemplate = false },
-            new CsvColumn("DIFFREMARKS", false, "WBDIFFREMARKS") { InTemplate = false },
-            new CsvColumn("VERIFIEDBY", false, "VERIFIED BY", "WBVERIFIEDBY") { InTemplate = false },
-            new CsvColumn("ACTIONTAKEN", false, "ACTION TAKEN", "WBACTIONTAKEN") { InTemplate = false },
-            new CsvColumn("DISPOSITION", false, "WBDISPOSITION") { InTemplate = false },
-            new CsvColumn("RCMACHINEERROR", false, "WBRCMACHINEERROR", "MACHINE ERROR ROOT CAUSE") { InTemplate = false },
-            new CsvColumn("MACHINEERROR", false, "WBMACHINEERROR", "MACHINE ERROR") { InTemplate = false }
-        ];
-
-        // The date shapes a plant CSV actually arrives in. Parsed exactly rather
-        // than by the server locale, so 09/10/2026 cannot silently become
-        // September on one machine and October on another.
-        private static readonly string[] DateFormats =
-        [
-            "yyyy-MM-dd HH:mm:ss",
-            "yyyy-MM-dd HH:mm",
-            "yyyy-MM-dd",
-            "yyyy/MM/dd HH:mm",
-            "yyyy/MM/dd",
-            "dd-MM-yyyy HH:mm",
-            "dd-MM-yyyy",
-            "dd/MM/yyyy HH:mm",
-            "dd/MM/yyyy",
-            "dd-MMM-yyyy HH:mm",
-            "dd-MMM-yyyy"
+            new CsvColumn("PACKAGE", false, "PKG"),
+            new CsvColumn("PRODUCT", true, "DEVICE"),
+            new CsvColumn("LEADFRAME12NC", true, "LEADFRAME 12NC", "LF12NC", "LEADFRAME"),
+            new CsvColumn("RECIPE", true, "RECIPE NAME")
         ];
 
         [ModuleAccess(ModuleNames.TableWirebond, ModuleAction.View)]
@@ -105,10 +60,6 @@ namespace Atcbassemblyrecipe.Controllers
                 model.Page = result.Page;
                 model.PageSize = result.PageSize;
                 model.TotalRows = result.TotalRows;
-
-                // Never fatal: an unreadable AWACSWSTYPE just means no machine
-                // suggestions, and the service already answers with an empty list.
-                model.MachineOptions = await _wireBondService.GetMachineOptionsAsync();
             }
             catch (Exception ex) when (ex is OracleException or InvalidOperationException)
             {
@@ -122,8 +73,8 @@ namespace Atcbassemblyrecipe.Controllers
         public IActionResult DownloadTemplate()
         {
             const string csv =
-                "OCAPNO,WBDATE,ISSUEDBY,BFG,OPERATORID,PROCESS,MACHINE,PACKAGE,SOQTY,DEFECT,DEFECTCAT,DIFF4M1E,DIFFNO,DIFFREJECTQTY,REMARKS\r\n"
-                + "WB-2026-001,2026-09-10 14:30,NX487878,BFG1,OP1023,WIREBOND,WB-07,SOT669,3000,NON STICK ON PAD,PROCESS,MACHINE,DIFF-2026-0912,120,Raised on night shift\r\n";
+                "PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE\r\n"
+                + "SOT669,BUK9K6-40E,934123456789,WB_SOT669_STD\r\n";
             return File(Encoding.UTF8.GetBytes(csv), "text/csv", "tblwirebond-template.csv");
         }
 
@@ -134,41 +85,15 @@ namespace Atcbassemblyrecipe.Controllers
             {
                 var rows = await _wireBondService.GetForExportAsync(search, sortBy, sortDirection);
                 var builder = new StringBuilder();
-                builder.AppendLine(
-                    "OCAPNO,OCAPWWK,WBDATE,ISSUEDBY,BFG,OPERATORID,PROCESS,MACHINE,PACKAGE,SOQTY,"
-                    + "DEFECT,DEFECTCAT,DEFECTOTHERS,DIFF4M1E,DIFFAFFECTED,DIFFFABSITE,DIFFNO,"
-                    + "DIFFNOTAFFECTED,DIFFREJECTQTY,DIFFREMARKS,VERIFIEDBY,ACTIONTAKEN,DISPOSITION,"
-                    + "REMARKS,RCMACHINEERROR,MACHINEERROR,Last Updated By,Timestamp");
+                builder.AppendLine("PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE,Last Updated By,Timestamp");
 
                 foreach (var row in rows)
                 {
                     builder
-                        .Append(EscapeCsv(row.OcapNo)).Append(',')
-                        .Append(EscapeCsv(row.OcapWorkWeek)).Append(',')
-                        .Append(EscapeCsv(row.OcapDate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty)).Append(',')
-                        .Append(EscapeCsv(row.IssuedBy)).Append(',')
-                        .Append(EscapeCsv(row.Bfg)).Append(',')
-                        .Append(EscapeCsv(row.OperatorId)).Append(',')
-                        .Append(EscapeCsv(row.Process)).Append(',')
-                        .Append(EscapeCsv(row.Machine)).Append(',')
                         .Append(EscapeCsv(row.Package)).Append(',')
-                        .Append(EscapeCsv(row.SoQty?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)).Append(',')
-                        .Append(EscapeCsv(row.Defect)).Append(',')
-                        .Append(EscapeCsv(row.DefectCategory)).Append(',')
-                        .Append(EscapeCsv(row.DefectOthers)).Append(',')
-                        .Append(EscapeCsv(row.Diff4M1E)).Append(',')
-                        .Append(EscapeCsv(row.DiffAffected)).Append(',')
-                        .Append(EscapeCsv(row.DiffFabSite)).Append(',')
-                        .Append(EscapeCsv(row.DiffNo)).Append(',')
-                        .Append(EscapeCsv(row.DiffNotAffected)).Append(',')
-                        .Append(EscapeCsv(row.DiffRejectQty?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)).Append(',')
-                        .Append(EscapeCsv(row.DiffRemarks)).Append(',')
-                        .Append(EscapeCsv(row.VerifiedBy)).Append(',')
-                        .Append(EscapeCsv(row.ActionTaken)).Append(',')
-                        .Append(EscapeCsv(row.Disposition)).Append(',')
-                        .Append(EscapeCsv(row.Remarks)).Append(',')
-                        .Append(EscapeCsv(row.RcMachineError)).Append(',')
-                        .Append(EscapeCsv(row.MachineError)).Append(',')
+                        .Append(EscapeCsv(row.Product)).Append(',')
+                        .Append(EscapeCsv(row.Leadframe12Nc)).Append(',')
+                        .Append(EscapeCsv(row.Recipe)).Append(',')
                         .Append(EscapeCsv(row.LastUpdatedBy)).Append(',')
                         .Append(EscapeCsv(row.LastUpdate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty))
                         .AppendLine();
@@ -218,69 +143,38 @@ namespace Atcbassemblyrecipe.Controllers
 
             var importErrors = new List<string>();
             var pendingRows = new List<WireBondInputModel>();
-            var seenOcapNumbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seenRecipes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var row in read.Rows)
             {
-                var dateText = row["WBDATE"];
-                if (!TryParseDate(dateText, out var ocapDate))
-                {
-                    importErrors.Add($"Line {row.LineNumber}: WBDATE '{dateText}' is not a date. Use 2026-09-10 14:30 or 10/09/2026.");
-                    continue;
-                }
+                var leadframe = row["LEADFRAME12NC"];
 
-                if (!TryParseNumber(row["SOQTY"], out var soQty))
+                // Excel turns a long numeric 12NC into 3.4E+11 on save. Caught here
+                // rather than stored as the literal text "3.4E+11".
+                if (CsvImportReader.LooksLikeExcelScientificNumber(leadframe))
                 {
-                    importErrors.Add($"Line {row.LineNumber}: SOQTY '{row["SOQTY"]}' is not a number.");
-                    continue;
-                }
-
-                if (!TryParseNumber(row["DIFFREJECTQTY"], out var rejectQty))
-                {
-                    importErrors.Add($"Line {row.LineNumber}: DIFFREJECTQTY '{row["DIFFREJECTQTY"]}' is not a number.");
-                    continue;
-                }
-
-                var ocapNo = row["OCAPNO"];
-
-                // Two rows in one file carrying the same OCAP number would both
-                // pass the database check (neither is committed yet) and land as a
-                // duplicate pair. Caught here instead.
-                if (!string.IsNullOrWhiteSpace(ocapNo) && !seenOcapNumbers.Add(InputText.CleanUpper(ocapNo)))
-                {
-                    importErrors.Add($"Line {row.LineNumber}: Record No {ocapNo} appears more than once in this file.");
+                    importErrors.Add($"Line {row.LineNumber}: LEADFRAME12NC '{leadframe}' was saved by Excel as a number. Format that column as Text and save again.");
                     continue;
                 }
 
                 var model = new WireBondInputModel
                 {
-                    OcapNo = ocapNo,
-                    OcapDate = ocapDate,
-                    IssuedBy = row["ISSUEDBY"],
-                    Bfg = row["BFG"],
-                    OperatorId = row["OPERATORID"],
-                    Process = row["PROCESS"],
-                    Machine = row["MACHINE"],
                     Package = row["PACKAGE"],
-                    SoQty = soQty,
-                    Defect = row["DEFECT"],
-                    DefectCategory = row["DEFECTCAT"],
-                    DefectOthers = row["DEFECTOTHERS"],
-                    Diff4M1E = row["DIFF4M1E"],
-                    DiffAffected = row["DIFFAFFECTED"],
-                    DiffFabSite = row["DIFFFABSITE"],
-                    DiffNo = row["DIFFNO"],
-                    DiffNotAffected = row["DIFFNOTAFFECTED"],
-                    DiffRejectQty = rejectQty,
-                    DiffRemarks = row["DIFFREMARKS"],
-                    VerifiedBy = row["VERIFIEDBY"],
-                    ActionTaken = row["ACTIONTAKEN"],
-                    Disposition = row["DISPOSITION"],
-                    Remarks = row["REMARKS"],
-                    RcMachineError = row["RCMACHINEERROR"],
-                    MachineError = row["MACHINEERROR"],
+                    Product = row["PRODUCT"],
+                    Leadframe12Nc = leadframe,
+                    Recipe = row["RECIPE"],
                     Confirmed = true
                 };
+
+                // Two rows in one file carrying the same recipe would both pass the
+                // database check (neither is committed yet) and land as a duplicate
+                // pair. Caught here instead.
+                var key = $"{InputText.CleanUpper(model.Product)}|{InputText.CleanUpper(model.Leadframe12Nc)}|{InputText.CleanUpper(model.Recipe)}";
+                if (!seenRecipes.Add(key))
+                {
+                    importErrors.Add($"Line {row.LineNumber}: {model.Product} / {model.Leadframe12Nc} / {model.Recipe} appears more than once in this file.");
+                    continue;
+                }
 
                 var validationResults = new List<ValidationResult>();
                 if (!Validator.TryValidateObject(model, new ValidationContext(model), validationResults, true))
@@ -352,10 +246,10 @@ namespace Atcbassemblyrecipe.Controllers
 
             // No search, no page number and the default sort (lastupdate desc), so
             // the row that was just inserted is the first row of the grid. highlight
-            // flashes it and scrolls to it. model.OcapNo is the value the service
+            // flashes it and scrolls to it. model.Product is the value the service
             // actually stored - CreateAsync normalizes the model in place.
             return result.Success
-                ? RedirectToAction(nameof(Index), new { highlight = model.OcapNo })
+                ? RedirectToAction(nameof(Index), new { highlight = model.Product })
                 : RedirectToAction(nameof(Index), new { promptAdd = true });
         }
 
@@ -386,7 +280,7 @@ namespace Atcbassemblyrecipe.Controllers
             TempData["PopupType"] = result.Success ? "success" : "danger";
             TempData["PopupMessage"] = result.Message;
             return result.Success
-                ? RedirectToAction(nameof(Index), new { highlight = model.OcapNo })
+                ? RedirectToAction(nameof(Index), new { highlight = model.Product })
                 : RedirectToAction(nameof(Index));
         }
 
@@ -419,47 +313,6 @@ namespace Atcbassemblyrecipe.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // Empty is allowed - most of these columns are optional. Only a value that
-        // is present and unparseable is an error.
-        private static bool TryParseDate(string? text, out DateTime? value)
-        {
-            value = null;
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return true;
-            }
-
-            if (DateTime.TryParseExact(text.Trim(), DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
-            {
-                value = parsed;
-                return true;
-            }
-
-            return false;
-        }
-
-        private static bool TryParseNumber(string? text, out decimal? value)
-        {
-            value = null;
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return true;
-            }
-
-            if (CsvImportReader.LooksLikeExcelScientificNumber(text))
-            {
-                return false;
-            }
-
-            if (decimal.TryParse(text.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
-            {
-                value = parsed;
-                return true;
-            }
-
-            return false;
-        }
-
         private static string HeaderlessNote(CsvImportResult read)
         {
             return read.HadHeaderRow
@@ -470,8 +323,8 @@ namespace Atcbassemblyrecipe.Controllers
         // DatabaseErrorMessage.Build answers every OracleException with the same
         // "check the password, VPN and service name" text. That is right for a
         // connection failure and actively misleading for anything else: an
-        // ORA-00904 or ORA-00942 raised by this page's own SQL would read as if
-        // the database were unreachable, and the grid would just look empty. Real
+        // ORA-00904 or ORA-02290 raised by this page's own SQL would read as if the
+        // database were unreachable, and the grid would just look empty. Real
         // connection errors keep the original wording; everything else says what
         // Oracle actually said.
         private static string Describe(Exception ex)
