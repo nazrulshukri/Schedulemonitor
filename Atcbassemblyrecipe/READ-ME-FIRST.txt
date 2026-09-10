@@ -10,16 +10,19 @@ It converts the table in place with ALTER instead of dropping it, so the
 grants, synonyms and privileges survive and it cannot fail because your
 tablespace is named something other than OCAPSYS_DAT.
 
-Run it ONE STATEMENT AT A TIME - in SQL Developer click into a statement
-and press Ctrl+Enter (Run Statement). Do NOT press F5 on the whole file.
-Some steps are meant to fail depending on what your table looks like;
-each one says which error to expect.
+Open it, click anywhere in it, press F5.
+   Toad for Oracle ... F5 = Execute as Script
+   SQL Developer ..... F5 = Run Script
 
-Start with STEP 0. It prints your current columns and tells you which of
-the later steps you actually need.
+DO NOT use Execute Statement (F9 in Toad, Ctrl+Enter in SQL Developer) -
+that is what produced ORA-00933 on the earlier version of this script.
+The file is now ONE PL/SQL block ending at a / on its own line, so there
+is nothing for the client to mis-split.
 
-Stop at the line that says STOP HERE AND TEST THE PAGE, test add / edit /
-delete, and only then run STEP 6 which drops the old columns for good.
+Safe to run twice. Every step checks the database first and skips itself
+if it is already done, so a half-finished attempt is repaired by running
+the whole thing again. If anything is still wrong at the end the block
+raises an error naming exactly which column is missing.
 
 Database/tblwirebond.sql is the DROP + CREATE alternative. Use it only
 for a table that does not exist yet, or one you are happy to lose.
