@@ -33,6 +33,10 @@ namespace Atcbassemblyrecipe.Controllers
         // the order a file with no header row is read in.
         private static readonly CsvColumn[] WireBondCsvColumns =
         [
+            // Read so that an Export CSV can be edited and uploaded again, then
+            // ignored: every row in TBLWIREBOND is a wirebond row whatever this
+            // column says.
+            new CsvColumn("WSTYPE", false, "WS TYPE"),
             new CsvColumn("PACKAGE", false, "PKG"),
             new CsvColumn("PRODUCT", true, "DEVICE"),
             new CsvColumn("LEADFRAME12NC", true, "LEADFRAME 12NC", "LF12NC", "LEADFRAME"),
@@ -73,8 +77,8 @@ namespace Atcbassemblyrecipe.Controllers
         public IActionResult DownloadTemplate()
         {
             const string csv =
-                "PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE\r\n"
-                + "SOT669,BUK9K6-40E,934123456789,WB_SOT669_STD\r\n";
+                "WSTYPE,PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE\r\n"
+                + "WIREBOND,SOT669,BUK9K6-40E,934123456789,WB_SOT669_STD\r\n";
             return File(Encoding.UTF8.GetBytes(csv), "text/csv", "tblwirebond-template.csv");
         }
 
@@ -85,11 +89,12 @@ namespace Atcbassemblyrecipe.Controllers
             {
                 var rows = await _wireBondService.GetForExportAsync(search, sortBy, sortDirection);
                 var builder = new StringBuilder();
-                builder.AppendLine("PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE,Last Updated By,Timestamp");
+                builder.AppendLine("WSTYPE,PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE,Last Updated By,Timestamp");
 
                 foreach (var row in rows)
                 {
                     builder
+                        .Append(RecipeWsTypes.Wirebond).Append(',')
                         .Append(EscapeCsv(row.Package)).Append(',')
                         .Append(EscapeCsv(row.Product)).Append(',')
                         .Append(EscapeCsv(row.Leadframe12Nc)).Append(',')

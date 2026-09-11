@@ -65,6 +65,7 @@
         <colgroup>
             <col class="col-select" />
             <col class="col-sequence" />
+            <col class="col-wstype" />
             <col class="col-package" />
             <col class="col-product" />
             <col class="col-leadframe" />
@@ -77,10 +78,20 @@
         <thead>
             <tr>
                 <th data-col-key="select"><input class="form-check-input" type="checkbox" aria-label="Select all rows" disabled /><span class="column-resizer"></span></th>
-                @foreach (var column in SortableColumns)
+                @foreach (var column in GridColumns)
                 {
                     <th data-col-key="@column.Key">
-                        <a class="sort-header @SortClass(Model, column.Key)" asp-controller="WireBond" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="1" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@column.Key" asp-route-sortDirection="@NextSortDirection(Model, column.Key)">@column.Label<span></span></a>
+                        @if (column.Sortable)
+                        {
+                            <a class="sort-header @SortClass(Model, column.Key)" asp-controller="WireBond" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="1" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@column.Key" asp-route-sortDirection="@NextSortDirection(Model, column.Key)">@column.Label<span></span></a>
+                        }
+                        else
+                        {
+                            @* WSTYPE is the same word on every row, so there is nothing
+                               to sort and no link here - a sort arrow that did nothing
+                               would just be a dead control. *@
+                            <span class="sort-header sort-header-static">@column.Label</span>
+                        }
                         <span class="column-resizer"></span>
                     </th>
                 }
@@ -94,6 +105,11 @@
                 <tr id="addRow" class="excel-edit-row @(Model.PromptAdd ? "" : "d-none")">
                     <td><input class="form-check-input" type="checkbox" aria-label="New row" disabled /></td>
                     <td><span class="cell-muted">New</span></td>
+                    <td>
+                        @* No name and no form attribute, so it posts nothing. Every row
+                           in TBLWIREBOND is wirebond; the column is here to say so. *@
+                        <input class="form-control cell-input" value="@RecipeWsTypes.Wirebond" readonly aria-label="WSTYPE" />
+                    </td>
                     <td>
                         <input name="Package" form="createWireBondForm" class="form-control cell-input" maxlength="64" placeholder="Package" aria-label="Package" />
                     </td>
@@ -124,7 +140,7 @@
             @if (Model.Rows.Count == 0)
             {
                 <tr>
-                    <td colspan="10" class="text-center text-muted py-4">No rows found.</td>
+                    <td colspan="11" class="text-center text-muted py-4">No rows found.</td>
                 </tr>
             }
             else
@@ -140,7 +156,8 @@
                     <tr class="excel-display-row @(isJustSaved ? "row-just-saved" : "")" data-row-id="@row.TblRowId">
                         <td><input class="form-check-input" type="checkbox" aria-label="Select @row.Product" /></td>
                         <td>@rowNumber</td>
-                        <td class="fw-semibold">@row.Package</td>
+                        <td class="fw-semibold">@RecipeWsTypes.Wirebond</td>
+                        <td>@row.Package</td>
                         <td>@row.Product</td>
                         <td>@row.Leadframe12Nc</td>
                         <td>@row.Recipe</td>
@@ -170,6 +187,9 @@
                         <tr class="excel-edit-row d-none" data-edit-panel="@row.TblRowId">
                             <td><input class="form-check-input" type="checkbox" aria-label="Editing @row.Product" disabled /></td>
                             <td><span class="cell-muted">@rowNumber</span></td>
+                            <td>
+                                <input class="form-control cell-input" value="@RecipeWsTypes.Wirebond" readonly aria-label="WSTYPE" />
+                            </td>
                             <td>
                                 <input name="Package" form="@editFormId" class="form-control cell-input" maxlength="64" value="@row.Package" data-original-value="@row.Package" aria-label="Package" />
                             </td>
@@ -289,6 +309,7 @@
                     <table class="table template-preview-table align-middle">
                         <thead>
                             <tr>
+                                <th>WSTYPE</th>
                                 <th>PACKAGE</th>
                                 <th>PRODUCT</th>
                                 <th>LEADFRAME12NC</th>
@@ -297,6 +318,7 @@
                         </thead>
                         <tbody>
                             <tr>
+                                <td>WIREBOND</td>
                                 <td>SOT669</td>
                                 <td>BUK9K6-40E</td>
                                 <td>934123456789</td>
@@ -307,7 +329,9 @@
                 </div>
 
                 <div class="template-note">
-                    Required columns: PRODUCT, LEADFRAME12NC, RECIPE. PACKAGE is optional.
+                    Required columns: PRODUCT, LEADFRAME12NC, RECIPE. PACKAGE is optional, and
+                    WSTYPE is ignored - every uploaded row is a wirebond row whatever that
+                    column says.
                     The header row itself is optional: a file that starts straight at the values is read
                     in the column order above. Format LEADFRAME12NC as Text in Excel, otherwise it is
                     saved as 3.4E+11 and the upload is rejected. A product / leadframe / recipe that is
@@ -351,6 +375,12 @@
 @* The doubled at-sign in the keyframes rule is Razor escaping: it renders as a
    single one. A bare at-sign there would be read as a Razor expression. *@
 <style>
+    /* .sort-header:hover underlines, which on a header that is not a link
+       reads as "click me". WSTYPE is not clickable. */
+    .sort-header-static:hover {
+        text-decoration: none;
+    }
+
     .row-just-saved > td {
         animation: wireBondJustSaved 3s ease-out 1;
     }
@@ -378,18 +408,23 @@
 }
 
 @functions {
-    // Every key here is in WireBondService.NormalizeSortBy's whitelist, so every
-    // header sorts. Adding one here without adding it there would silently fall
-    // back to lastupdate.
-    private static readonly (string Key, string Label)[] SortableColumns = new (string Key, string Label)[]
+    // The grid's columns, between the tickbox and the Edit/Delete pair.
+    //
+    // Every Sortable key here must also be in WireBondService.NormalizeSortBy's
+    // whitelist - adding one without adding it there silently sorts by
+    // lastupdate instead. WSTYPE is not sortable because it is not a column in
+    // TBLWIREBOND at all: the table holds wirebond rows and nothing else, so the
+    // page states the value rather than storing it once per row.
+    private static readonly (string Key, string Label, bool Sortable)[] GridColumns = new (string Key, string Label, bool Sortable)[]
     {
-        ("sequence", "#"),
-        ("package", "PACKAGE"),
-        ("product", "Product"),
-        ("leadframe12nc", "Leadframe 12NC"),
-        ("recipe", "Recipe"),
-        ("lastupdatedby", "Last Updated By"),
-        ("lastupdate", "Timestamp")
+        ("sequence", "#", true),
+        ("wstype", "WSTYPE", false),
+        ("package", "PACKAGE", true),
+        ("product", "Product", true),
+        ("leadframe12nc", "Leadframe 12NC", true),
+        ("recipe", "Recipe", true),
+        ("lastupdatedby", "Last Updated By", true),
+        ("lastupdate", "Timestamp", true)
     };
 
     private static string NextSortDirection(WireBondViewModel model, string column)

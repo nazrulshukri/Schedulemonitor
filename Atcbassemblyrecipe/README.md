@@ -5,13 +5,27 @@ shape as the Sawing and Marker grids.
 
 Route: `/WireBond/Index`. Sidebar: **Operations → Wirebond**.
 
-Ten columns, and only these ten:
+The columns, and only these:
 
-| | # | PACKAGE | Product | Leadframe 12NC | Recipe | Last Updated By | Timestamp | Edit | Delete |
-|---|---|---|---|---|---|---|---|---|---|
+| | # | WSTYPE | PACKAGE | Product | Leadframe 12NC | Recipe | Last Updated By | Timestamp | Edit | Delete |
+|---|---|---|---|---|---|---|---|---|---|---|
 
-No WSTYPE column — every row in this table is wirebond, so there is nothing to
-filter on.
+**WSTYPE always reads `WIREBOND` and cannot be edited** — it is a read-only cell
+on the add row and on every edit row, exactly like `SAWING` on the Sawing grid.
+
+It is *not* a column in TBLWIREBOND. Every row in this table is a wirebond row
+by definition, so storing the same word on all of them would buy nothing and
+give somebody a way to set it wrong. The page states the value instead. Nothing
+posts it, so nothing can change it.
+
+If you do want it in the table — say the MES joins on it — one statement does it,
+and the page keeps working either way because it never reads the column:
+
+```sql
+ALTER TABLE OCAPSYS.TBLWIREBOND ADD (WSTYPE VARCHAR2(16 BYTE) DEFAULT 'WIREBOND' NOT NULL);
+UPDATE OCAPSYS.TBLWIREBOND SET WSTYPE = 'WIREBOND';
+COMMIT;
+```
 
 ## The database change comes first
 

@@ -49,7 +49,7 @@
          }
          <button type="button" class="btn btn-outline-secondary" data-template-modal><partial name="_Icon" model="@("template")" /> Template</button>
          <a class="btn btn-outline-secondary" asp-controller="WireBond" asp-action="Export" asp-route-search="@Model.Search" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection"><partial name="_Icon" model="@("export")" /> Export CSV</a>
-@@ -58,41 +60,15 @@
+@@ -58,41 +60,16 @@
      </div>
  </section>
  
@@ -86,16 +86,40 @@
          <colgroup>
              <col class="col-select" />
              <col class="col-sequence" />
-+            <col class="col-package" />
-             <col class="col-product" />
--            <col class="col-wstype" />
+-            <col class="col-product" />
+             <col class="col-wstype" />
 -            <col class="col-date" />
++            <col class="col-package" />
++            <col class="col-product" />
 +            <col class="col-leadframe" />
 +            <col class="col-recipe" />
              <col class="col-user" />
              <col class="col-date" />
              <col class="col-action" />
-@@ -115,17 +91,32 @@
+@@ -101,10 +78,20 @@
+         <thead>
+             <tr>
+                 <th data-col-key="select"><input class="form-check-input" type="checkbox" aria-label="Select all rows" disabled /><span class="column-resizer"></span></th>
+-                @foreach (var column in SortableColumns)
++                @foreach (var column in GridColumns)
+                 {
+                     <th data-col-key="@column.Key">
+-                        <a class="sort-header @SortClass(Model, column.Key)" asp-controller="WireBond" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="1" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@column.Key" asp-route-sortDirection="@NextSortDirection(Model, column.Key)">@column.Label<span></span></a>
++                        @if (column.Sortable)
++                        {
++                            <a class="sort-header @SortClass(Model, column.Key)" asp-controller="WireBond" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="1" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@column.Key" asp-route-sortDirection="@NextSortDirection(Model, column.Key)">@column.Label<span></span></a>
++                        }
++                        else
++                        {
++                            @* WSTYPE is the same word on every row, so there is nothing
++                               to sort and no link here - a sort arrow that did nothing
++                               would just be a dead control. *@
++                            <span class="sort-header sort-header-static">@column.Label</span>
++                        }
+                         <span class="column-resizer"></span>
+                     </th>
+                 }
+@@ -115,17 +102,37 @@
          <tbody>
              @if (canAdd)
              {
@@ -112,6 +136,11 @@
 -                        </div>
 +                    <td><input class="form-check-input" type="checkbox" aria-label="New row" disabled /></td>
 +                    <td><span class="cell-muted">New</span></td>
++                    <td>
++                        @* No name and no form attribute, so it posts nothing. Every row
++                           in TBLWIREBOND is wirebond; the column is here to say so. *@
++                        <input class="form-control cell-input" value="@RecipeWsTypes.Wirebond" readonly aria-label="WSTYPE" />
++                    </td>
 +                    <td>
 +                        <input name="Package" form="createWireBondForm" class="form-control cell-input" maxlength="64" placeholder="Package" aria-label="Package" />
 +                    </td>
@@ -138,16 +167,16 @@
                      </td>
                  </tr>
              }
-@@ -133,7 +124,7 @@
+@@ -133,7 +140,7 @@
              @if (Model.Rows.Count == 0)
              {
                  <tr>
 -                    <td colspan="9" class="text-center text-muted py-4">No TBLWIREBOND records found.</td>
-+                    <td colspan="10" class="text-center text-muted py-4">No rows found.</td>
++                    <td colspan="11" class="text-center text-muted py-4">No rows found.</td>
                  </tr>
              }
              else
-@@ -141,18 +132,24 @@
+@@ -141,18 +148,25 @@
                  var rowNumber = ((Model.Page - 1) * Model.PageSize) + 1;
                  foreach (var row in Model.Rows)
                  {
@@ -164,7 +193,8 @@
 -                        <td class="fw-semibold">@row.OcapNo</td>
 -                        <td>@row.OcapWorkWeek</td>
 -                        <td>@row.OcapDate?.ToString("yyyy-MM-dd HH:mm")</td>
-+                        <td class="fw-semibold">@row.Package</td>
++                        <td class="fw-semibold">@RecipeWsTypes.Wirebond</td>
++                        <td>@row.Package</td>
 +                        <td>@row.Product</td>
 +                        <td>@row.Leadframe12Nc</td>
 +                        <td>@row.Recipe</td>
@@ -178,7 +208,7 @@
                                      <span></span>
                                  </button>
                              }
-@@ -160,7 +157,7 @@
+@@ -160,7 +174,7 @@
                          <td class="text-center">
                              @if (canDelete)
                              {
@@ -187,7 +217,7 @@
                                      <span></span>
                                  </button>
                              }
-@@ -171,12 +168,31 @@
+@@ -171,12 +185,34 @@
                      {
                          var editFormId = $"editWireBondForm-{row.TblRowId}";
                          <tr class="excel-edit-row d-none" data-edit-panel="@row.TblRowId">
@@ -199,6 +229,9 @@
 -                                </div>
 +                            <td><input class="form-check-input" type="checkbox" aria-label="Editing @row.Product" disabled /></td>
 +                            <td><span class="cell-muted">@rowNumber</span></td>
++                            <td>
++                                <input class="form-control cell-input" value="@RecipeWsTypes.Wirebond" readonly aria-label="WSTYPE" />
++                            </td>
 +                            <td>
 +                                <input name="Package" form="@editFormId" class="form-control cell-input" maxlength="64" value="@row.Package" data-original-value="@row.Package" aria-label="Package" />
 +                            </td>
@@ -225,7 +258,7 @@
                              </td>
                          </tr>
                      }
-@@ -188,7 +204,16 @@
+@@ -188,7 +224,16 @@
      </table>
  </div>
  
@@ -243,7 +276,7 @@
  <div class="row-forms d-none" aria-hidden="true">
      @if (canAdd)
      {
-@@ -225,7 +250,7 @@
+@@ -225,7 +270,7 @@
  
  <div class="pagination-bar">
      <span>Showing page @Model.Page of @Model.TotalPages, @Model.TotalRows total rows</span>
@@ -252,7 +285,7 @@
          <ul class="pagination mb-0">
              <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
                  <a class="page-link" asp-controller="WireBond" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection">Prev</a>
-@@ -249,7 +274,7 @@
+@@ -249,7 +294,7 @@
              <div class="modal-header">
                  <div>
                      <span class="eyebrow">CSV Template</span>
@@ -261,7 +294,7 @@
                  </div>
                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
              </div>
-@@ -257,8 +282,6 @@
+@@ -257,8 +302,6 @@
                  <ol class="template-steps">
                      <li>Download the template below.</li>
                      <li>Key in the values under the same headers - or delete the header row and key in the values only, in the same left-to-right order.</li>
@@ -270,13 +303,14 @@
                      <li>In Excel, use Save As and choose CSV (Comma delimited) (*.csv).</li>
                  </ol>
  
-@@ -266,46 +289,29 @@
+@@ -266,46 +309,33 @@
                      <table class="table template-preview-table align-middle">
                          <thead>
                              <tr>
 -                                <th>OCAPNO</th>
 -                                <th>WBDATE</th>
 -                                <th>MACHINE</th>
++                                <th>WSTYPE</th>
                                  <th>PACKAGE</th>
 -                                <th>SOQTY</th>
 -                                <th>DEFECT</th>
@@ -291,6 +325,7 @@
 -                                <td>OCAP-WB-2026-001</td>
 -                                <td>2026-09-10 14:30</td>
 -                                <td>WB-07</td>
++                                <td>WIREBOND</td>
                                  <td>SOT669</td>
 -                                <td>3000</td>
 -                                <td>NON STICK ON PAD</td>
@@ -320,7 +355,9 @@
 -                    VERIFIEDBY, ACTIONTAKEN, DISPOSITION, RCMACHINEERROR and MACHINEERROR, so an
 -                    Export CSV can be edited and uploaded again. An OCAP number that is already in
 -                    the table - or twice in the same file - cancels the whole import.
-+                    Required columns: PRODUCT, LEADFRAME12NC, RECIPE. PACKAGE is optional.
++                    Required columns: PRODUCT, LEADFRAME12NC, RECIPE. PACKAGE is optional, and
++                    WSTYPE is ignored - every uploaded row is a wirebond row whatever that
++                    column says.
 +                    The header row itself is optional: a file that starts straight at the values is read
 +                    in the column order above. Format LEADFRAME12NC as Text in Excel, otherwise it is
 +                    saved as 3.4E+11 and the upload is rejected. A product / leadframe / recipe that is
@@ -328,7 +365,7 @@
                  </div>
              </div>
              <div class="modal-footer">
-@@ -324,7 +330,7 @@
+@@ -324,7 +354,7 @@
                  <div class="modal-header">
                      <div>
                          <span class="eyebrow">Delete Validation</span>
@@ -337,13 +374,19 @@
                      </div>
                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                  </div>
-@@ -342,37 +348,46 @@
+@@ -342,39 +372,59 @@
      </div>
  }
  
 +@* The doubled at-sign in the keyframes rule is Razor escaping: it renders as a
 +   single one. A bare at-sign there would be read as a Razor expression. *@
 +<style>
++    /* .sort-header:hover underlines, which on a header that is not a link
++       reads as "click me". WSTYPE is not clickable. */
++    .sort-header-static:hover {
++        text-decoration: none;
++    }
++
 +    .row-just-saved > td {
 +        animation: wireBondJustSaved 3s ease-out 1;
 +    }
@@ -383,22 +426,33 @@
  }
  
  @functions {
-+    // Every key here is in WireBondService.NormalizeSortBy's whitelist, so every
-+    // header sorts. Adding one here without adding it there would silently fall
-+    // back to lastupdate.
-     private static readonly (string Key, string Label)[] SortableColumns = new (string Key, string Label)[]
+-    private static readonly (string Key, string Label)[] SortableColumns = new (string Key, string Label)[]
++    // The grid's columns, between the tickbox and the Edit/Delete pair.
++    //
++    // Every Sortable key here must also be in WireBondService.NormalizeSortBy's
++    // whitelist - adding one without adding it there silently sorts by
++    // lastupdate instead. WSTYPE is not sortable because it is not a column in
++    // TBLWIREBOND at all: the table holds wirebond rows and nothing else, so the
++    // page states the value rather than storing it once per row.
++    private static readonly (string Key, string Label, bool Sortable)[] GridColumns = new (string Key, string Label, bool Sortable)[]
      {
-         ("sequence", "#"),
+-        ("sequence", "#"),
 -        ("wbocapno", "OCAP No"),
 -        ("wbocapwwk", "Work Week"),
 -        ("wbdate", "OCAP Date"),
-+        ("package", "PACKAGE"),
-+        ("product", "Product"),
-+        ("leadframe12nc", "Leadframe 12NC"),
-+        ("recipe", "Recipe"),
-         ("lastupdatedby", "Last Updated By"),
-         ("lastupdate", "Timestamp")
+-        ("lastupdatedby", "Last Updated By"),
+-        ("lastupdate", "Timestamp")
++        ("sequence", "#", true),
++        ("wstype", "WSTYPE", false),
++        ("package", "PACKAGE", true),
++        ("product", "Product", true),
++        ("leadframe12nc", "Leadframe 12NC", true),
++        ("recipe", "Recipe", true),
++        ("lastupdatedby", "Last Updated By", true),
++        ("lastupdate", "Timestamp", true)
      };
+ 
+     private static string NextSortDirection(WireBondViewModel model, string column)
 --- a/Models/WireBond.cs
 +++ b/Models/WireBond.cs
 @@ -1,85 +1,24 @@
@@ -718,7 +772,7 @@
      [Authorize]
      public class WireBondController : Controller
      {
-@@ -28,61 +29,18 @@
+@@ -28,61 +29,22 @@
              _wireBondService = wireBondService;
          }
  
@@ -775,6 +829,10 @@
 -            "dd/MM/yyyy",
 -            "dd-MMM-yyyy HH:mm",
 -            "dd-MMM-yyyy"
++            // Read so that an Export CSV can be edited and uploaded again, then
++            // ignored: every row in TBLWIREBOND is a wirebond row whatever this
++            // column says.
++            new CsvColumn("WSTYPE", false, "WS TYPE"),
 +            new CsvColumn("PACKAGE", false, "PKG"),
 +            new CsvColumn("PRODUCT", true, "DEVICE"),
 +            new CsvColumn("LEADFRAME12NC", true, "LEADFRAME 12NC", "LF12NC", "LEADFRAME"),
@@ -787,7 +845,7 @@
          {
              var normalizedSortBy = WireBondService.NormalizeSortBy(sortBy);
              var normalizedSortDirection = NormalizeSortDirection(sortDirection);
-@@ -90,7 +48,8 @@
+@@ -90,7 +52,8 @@
              {
                  SortBy = normalizedSortBy,
                  SortDirection = normalizedSortDirection,
@@ -797,18 +855,18 @@
              };
  
              try
-@@ -114,8 +73,8 @@
+@@ -114,8 +77,8 @@
          public IActionResult DownloadTemplate()
          {
              const string csv =
 -                "OCAPNO,WBDATE,ISSUEDBY,BFG,OPERATORID,PROCESS,MACHINE,PACKAGE,SOQTY,DEFECT,DEFECTCAT,DIFF4M1E,DIFFNO,DIFFREJECTQTY,REMARKS\r\n"
 -                + "OCAP-WB-2026-001,2026-09-10 14:30,NX487878,BFG1,OP1023,WIREBOND,WB-07,SOT669,3000,NON STICK ON PAD,PROCESS,MACHINE,DIFF-2026-0912,120,Raised on night shift\r\n";
-+                "PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE\r\n"
-+                + "SOT669,BUK9K6-40E,934123456789,WB_SOT669_STD\r\n";
++                "WSTYPE,PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE\r\n"
++                + "WIREBOND,SOT669,BUK9K6-40E,934123456789,WB_SOT669_STD\r\n";
              return File(Encoding.UTF8.GetBytes(csv), "text/csv", "tblwirebond-template.csv");
          }
  
-@@ -126,41 +85,15 @@
+@@ -126,41 +89,16 @@
              {
                  var rows = await _wireBondService.GetForExportAsync(search, sortBy, sortDirection);
                  var builder = new StringBuilder();
@@ -817,7 +875,7 @@
 -                    + "DEFECT,DEFECTCAT,DEFECTOTHERS,DIFF4M1E,DIFFAFFECTED,DIFFFABSITE,DIFFNO,"
 -                    + "DIFFNOTAFFECTED,DIFFREJECTQTY,DIFFREMARKS,VERIFIEDBY,ACTIONTAKEN,DISPOSITION,"
 -                    + "REMARKS,RCMACHINEERROR,MACHINEERROR,Last Updated By,Timestamp");
-+                builder.AppendLine("PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE,Last Updated By,Timestamp");
++                builder.AppendLine("WSTYPE,PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE,Last Updated By,Timestamp");
  
                  foreach (var row in rows)
                  {
@@ -830,6 +888,7 @@
 -                        .Append(EscapeCsv(row.OperatorId)).Append(',')
 -                        .Append(EscapeCsv(row.Process)).Append(',')
 -                        .Append(EscapeCsv(row.Machine)).Append(',')
++                        .Append(RecipeWsTypes.Wirebond).Append(',')
                          .Append(EscapeCsv(row.Package)).Append(',')
 -                        .Append(EscapeCsv(row.SoQty?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)).Append(',')
 -                        .Append(EscapeCsv(row.Defect)).Append(',')
@@ -854,7 +913,7 @@
                          .Append(EscapeCsv(row.LastUpdatedBy)).Append(',')
                          .Append(EscapeCsv(row.LastUpdate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty))
                          .AppendLine();
-@@ -210,70 +143,39 @@
+@@ -210,70 +148,39 @@
  
              var importErrors = new List<string>();
              var pendingRows = new List<WireBondInputModel>();
@@ -944,7 +1003,7 @@
                  var validationResults = new List<ValidationResult>();
                  if (!Validator.TryValidateObject(model, new ValidationContext(model), validationResults, true))
                  {
-@@ -342,8 +244,12 @@
+@@ -342,8 +249,12 @@
              TempData["PopupType"] = result.Success ? "success" : "danger";
              TempData["PopupMessage"] = result.Message;
  
@@ -958,7 +1017,7 @@
                  : RedirectToAction(nameof(Index), new { promptAdd = true });
          }
  
-@@ -373,7 +279,9 @@
+@@ -373,7 +284,9 @@
  
              TempData["PopupType"] = result.Success ? "success" : "danger";
              TempData["PopupMessage"] = result.Message;
@@ -969,7 +1028,7 @@
          }
  
          [HttpPost]
-@@ -405,47 +313,6 @@
+@@ -405,47 +318,6 @@
              return RedirectToAction(nameof(Index));
          }
  
@@ -1017,7 +1076,7 @@
          private static string HeaderlessNote(CsvImportResult read)
          {
              return read.HadHeaderRow
-@@ -456,8 +323,8 @@
+@@ -456,8 +328,8 @@
          // DatabaseErrorMessage.Build answers every OracleException with the same
          // "check the password, VPN and service name" text. That is right for a
          // connection failure and actively misleading for anything else: an
@@ -2435,7 +2494,7 @@
 +-- SELECT table_name, COUNT(1) FROM tblrecipetrash   GROUP BY table_name;
 --- a/README.md
 +++ b/README.md
-@@ -1,103 +1,158 @@
+@@ -1,103 +1,172 @@
 -# Wirebond OCAP page (OCAPSYS.TBLWIREBOND)
 +# Wirebond page (OCAPSYS.TBLWIREBOND)
  
@@ -2450,20 +2509,34 @@
 +Route: `/WireBond/Index`. Sidebar: **Operations → Wirebond**.
  
 -## Install
-+Ten columns, and only these ten:
++The columns, and only these:
 +
-+| | # | PACKAGE | Product | Leadframe 12NC | Recipe | Last Updated By | Timestamp | Edit | Delete |
-+|---|---|---|---|---|---|---|---|---|---|
++| | # | WSTYPE | PACKAGE | Product | Leadframe 12NC | Recipe | Last Updated By | Timestamp | Edit | Delete |
++|---|---|---|---|---|---|---|---|---|---|---|
 +
-+No WSTYPE column — every row in this table is wirebond, so there is nothing to
-+filter on.
++**WSTYPE always reads `WIREBOND` and cannot be edited** — it is a read-only cell
++on the add row and on every edit row, exactly like `SAWING` on the Sawing grid.
++
++It is *not* a column in TBLWIREBOND. Every row in this table is a wirebond row
++by definition, so storing the same word on all of them would buy nothing and
++give somebody a way to set it wrong. The page states the value instead. Nothing
++posts it, so nothing can change it.
++
++If you do want it in the table — say the MES joins on it — one statement does it,
++and the page keeps working either way because it never reads the column:
++
++```sql
++ALTER TABLE OCAPSYS.TBLWIREBOND ADD (WSTYPE VARCHAR2(16 BYTE) DEFAULT 'WIREBOND' NOT NULL);
++UPDATE OCAPSYS.TBLWIREBOND SET WSTYPE = 'WIREBOND';
++COMMIT;
++```
 +
 +## The database change comes first
- 
--Copy the files over the project, keeping the folder structure:
++
 +Until the table is changed the page cannot load at all — the app asks for
 +`RECIPE` and Oracle answers **ORA-00904: "RECIPE": invalid identifier**.
-+
+ 
+-Copy the files over the project, keeping the folder structure:
 +Two ways to change it. **Use the first one** if TBLWIREBOND already exists:
 +
 +| Script | |
