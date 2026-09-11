@@ -1,31 +1,49 @@
-THE WIREBOND GRID IS NOW THE MACHINE LIST
-=========================================
-Add a wire bonder in AWACSWSTYPE (WSTYPE WIREBOND) and it appears on the
-Wirebond page straight away - as an empty row at the top of the grid,
-with its machine already filled in and PACKAGE / Product / Leadframe 12NC
-/ Recipe waiting to be typed. Fill them in, click the save icon, and that
-is when the row is written to TBLWIREBOND.
+TWO PROBLEMS, TWO FIXES
+=======================
 
-Nothing is written to the table for a machine that has no recipe yet, so
-TBLWIREBOND never collects blank records. That is why Toad will not show
-a row for machine 32233 until you save a recipe for it.
+1. THE BUILD ERROR - nothing to do with the code
+------------------------------------------------
+   JsonException: The input does not contain any JSON tokens
+   ... GenerateStaticWebAssetsManifest.PersistManifest
 
-Machines with no recipe sort to the TOP whatever column you sort by, so a
-machine you registered a minute ago is never buried on page 3.
+A JSON file under obj\ is empty. It happens when a build is killed part
+way through - which is exactly what happened when you had to taskkill the
+locked DLL. MSBuild will not repair it, it just reads it again and fails.
 
-A recipe whose machine is no longer registered in AWACSWSTYPE still
-shows. Hiding rows the table really contains would be worse than showing
-one whose parent has gone.
+Close Visual Studio, then in a command prompt in the project folder:
 
-NO DATABASE CHANGE IN THIS DROP
--------------------------------
-Three files changed - Models/WireBond.cs, Services/WireBondService.cs,
-Views/WireBond/Index.cshtml. Copy them over and rebuild.
+    rmdir /s /q bin
+    rmdir /s /q obj
 
-If you have not run it yet, the WSID column is still required:
-    ALTER TABLE OCAPSYS.TBLWIREBOND ADD (WSID VARCHAR2(16 BYTE));
+Reopen and build. Restoring packages takes a minute; after that it is
+gone for good.
 
-WHAT YOU SHOULD SEE AFTER REBUILDING
-------------------------------------
-Your machine 32233 as row 1, empty, ready to fill in.
-Below it, the two WB-007 recipes you already have.
+
+2. THE COLUMN RESIZE BUG - one file
+-----------------------------------
+Only wwwroot/js/excel-grid.js changed. Copy it over and hard-refresh the
+browser (Ctrl+F5).
+
+WHAT WAS WRONG
+The tables are table-layout: fixed with a width of max(100%, Npx). Under
+that rule, when the column widths add up to MORE than the table, the
+browser does not overflow - it re-proportions EVERY column down to fit.
+So dragging one column wider silently squeezed all the others. That is
+how WSTYPE ended up a sliver showing just "S".
+
+WHAT IT DOES NOW
+- On the first drag, every column is pinned at the width it is currently
+  showing, so none is left loose for the browser to squeeze.
+- The table then grows to the sum of the column widths, and the panel
+  scrolls sideways instead. Dragging a column now moves the ones to its
+  right rather than shrinking them - the way a spreadsheet behaves.
+- Double-click a resizer to let just that column size itself again,
+  leaving the others where you put them.
+- Reset column widths (in the account menu) puts the table back to the
+  responsive layout.
+
+Until you touch a resizer the table stays responsive exactly as before.
+
+IF A GRID STILL LOOKS WRONG after the update, the old broken widths are
+still saved in your browser: open the account menu and click Reset column
+widths once.
