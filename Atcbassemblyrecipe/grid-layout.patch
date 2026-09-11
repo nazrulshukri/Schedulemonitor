@@ -1,0 +1,165 @@
+--- a/wwwroot/js/excel-grid.js
++++ b/wwwroot/js/excel-grid.js
+@@ -146,15 +146,82 @@
+         const cols = Array.from(table.querySelectorAll('col'));
+         const columnKeyAt = (index) => table.tHead?.rows[0]?.cells[index]?.dataset.colKey;
+ 
++        // The table is table-layout: fixed with a width of max(100%, Npx). Under
++        // that rule, when the specified column widths add up to MORE than the
++        // table, the browser does not overflow - it re-proportions every column
++        // down to fit. So widening one column silently crushed the others, which
++        // is how WSTYPE ended up a sliver showing "S".
++        //
++        // Two things stop it. Every column gets an explicit px width before the
++        // first drag, so none of them is left for the browser to squeeze; and the
++        // table itself grows to the sum of those widths, so the panel (which is
++        // already overflow-x: auto) scrolls instead. That is how a spreadsheet
++        // behaves: dragging one column moves the ones to its right, it does not
++        // shrink them.
++        const freezeColumnWidths = () => {
++            const headerCells = table.tHead?.rows[0]?.cells;
++            if (!headerCells) {
++                return;
++            }
++
++            cols.forEach((col, index) => {
++                if (col.style.width) {
++                    return;
++                }
++
++                const cell = headerCells[index];
++                if (cell) {
++                    col.style.width = `${Math.round(cell.getBoundingClientRect().width)}px`;
++                }
++            });
++        };
++
++        const applyTableWidth = () => {
++            // Only meaningful once every column is explicit. Until then the table
++            // keeps its responsive CSS width.
++            if (!cols.every((col) => Number.parseFloat(col.style.width) > 0)) {
++                table.style.width = '';
++                table.style.minWidth = '';
++                return;
++            }
++
++            const total = cols.reduce((sum, col) => sum + Number.parseFloat(col.style.width), 0);
++
++            // width 100% + min-width total, not width: total.
++            //
++            // Setting the width to the total made the table exactly as wide as
++            // its columns, which is wrong in both directions: narrower than the
++            // panel left a band of empty white to the right of the grid, and
++            // wider than the panel pushed the whole page sideways.
++            //
++            // This way the table always fills the panel, and only grows past it
++            // when the columns genuinely need more room - at which point the
++            // panel scrolls, because it is overflow-x: auto.
++            table.style.width = '100%';
++            table.style.minWidth = `${Math.round(total)}px`;
++        };
++
+         const loadColumnWidths = () => {
+             try {
+                 const widths = JSON.parse(localStorage.getItem(columnWidthKey) || '{}');
++                if (Object.keys(widths).length === 0) {
++                    // Nothing saved: leave the table responsive.
++                    return;
++                }
++
++                // Freeze BEFORE applying the saved widths. Doing it after would
++                // capture columns the browser had already squeezed, and the
++                // squeeze would be baked in permanently.
++                freezeColumnWidths();
++
+                 cols.forEach((col, index) => {
+                     const key = columnKeyAt(index);
+                     if (key && Number.isFinite(widths[key])) {
+                         col.style.width = `${widths[key]}px`;
+                     }
+                 });
++
++                applyTableWidth();
+             } catch {
+                 localStorage.removeItem(columnWidthKey);
+             }
+@@ -178,6 +245,10 @@
+                 event.preventDefault();
+                 const header = handle.closest('th');
+                 const index = Array.from(header.parentElement.children).indexOf(header);
++                // Pin every column at the width it is showing right now, before
++                // anything moves. Without this the first drag is the one that
++                // crushes its neighbours.
++                freezeColumnWidths();
+                 const col = cols[index];
+                 const startX = event.clientX;
+                 const startWidth = col.getBoundingClientRect().width || header.getBoundingClientRect().width;
+@@ -185,11 +256,13 @@
+ 
+                 const move = (moveEvent) => {
+                     col.style.width = `${clamp(startWidth + moveEvent.clientX - startX, 48, 620)}px`;
++                    applyTableWidth();
+                 };
+                 const stop = () => {
+                     document.removeEventListener('mousemove', move);
+                     document.removeEventListener('mouseup', stop);
+                     document.body.classList.remove('is-resizing-column');
++                    applyTableWidth();
+                     saveColumnWidths();
+                 };
+ 
+@@ -197,16 +270,26 @@
+                 document.addEventListener('mouseup', stop);
+             });
+ 
++            // Double-click a resizer to let that one column size itself again,
++            // leaving every other column where the user put it.
+             handle.addEventListener('dblclick', () => {
+                 const header = handle.closest('th');
+                 const index = Array.from(header.parentElement.children).indexOf(header);
+                 cols[index].style.width = '';
++                table.style.width = '';
++                table.style.minWidth = '';
++                freezeColumnWidths();
++                applyTableWidth();
+                 saveColumnWidths();
+             });
+         });
+ 
+         resetColumnWidths?.addEventListener('click', () => {
+             cols.forEach((col) => (col.style.width = ''));
++            // Drop the explicit table width too, or the columns would be reset
++            // inside a table that is still pinned to the old total.
++            table.style.width = '';
++            table.style.minWidth = '';
+             localStorage.removeItem(columnWidthKey);
+         });
+     };
+--- a/wwwroot/css/site.css
++++ b/wwwroot/css/site.css
+@@ -4167,3 +4167,25 @@
+         position: static;
+     }
+ }
++
++/* ---------------------------------------------------------------------
++   Keep a wide grid inside its own panel
++
++   .app-shell is a grid with minmax(0, 1fr) for the content track, so the
++   TRACK cannot blow out - but .app-main is a grid ITEM, and a grid item's
++   min-width is auto, meaning "at least as wide as my content". A table
++   wider than the track therefore stretched .app-main past it and the whole
++   page scrolled sideways: the topbar and the Delete column both ended up
++   cut off at the right edge.
++
++   min-width: 0 lets .app-main be narrower than its content again, so the
++   overflow lands where it belongs - inside .excel-panel, which is already
++   overflow-x: auto and scrolls on its own.
++   --------------------------------------------------------------------- */
++.app-main {
++    min-width: 0;
++}
++
++.data-panel.table-responsive.excel-panel {
++    max-width: 100%;
++}

@@ -181,11 +181,24 @@
             // keeps its responsive CSS width.
             if (!cols.every((col) => Number.parseFloat(col.style.width) > 0)) {
                 table.style.width = '';
+                table.style.minWidth = '';
                 return;
             }
 
             const total = cols.reduce((sum, col) => sum + Number.parseFloat(col.style.width), 0);
-            table.style.width = `${Math.round(total)}px`;
+
+            // width 100% + min-width total, not width: total.
+            //
+            // Setting the width to the total made the table exactly as wide as
+            // its columns, which is wrong in both directions: narrower than the
+            // panel left a band of empty white to the right of the grid, and
+            // wider than the panel pushed the whole page sideways.
+            //
+            // This way the table always fills the panel, and only grows past it
+            // when the columns genuinely need more room - at which point the
+            // panel scrolls, because it is overflow-x: auto.
+            table.style.width = '100%';
+            table.style.minWidth = `${Math.round(total)}px`;
         };
 
         const loadColumnWidths = () => {
@@ -264,6 +277,7 @@
                 const index = Array.from(header.parentElement.children).indexOf(header);
                 cols[index].style.width = '';
                 table.style.width = '';
+                table.style.minWidth = '';
                 freezeColumnWidths();
                 applyTableWidth();
                 saveColumnWidths();
@@ -275,6 +289,7 @@
             // Drop the explicit table width too, or the columns would be reset
             // inside a table that is still pinned to the old total.
             table.style.width = '';
+            table.style.minWidth = '';
             localStorage.removeItem(columnWidthKey);
         });
     };

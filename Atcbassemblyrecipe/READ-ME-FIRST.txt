@@ -1,49 +1,45 @@
-TWO PROBLEMS, TWO FIXES
-=======================
+TABLE LAYOUT - TWO FILES, NO REBUILD NEEDED FOR THE CSS/JS THEMSELVES
+=====================================================================
+   wwwroot/js/excel-grid.js
+   wwwroot/css/site.css
 
-1. THE BUILD ERROR - nothing to do with the code
-------------------------------------------------
-   JsonException: The input does not contain any JSON tokens
-   ... GenerateStaticWebAssetsManifest.PersistManifest
+Copy both over, then HARD REFRESH the browser (Ctrl+F5). Both files are
+static assets; if you are running from Visual Studio you may still want to
+rebuild so the published copies update.
 
-A JSON file under obj\ is empty. It happens when a build is killed part
-way through - which is exactly what happened when you had to taskkill the
-locked DLL. MSBuild will not repair it, it just reads it again and fails.
-
-Close Visual Studio, then in a command prompt in the project folder:
-
-    rmdir /s /q bin
-    rmdir /s /q obj
-
-Reopen and build. Restoring packages takes a minute; after that it is
-gone for good.
-
-
-2. THE COLUMN RESIZE BUG - one file
------------------------------------
-Only wwwroot/js/excel-grid.js changed. Copy it over and hard-refresh the
-browser (Ctrl+F5).
 
 WHAT WAS WRONG
-The tables are table-layout: fixed with a width of max(100%, Npx). Under
-that rule, when the column widths add up to MORE than the table, the
-browser does not overflow - it re-proportions EVERY column down to fit.
-So dragging one column wider silently squeezed all the others. That is
-how WSTYPE ended up a sliver showing just "S".
+--------------
+1. WHITE GAP ON THE RIGHT (your Sawing screenshot)
+   The table was being set to exactly the sum of its column widths. When
+   that total was narrower than the panel, the table simply stopped early
+   and left a band of empty white beside it.
+
+2. THE WHOLE PAGE SLID SIDEWAYS (your Wirebond screenshot)
+   The Delete column AND the LOGOUT button were both cut off at the right
+   edge - that is the page scrolling, not the grid.
+
+   .app-shell is a grid whose content track is minmax(0, 1fr), so the
+   track was fine. But .app-main is a grid ITEM, and a grid item's
+   min-width defaults to auto - "at least as wide as my content". A table
+   wider than the track stretched .app-main past it and took the whole
+   page with it.
+
 
 WHAT IT DOES NOW
-- On the first drag, every column is pinned at the width it is currently
-  showing, so none is left loose for the browser to squeeze.
-- The table then grows to the sum of the column widths, and the panel
-  scrolls sideways instead. Dragging a column now moves the ones to its
-  right rather than shrinking them - the way a spreadsheet behaves.
-- Double-click a resizer to let just that column size itself again,
-  leaving the others where you put them.
-- Reset column widths (in the account menu) puts the table back to the
-  responsive layout.
+----------------
+The table is width 100% with a min-width of its column total:
 
-Until you touch a resizer the table stays responsive exactly as before.
+  * columns narrower than the panel -> the table still fills the panel,
+    no white gap, columns share the extra space
+  * columns wider than the panel   -> the panel itself scrolls sideways,
+    and the page does not move at all
 
-IF A GRID STILL LOOKS WRONG after the update, the old broken widths are
-still saved in your browser: open the account menu and click Reset column
-widths once.
+.app-main gets min-width: 0, so overflow lands inside .excel-panel where
+it belongs instead of pushing the layout.
+
+Sawing, Marker, AWACSWSTYPE, AWACSLF and Wirebond all get this - it is the
+shared grid script and the shared stylesheet.
+
+If a grid still looks odd, your old saved widths are still in the browser:
+account menu > Reset column widths, once.
