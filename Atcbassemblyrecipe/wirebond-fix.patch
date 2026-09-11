@@ -36,7 +36,7 @@
          <div>
              <label for="search" class="form-label">Search</label>
 -            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Search OCAP no, work week, machine, package, defect, or difference no" />
-+            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Search product, recipe, leadframe 12NC, or package" />
++            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Search machine, product, recipe, leadframe 12NC, or package" />
          </div>
          <div>
              <label for="pageSize" class="form-label">Rows</label>
@@ -49,7 +49,7 @@
          }
          <button type="button" class="btn btn-outline-secondary" data-template-modal><partial name="_Icon" model="@("template")" /> Template</button>
          <a class="btn btn-outline-secondary" asp-controller="WireBond" asp-action="Export" asp-route-search="@Model.Search" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection"><partial name="_Icon" model="@("export")" /> Export CSV</a>
-@@ -58,41 +60,16 @@
+@@ -58,41 +60,17 @@
      </div>
  </section>
  
@@ -89,6 +89,7 @@
 -            <col class="col-product" />
              <col class="col-wstype" />
 -            <col class="col-date" />
++            <col class="col-wsid" />
 +            <col class="col-package" />
 +            <col class="col-product" />
 +            <col class="col-leadframe" />
@@ -96,7 +97,7 @@
              <col class="col-user" />
              <col class="col-date" />
              <col class="col-action" />
-@@ -101,10 +78,20 @@
+@@ -101,10 +79,20 @@
          <thead>
              <tr>
                  <th data-col-key="select"><input class="form-check-input" type="checkbox" aria-label="Select all rows" disabled /><span class="column-resizer"></span></th>
@@ -119,7 +120,7 @@
                          <span class="column-resizer"></span>
                      </th>
                  }
-@@ -115,17 +102,37 @@
+@@ -115,17 +103,50 @@
          <tbody>
              @if (canAdd)
              {
@@ -140,6 +141,19 @@
 +                        @* No name and no form attribute, so it posts nothing. Every row
 +                           in TBLWIREBOND is wirebond; the column is here to say so. *@
 +                        <input class="form-control cell-input" value="@RecipeWsTypes.Wirebond" readonly aria-label="WSTYPE" />
++                    </td>
++                    <td>
++                        @* AWACSWSTYPE is the parent table: a recipe has to name a
++                           machine that is registered there as a wire bonder. The
++                           server checks it again on save, so a hand-made POST
++                           naming an unregistered machine is refused too. *@
++                        <select name="WsId" form="createWireBondForm" class="form-select cell-input" required aria-label="Machine">
++                            <option value="">- machine -</option>
++                            @foreach (var machine in Model.MachineOptions)
++                            {
++                                <option value="@machine">@machine</option>
++                            }
++                        </select>
 +                    </td>
 +                    <td>
 +                        <input name="Package" form="createWireBondForm" class="form-control cell-input" maxlength="64" placeholder="Package" aria-label="Package" />
@@ -167,16 +181,22 @@
                      </td>
                  </tr>
              }
-@@ -133,7 +140,7 @@
+@@ -133,7 +154,13 @@
              @if (Model.Rows.Count == 0)
              {
                  <tr>
 -                    <td colspan="9" class="text-center text-muted py-4">No TBLWIREBOND records found.</td>
-+                    <td colspan="11" class="text-center text-muted py-4">No rows found.</td>
++                    <td colspan="12" class="text-center text-muted py-4">
++                        No rows found.
++                        @if (Model.MachineOptions.Count == 0)
++                        {
++                            <div class="mt-2">No wire bonders are registered in AWACSWSTYPE yet, so a recipe has no machine to belong to. Add them on the AWACSWSTYPE page first: Add Row, WSTYPE WIREBOND.</div>
++                        }
++                    </td>
                  </tr>
              }
              else
-@@ -141,18 +148,25 @@
+@@ -141,18 +168,26 @@
                  var rowNumber = ((Model.Page - 1) * Model.PageSize) + 1;
                  foreach (var row in Model.Rows)
                  {
@@ -194,6 +214,7 @@
 -                        <td>@row.OcapWorkWeek</td>
 -                        <td>@row.OcapDate?.ToString("yyyy-MM-dd HH:mm")</td>
 +                        <td class="fw-semibold">@RecipeWsTypes.Wirebond</td>
++                        <td>@row.WsId</td>
 +                        <td>@row.Package</td>
 +                        <td>@row.Product</td>
 +                        <td>@row.Leadframe12Nc</td>
@@ -208,7 +229,7 @@
                                      <span></span>
                                  </button>
                              }
-@@ -160,7 +174,7 @@
+@@ -160,7 +195,7 @@
                          <td class="text-center">
                              @if (canDelete)
                              {
@@ -217,9 +238,17 @@
                                      <span></span>
                                  </button>
                              }
-@@ -171,12 +185,34 @@
+@@ -170,13 +205,50 @@
+                     @if (canUpdate)
                      {
                          var editFormId = $"editWireBondForm-{row.TblRowId}";
++
++                        // The row's own machine is always in the list, even if it has
++                        // since been removed from AWACSWSTYPE. Otherwise opening an edit
++                        // would quietly repoint the row at whatever happened to be first.
++                        var machineOptions = Model.MachineOptions.Contains(row.WsId)
++                            ? Model.MachineOptions.AsEnumerable()
++                            : Model.MachineOptions.Append(row.WsId);
                          <tr class="excel-edit-row d-none" data-edit-panel="@row.TblRowId">
 -                            <td colspan="9">
 -                                <partial name="_WireBondFields" model="@(new WireBondPanelModel(editFormId, row))" />
@@ -231,6 +260,14 @@
 +                            <td><span class="cell-muted">@rowNumber</span></td>
 +                            <td>
 +                                <input class="form-control cell-input" value="@RecipeWsTypes.Wirebond" readonly aria-label="WSTYPE" />
++                            </td>
++                            <td>
++                                <select name="WsId" form="@editFormId" class="form-select cell-input" required aria-label="Machine">
++                                    @foreach (var machine in machineOptions)
++                                    {
++                                        <option value="@machine" selected="@(machine == row.WsId)">@machine</option>
++                                    }
++                                </select>
 +                            </td>
 +                            <td>
 +                                <input name="Package" form="@editFormId" class="form-control cell-input" maxlength="64" value="@row.Package" data-original-value="@row.Package" aria-label="Package" />
@@ -258,7 +295,7 @@
                              </td>
                          </tr>
                      }
-@@ -188,7 +224,16 @@
+@@ -188,7 +260,16 @@
      </table>
  </div>
  
@@ -276,7 +313,7 @@
  <div class="row-forms d-none" aria-hidden="true">
      @if (canAdd)
      {
-@@ -225,7 +270,7 @@
+@@ -225,7 +306,7 @@
  
  <div class="pagination-bar">
      <span>Showing page @Model.Page of @Model.TotalPages, @Model.TotalRows total rows</span>
@@ -285,7 +322,7 @@
          <ul class="pagination mb-0">
              <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
                  <a class="page-link" asp-controller="WireBond" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection">Prev</a>
-@@ -249,7 +294,7 @@
+@@ -249,7 +330,7 @@
              <div class="modal-header">
                  <div>
                      <span class="eyebrow">CSV Template</span>
@@ -294,7 +331,7 @@
                  </div>
                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
              </div>
-@@ -257,8 +302,6 @@
+@@ -257,8 +338,6 @@
                  <ol class="template-steps">
                      <li>Download the template below.</li>
                      <li>Key in the values under the same headers - or delete the header row and key in the values only, in the same left-to-right order.</li>
@@ -303,7 +340,7 @@
                      <li>In Excel, use Save As and choose CSV (Comma delimited) (*.csv).</li>
                  </ol>
  
-@@ -266,46 +309,33 @@
+@@ -266,46 +345,38 @@
                      <table class="table template-preview-table align-middle">
                          <thead>
                              <tr>
@@ -311,6 +348,7 @@
 -                                <th>WBDATE</th>
 -                                <th>MACHINE</th>
 +                                <th>WSTYPE</th>
++                                <th>WSID</th>
                                  <th>PACKAGE</th>
 -                                <th>SOQTY</th>
 -                                <th>DEFECT</th>
@@ -326,6 +364,7 @@
 -                                <td>2026-09-10 14:30</td>
 -                                <td>WB-07</td>
 +                                <td>WIREBOND</td>
++                                <td>WB-007</td>
                                  <td>SOT669</td>
 -                                <td>3000</td>
 -                                <td>NON STICK ON PAD</td>
@@ -355,7 +394,10 @@
 -                    VERIFIEDBY, ACTIONTAKEN, DISPOSITION, RCMACHINEERROR and MACHINEERROR, so an
 -                    Export CSV can be edited and uploaded again. An OCAP number that is already in
 -                    the table - or twice in the same file - cancels the whole import.
-+                    Required columns: PRODUCT, LEADFRAME12NC, RECIPE. PACKAGE is optional, and
++                    Required columns: WSID, PRODUCT, LEADFRAME12NC, RECIPE. WSID is the
++                    machine and must already be registered in AWACSWSTYPE as a WIREBOND
++                    workstation - a row naming an unregistered machine cancels the whole
++                    import. PACKAGE is optional, and
 +                    WSTYPE is ignored - every uploaded row is a wirebond row whatever that
 +                    column says.
 +                    The header row itself is optional: a file that starts straight at the values is read
@@ -365,7 +407,7 @@
                  </div>
              </div>
              <div class="modal-footer">
-@@ -324,7 +354,7 @@
+@@ -324,7 +395,7 @@
                  <div class="modal-header">
                      <div>
                          <span class="eyebrow">Delete Validation</span>
@@ -374,7 +416,7 @@
                      </div>
                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                  </div>
-@@ -342,39 +372,59 @@
+@@ -342,39 +413,60 @@
      </div>
  }
  
@@ -444,6 +486,7 @@
 -        ("lastupdate", "Timestamp")
 +        ("sequence", "#", true),
 +        ("wstype", "WSTYPE", false),
++        ("wsid", "Machine", true),
 +        ("package", "PACKAGE", true),
 +        ("product", "Product", true),
 +        ("leadframe12nc", "Leadframe 12NC", true),
@@ -455,7 +498,7 @@
      private static string NextSortDirection(WireBondViewModel model, string column)
 --- a/Models/WireBond.cs
 +++ b/Models/WireBond.cs
-@@ -1,85 +1,24 @@
+@@ -1,85 +1,29 @@
  namespace Atcbassemblyrecipe.Models
  {
 -    // One row of OCAPSYS.TBLWIREBOND: a wire bond OCAP record - who raised it,
@@ -485,7 +528,7 @@
          public string TblRowId { get; set; } = string.Empty;
          public DateTime? LastUpdate { get; set; }
          public string LastUpdatedBy { get; set; } = string.Empty;
--
+ 
 -        public string OcapNo { get; set; } = string.Empty;
 -
 -        // Set by the BEFORE INSERT trigger OCAP_WIREBOND_WORKWEEK, never by the
@@ -498,6 +541,10 @@
 -        public string OperatorId { get; set; } = string.Empty;
 -        public string Process { get; set; } = string.Empty;
 -        public string Machine { get; set; } = string.Empty;
++        // The machine this recipe belongs to: AWACSWSTYPE.WSID. AWACSWSTYPE is
++        // the parent - one row per machine - and this is the child's reference
++        // back to it, the same way TBLSAWING.SAWMACHINE points at a WSID.
++        public string WsId { get; set; } = string.Empty;
          public string Package { get; set; } = string.Empty;
 -        public decimal? SoQty { get; set; }
 -        public string Defect { get; set; } = string.Empty;
@@ -555,7 +602,7 @@
  }
 --- a/ViewModels/WireBondInputModel.cs
 +++ b/ViewModels/WireBondInputModel.cs
-@@ -2,155 +2,51 @@
+@@ -2,155 +2,63 @@
  
  namespace Atcbassemblyrecipe.ViewModels
  {
@@ -601,9 +648,14 @@
 -        public string? Process { get; set; }
 -
 -        [StringLength(100)]
--        [Display(Name = "Machine")]
++        // Must be a WSID that exists in AWACSWSTYPE as a WIREBOND workstation.
++        // The list is checked in the database on every save, not just in the
++        // dropdown - see WireBondService.MachineIsRegisteredAsync.
++        [Required, StringLength(16)]
+         [Display(Name = "Machine")]
 -        public string? Machine { get; set; }
--
++        public string WsId { get; set; } = string.Empty;
+ 
 -        [StringLength(100)]
 +        [StringLength(64)]
          [Display(Name = "Package")]
@@ -695,22 +747,25 @@
          public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
          {
 -            if (string.IsNullOrWhiteSpace(OcapNo))
-+            if (string.IsNullOrWhiteSpace(Product))
++            if (string.IsNullOrWhiteSpace(WsId))
              {
 -                yield return new ValidationResult("OCAP No is required.", [nameof(OcapNo)]);
-+                yield return new ValidationResult("Product is required.", [nameof(Product)]);
++                yield return new ValidationResult("Machine is required - pick the wire bonder this recipe belongs to.", [nameof(WsId)]);
              }
  
 -            // The work week is derived from this date by the database trigger, so a
 -            // row without one lands in the week it was keyed in rather than the
 -            // week it happened. Cheap to insist on it at the point of entry.
 -            if (OcapDate is null)
--            {
++            if (string.IsNullOrWhiteSpace(Product))
+             {
 -                yield return new ValidationResult(
 -                    "OCAP Date is required - the work week is calculated from it.",
 -                    [nameof(OcapDate)]);
--            }
++                yield return new ValidationResult("Product is required.", [nameof(Product)]);
+             }
 -            else if (OcapDate > DateTime.Now.AddDays(1))
++
 +            if (string.IsNullOrWhiteSpace(Leadframe12Nc))
              {
 -                yield return new ValidationResult(
@@ -734,10 +789,15 @@
              if (!Confirmed)
 --- a/ViewModels/WireBondViewModel.cs
 +++ b/ViewModels/WireBondViewModel.cs
-@@ -12,6 +12,12 @@
+@@ -12,6 +12,17 @@
          public string SortBy { get; set; } = "lastupdate";
          public string SortDirection { get; set; } = "desc";
          public bool PromptAdd { get; set; }
++
++        // The wire bonders registered in AWACSWSTYPE (WSTYPE = 'WIREBOND'), which
++        // is what the Machine cell offers. Empty means none are registered yet -
++        // the grid says so rather than presenting an empty dropdown.
++        public IReadOnlyList<string> MachineOptions { get; set; } = [];
 +
 +        // PRODUCT of the row that was just inserted or updated. The grid flashes
 +        // it and scrolls to it, so a save visibly lands instead of the user
@@ -772,7 +832,7 @@
      [Authorize]
      public class WireBondController : Controller
      {
-@@ -28,61 +29,22 @@
+@@ -28,61 +29,23 @@
              _wireBondService = wireBondService;
          }
  
@@ -833,6 +893,7 @@
 +            // ignored: every row in TBLWIREBOND is a wirebond row whatever this
 +            // column says.
 +            new CsvColumn("WSTYPE", false, "WS TYPE"),
++            new CsvColumn("WSID", true, "MACHINE", "WS ID", "WIREBONDER"),
 +            new CsvColumn("PACKAGE", false, "PKG"),
 +            new CsvColumn("PRODUCT", true, "DEVICE"),
 +            new CsvColumn("LEADFRAME12NC", true, "LEADFRAME 12NC", "LF12NC", "LEADFRAME"),
@@ -845,7 +906,7 @@
          {
              var normalizedSortBy = WireBondService.NormalizeSortBy(sortBy);
              var normalizedSortDirection = NormalizeSortDirection(sortDirection);
-@@ -90,7 +52,8 @@
+@@ -90,7 +53,8 @@
              {
                  SortBy = normalizedSortBy,
                  SortDirection = normalizedSortDirection,
@@ -855,18 +916,29 @@
              };
  
              try
-@@ -114,8 +77,8 @@
+@@ -101,6 +65,10 @@
+                 model.Page = result.Page;
+                 model.PageSize = result.PageSize;
+                 model.TotalRows = result.TotalRows;
++
++                // The wire bonders AWACSWSTYPE knows about. Never fatal: the
++                // service answers with an empty list if it cannot read them.
++                model.MachineOptions = await _wireBondService.GetMachineOptionsAsync();
+             }
+             catch (Exception ex) when (ex is OracleException or InvalidOperationException)
+             {
+@@ -114,8 +82,8 @@
          public IActionResult DownloadTemplate()
          {
              const string csv =
 -                "OCAPNO,WBDATE,ISSUEDBY,BFG,OPERATORID,PROCESS,MACHINE,PACKAGE,SOQTY,DEFECT,DEFECTCAT,DIFF4M1E,DIFFNO,DIFFREJECTQTY,REMARKS\r\n"
 -                + "OCAP-WB-2026-001,2026-09-10 14:30,NX487878,BFG1,OP1023,WIREBOND,WB-07,SOT669,3000,NON STICK ON PAD,PROCESS,MACHINE,DIFF-2026-0912,120,Raised on night shift\r\n";
-+                "WSTYPE,PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE\r\n"
-+                + "WIREBOND,SOT669,BUK9K6-40E,934123456789,WB_SOT669_STD\r\n";
++                "WSTYPE,WSID,PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE\r\n"
++                + "WIREBOND,WB-007,SOT669,BUK9K6-40E,934123456789,WB_SOT669_STD\r\n";
              return File(Encoding.UTF8.GetBytes(csv), "text/csv", "tblwirebond-template.csv");
          }
  
-@@ -126,41 +89,16 @@
+@@ -126,41 +94,17 @@
              {
                  var rows = await _wireBondService.GetForExportAsync(search, sortBy, sortDirection);
                  var builder = new StringBuilder();
@@ -875,7 +947,7 @@
 -                    + "DEFECT,DEFECTCAT,DEFECTOTHERS,DIFF4M1E,DIFFAFFECTED,DIFFFABSITE,DIFFNO,"
 -                    + "DIFFNOTAFFECTED,DIFFREJECTQTY,DIFFREMARKS,VERIFIEDBY,ACTIONTAKEN,DISPOSITION,"
 -                    + "REMARKS,RCMACHINEERROR,MACHINEERROR,Last Updated By,Timestamp");
-+                builder.AppendLine("WSTYPE,PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE,Last Updated By,Timestamp");
++                builder.AppendLine("WSTYPE,WSID,PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE,Last Updated By,Timestamp");
  
                  foreach (var row in rows)
                  {
@@ -889,6 +961,7 @@
 -                        .Append(EscapeCsv(row.Process)).Append(',')
 -                        .Append(EscapeCsv(row.Machine)).Append(',')
 +                        .Append(RecipeWsTypes.Wirebond).Append(',')
++                        .Append(EscapeCsv(row.WsId)).Append(',')
                          .Append(EscapeCsv(row.Package)).Append(',')
 -                        .Append(EscapeCsv(row.SoQty?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)).Append(',')
 -                        .Append(EscapeCsv(row.Defect)).Append(',')
@@ -913,7 +986,7 @@
                          .Append(EscapeCsv(row.LastUpdatedBy)).Append(',')
                          .Append(EscapeCsv(row.LastUpdate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty))
                          .AppendLine();
-@@ -210,70 +148,39 @@
+@@ -210,70 +154,40 @@
  
              var importErrors = new List<string>();
              var pendingRows = new List<WireBondInputModel>();
@@ -928,19 +1001,19 @@
 -                    importErrors.Add($"Line {row.LineNumber}: WBDATE '{dateText}' is not a date. Use 2026-09-10 14:30 or 10/09/2026.");
 -                    continue;
 -                }
+-
+-                if (!TryParseNumber(row["SOQTY"], out var soQty))
+-                {
+-                    importErrors.Add($"Line {row.LineNumber}: SOQTY '{row["SOQTY"]}' is not a number.");
+-                    continue;
+-                }
 +                var leadframe = row["LEADFRAME12NC"];
  
--                if (!TryParseNumber(row["SOQTY"], out var soQty))
+-                if (!TryParseNumber(row["DIFFREJECTQTY"], out var rejectQty))
 +                // Excel turns a long numeric 12NC into 3.4E+11 on save. Caught here
 +                // rather than stored as the literal text "3.4E+11".
 +                if (CsvImportReader.LooksLikeExcelScientificNumber(leadframe))
                  {
--                    importErrors.Add($"Line {row.LineNumber}: SOQTY '{row["SOQTY"]}' is not a number.");
--                    continue;
--                }
--
--                if (!TryParseNumber(row["DIFFREJECTQTY"], out var rejectQty))
--                {
 -                    importErrors.Add($"Line {row.LineNumber}: DIFFREJECTQTY '{row["DIFFREJECTQTY"]}' is not a number.");
 -                    continue;
 -                }
@@ -966,6 +1039,7 @@
 -                    OperatorId = row["OPERATORID"],
 -                    Process = row["PROCESS"],
 -                    Machine = row["MACHINE"],
++                    WsId = row["WSID"],
                      Package = row["PACKAGE"],
 -                    SoQty = soQty,
 -                    Defect = row["DEFECT"],
@@ -1003,7 +1077,7 @@
                  var validationResults = new List<ValidationResult>();
                  if (!Validator.TryValidateObject(model, new ValidationContext(model), validationResults, true))
                  {
-@@ -342,8 +249,12 @@
+@@ -342,8 +256,12 @@
              TempData["PopupType"] = result.Success ? "success" : "danger";
              TempData["PopupMessage"] = result.Message;
  
@@ -1017,7 +1091,7 @@
                  : RedirectToAction(nameof(Index), new { promptAdd = true });
          }
  
-@@ -373,7 +284,9 @@
+@@ -373,7 +291,9 @@
  
              TempData["PopupType"] = result.Success ? "success" : "danger";
              TempData["PopupMessage"] = result.Message;
@@ -1028,7 +1102,7 @@
          }
  
          [HttpPost]
-@@ -405,47 +318,6 @@
+@@ -405,47 +325,6 @@
              return RedirectToAction(nameof(Index));
          }
  
@@ -1076,7 +1150,7 @@
          private static string HeaderlessNote(CsvImportResult read)
          {
              return read.HadHeaderRow
-@@ -456,8 +328,8 @@
+@@ -456,8 +335,8 @@
          // DatabaseErrorMessage.Build answers every OracleException with the same
          // "check the password, VPN and service name" text. That is right for a
          // connection failure and actively misleading for anything else: an
@@ -1089,7 +1163,14 @@
          private static string Describe(Exception ex)
 --- a/Services/WireBondService.cs
 +++ b/Services/WireBondService.cs
-@@ -16,65 +16,55 @@
+@@ -10,71 +10,63 @@
+     {
+         Task<PagedResult<WireBond>> GetAsync(string? search, int page, int pageSize, string? sortBy, string? sortDirection);
+         Task<IReadOnlyList<WireBond>> GetForExportAsync(string? search, string? sortBy, string? sortDirection);
++        Task<IReadOnlyList<string>> GetMachineOptionsAsync();
+         Task<(bool Success, string Message)> CreateAsync(WireBondInputModel model, string userName);
+         Task<(bool Success, int Inserted, string Message)> CreateManyAsync(IReadOnlyList<WireBondInputModel> models, string userName);
+         Task<(bool Success, string Message)> UpdateAsync(WireBondInputModel model, string userName);
          Task<(bool Success, string Message)> DeleteAsync(string tblRowId, string userName);
      }
  
@@ -1130,7 +1211,7 @@
 -            wbdiffaffected, wbdifffabsite, wbdiffno, wbdiffnotaffected,
 -            wbdiffrejectqty, wbdiffremarks, wbverifiedby, wbactiontaken,
 -            wbdisposition, wbremarks, wbrcmachineerror, wbmachineerror
-+            ROWIDTOCHAR(ROWID), lastupdate, lastupdatedby, "PACKAGE", product,
++            ROWIDTOCHAR(ROWID), lastupdate, lastupdatedby, wsid, "PACKAGE", product,
 +            leadframe12nc, recipe
              """;
  
@@ -1146,6 +1227,7 @@
 -                   OR UPPER(wbissuedby) LIKE :search
 -                   OR UPPER(wbverifiedby) LIKE :search
 -                   OR UPPER(wboperatorid) LIKE :search
++                   OR UPPER(wsid) LIKE :search
 +                   OR UPPER("PACKAGE") LIKE :search
 +                   OR UPPER(product) LIKE :search
 +                   OR UPPER(leadframe12nc) LIKE :search
@@ -1161,7 +1243,7 @@
 -                 wbdifffabsite, wbdiffno, wbdiffnotaffected, wbdiffrejectqty,
 -                 wbdiffremarks, wbverifiedby, wbactiontaken, wbdisposition,
 -                 wbremarks, wbrcmachineerror, wbmachineerror)
-+                (tblrowid, lastupdate, lastupdatedby, "PACKAGE", product,
++                (tblrowid, lastupdate, lastupdatedby, wsid, "PACKAGE", product,
 +                 leadframe12nc, recipe)
              VALUES
 -                (RAWTOHEX(SYS_GUID()), SYSDATE, :lastupdatedby, :wbocapno, :wbissuedby, :wbbfg,
@@ -1170,7 +1252,7 @@
 -                 :wbdifffabsite, :wbdiffno, :wbdiffnotaffected, :wbdiffrejectqty,
 -                 :wbdiffremarks, :wbverifiedby, :wbactiontaken, :wbdisposition,
 -                 :wbremarks, :wbrcmachineerror, :wbmachineerror)
-+                (RAWTOHEX(SYS_GUID()), SYSDATE, :lastupdatedby, :package, :product,
++                (RAWTOHEX(SYS_GUID()), SYSDATE, :lastupdatedby, :wsid, :package, :product,
 +                 :leadframe12nc, :recipe)
              """;
  
@@ -1180,26 +1262,109 @@
 +        // adding the key here silently sorts by lastupdate instead.
 +        private static readonly string[] SortableColumns =
 +        [
-+            "package", "product", "leadframe12nc", "recipe", "lastupdatedby", "lastupdate"
++            "wsid", "package", "product", "leadframe12nc", "recipe", "lastupdatedby", "lastupdate"
 +        ];
 +
          private readonly IOracleConnectionFactory _connectionFactory;
          private readonly IRecipeAuditRepository _auditRepository;
  
-@@ -164,10 +154,10 @@
+@@ -154,6 +146,76 @@
+             return rows;
+         }
+ 
++        // The wire bonders registered in AWACSWSTYPE. AWACSWSTYPE is the parent
++        // table - one row per machine - and this is the list the Machine cell
++        // offers.
++        //
++        // Swallows database errors: an unreadable AWACSWSTYPE means an empty list
++        // and a grid that says so, rather than a page that will not load.
++        public async Task<IReadOnlyList<string>> GetMachineOptionsAsync()
++        {
++            var values = new List<string>();
++
++            try
++            {
++                await using var connection = _connectionFactory.CreateConnection();
++                await connection.OpenAsync();
++
++                await using var command = connection.CreateCommand();
++                command.CommandText = """
++                    SELECT DISTINCT wsid
++                    FROM awacswstype
++                    WHERE UPPER(wstype) = 'WIREBOND'
++                      AND wsid IS NOT NULL
++                    ORDER BY wsid
++                    """;
++
++                await using var reader = await command.ExecuteReaderTracedAsync();
++                while (await reader.ReadAsync())
++                {
++                    if (!reader.IsDBNull(0))
++                    {
++                        values.Add(reader.GetString(0));
++                    }
++                }
++            }
++            catch (Exception ex) when (ex is OracleException or InvalidOperationException)
++            {
++                return [];
++            }
++
++            return values;
++        }
++
++        // The parent-child check. A recipe names a machine, so the machine has to
++        // exist in AWACSWSTYPE as a wire bonder. Enforced here rather than only in
++        // the dropdown: a POST that names an unregistered machine is refused too.
++        //
++        // The database has no foreign key doing this - AWACSWSTYPE has no unique
++        // key on WSID to point one at. Database/tblwirebond-wsid.sql carries the
++        // index and the constraint if you want the database enforcing it as well.
++        private static async Task<bool> MachineIsRegisteredAsync(OracleConnection connection, OracleTransaction transaction, string wsId)
++        {
++            await using var command = connection.CreateCommand();
++            command.BindByName = true;
++            command.Transaction = transaction;
++            command.CommandText = """
++                SELECT COUNT(1)
++                FROM awacswstype
++                WHERE UPPER(wsid) = UPPER(:wsid)
++                  AND UPPER(wstype) = 'WIREBOND'
++                """;
++            command.Parameters.Add(new OracleParameter("wsid", wsId));
++
++            return Convert.ToInt32(await command.ExecuteScalarTracedAsync()) > 0;
++        }
++
++        private static string UnregisteredMachineMessage(string wsId)
++        {
++            return $"Machine {wsId} is not registered in AWACSWSTYPE as a WIREBOND workstation. "
++                 + "Add it on the AWACSWSTYPE page first (Add Row, WSTYPE WIREBOND), then save this recipe.";
++        }
++
+         public async Task<(bool Success, string Message)> CreateAsync(WireBondInputModel model, string userName)
+         {
+             Normalize(model);
+@@ -164,10 +226,16 @@
  
              try
              {
 -                if (await OcapNoExistsAsync(connection, transaction, model.OcapNo))
-+                if (await RecipeExistsAsync(connection, transaction, model))
++                if (!await MachineIsRegisteredAsync(connection, transaction, model.WsId))
                  {
                      await transaction.RollbackAsync();
 -                    return (false, $"TBLWIREBOND already has a record for OCAP No {model.OcapNo}. Edit that row instead of adding a second one.");
++                    return (false, UnregisteredMachineMessage(model.WsId));
++                }
++
++                if (await RecipeExistsAsync(connection, transaction, model))
++                {
++                    await transaction.RollbackAsync();
 +                    return (false, $"TBLWIREBOND already has {model.Product} / {model.Leadframe12Nc} / {model.Recipe}. Edit that row instead of adding a second one.");
                  }
  
                  await using var command = connection.CreateCommand();
-@@ -177,18 +167,14 @@
+@@ -177,18 +245,14 @@
                  AddWriteParameters(command, model, userName);
  
                  var inserted = await command.ExecuteNonQueryTracedAsync();
@@ -1220,20 +1385,38 @@
              }
              catch
              {
-@@ -215,10 +201,10 @@
+@@ -215,10 +279,16 @@
                  {
                      Normalize(model);
  
 -                    if (await OcapNoExistsAsync(connection, transaction, model.OcapNo))
-+                    if (await RecipeExistsAsync(connection, transaction, model))
++                    if (!await MachineIsRegisteredAsync(connection, transaction, model.WsId))
                      {
                          await transaction.RollbackAsync();
 -                        return (false, 0, $"Import cancelled. OCAP No {model.OcapNo} is already in TBLWIREBOND. No rows were uploaded.");
++                        return (false, 0, $"Import cancelled. {UnregisteredMachineMessage(model.WsId)} No rows were uploaded.");
++                    }
++
++                    if (await RecipeExistsAsync(connection, transaction, model))
++                    {
++                        await transaction.RollbackAsync();
 +                        return (false, 0, $"Import cancelled. {model.Product} / {model.Leadframe12Nc} / {model.Recipe} is already in TBLWIREBOND. No rows were uploaded.");
                      }
  
                      await using var command = connection.CreateCommand();
-@@ -273,36 +259,14 @@
+@@ -267,42 +337,27 @@
+                     return (false, "TBLWIREBOND row was not found. It may have been deleted - check Trash.");
+                 }
+ 
++                if (!await MachineIsRegisteredAsync(connection, transaction, model.WsId))
++                {
++                    await transaction.RollbackAsync();
++                    return (false, UnregisteredMachineMessage(model.WsId));
++                }
++
+                 var oldValues = await _auditRepository.CaptureRowAsync(
+                     connection, transaction, AuditedTableNames.WireBond, model.TblRowId);
+ 
                  await using var command = connection.CreateCommand();
                  command.BindByName = true;
                  command.Transaction = transaction;
@@ -1267,6 +1450,7 @@
 -                        wbremarks = :wbremarks,
 -                        wbrcmachineerror = :wbrcmachineerror,
 -                        wbmachineerror = :wbmachineerror
++                        wsid = :wsid,
 +                        "PACKAGE" = :package,
 +                        product = :product,
 +                        leadframe12nc = :leadframe12nc,
@@ -1274,7 +1458,7 @@
                      WHERE ROWID = CHARTOROWID(:tblrowid)
                      """;
                  AddWriteParameters(command, model, userName);
-@@ -322,14 +286,14 @@
+@@ -322,14 +377,14 @@
                      connection,
                      transaction,
                      AuditedTableNames.WireBond,
@@ -1291,7 +1475,7 @@
              }
              catch
              {
-@@ -359,7 +323,7 @@
+@@ -359,7 +414,7 @@
                      connection,
                      transaction,
                      AuditedTableNames.WireBond,
@@ -1300,7 +1484,7 @@
                      rowData,
                      userName);
  
-@@ -377,7 +341,7 @@
+@@ -377,7 +432,7 @@
                  }
  
                  await transaction.CommitAsync();
@@ -1309,7 +1493,7 @@
              }
              catch
              {
-@@ -400,17 +364,24 @@
+@@ -400,17 +455,24 @@
              return Convert.ToInt32(await command.ExecuteScalarTracedAsync());
          }
  
@@ -1341,7 +1525,7 @@
  
              return Convert.ToInt32(await command.ExecuteScalarTracedAsync()) > 0;
          }
-@@ -426,51 +397,13 @@
+@@ -426,51 +488,14 @@
              return Convert.ToInt32(await command.ExecuteScalarTracedAsync()) == 1;
          }
  
@@ -1390,6 +1574,7 @@
 -            command.Parameters.Add(Text("wbremarks", model.Remarks));
 -            command.Parameters.Add(Text("wbrcmachineerror", model.RcMachineError));
 -            command.Parameters.Add(Text("wbmachineerror", model.MachineError));
++            command.Parameters.Add(new OracleParameter("wsid", model.WsId));
 +            command.Parameters.Add(Text("package", model.Package));
 +            command.Parameters.Add(new OracleParameter("product", model.Product));
 +            command.Parameters.Add(new OracleParameter("leadframe12nc", model.Leadframe12Nc));
@@ -1397,7 +1582,7 @@
          }
  
          private static OracleParameter Text(string name, string? value)
-@@ -481,86 +414,49 @@
+@@ -481,86 +506,50 @@
              };
          }
  
@@ -1426,6 +1611,7 @@
 -            model.OperatorId = InputText.CleanUpperOrNull(model.OperatorId);
 -            model.Process = InputText.CleanUpperOrNull(model.Process);
 -            model.Machine = InputText.CleanUpperOrNull(model.Machine);
++            model.WsId = InputText.CleanUpper(model.WsId);
              model.Package = InputText.CleanUpperOrNull(model.Package);
 -            model.Defect = InputText.CleanUpperOrNull(model.Defect);
 -            model.DefectCategory = InputText.CleanUpperOrNull(model.DefectCategory);
@@ -1508,7 +1694,7 @@
          }
  
          private static string? NormalizeSearch(string? search)
-@@ -575,32 +471,10 @@
+@@ -575,32 +564,11 @@
                  TblRowId = ReadString(reader, 0),
                  LastUpdate = ReadDate(reader, 1),
                  LastUpdatedBy = ReadString(reader, 2),
@@ -1538,14 +1724,15 @@
 -                Remarks = ReadString(reader, 26),
 -                RcMachineError = ReadString(reader, 27),
 -                MachineError = ReadString(reader, 28)
-+                Package = ReadString(reader, 3),
-+                Product = ReadString(reader, 4),
-+                Leadframe12Nc = ReadString(reader, 5),
-+                Recipe = ReadString(reader, 6)
++                WsId = ReadString(reader, 3),
++                Package = ReadString(reader, 4),
++                Product = ReadString(reader, 5),
++                Leadframe12Nc = ReadString(reader, 6),
++                Recipe = ReadString(reader, 7)
              };
          }
  
-@@ -613,10 +487,5 @@
+@@ -613,10 +581,5 @@
          {
              return reader.IsDBNull(index) ? null : reader.GetDateTime(index);
          }
@@ -1599,7 +1786,7 @@
              new(AuditedTableNames.WireBond, "ROWID = CHARTOROWID(:row_key)");
 --- a/ViewModels/AwacsWstypeInputModel.cs
 +++ b/ViewModels/AwacsWstypeInputModel.cs
-@@ -1,13 +1,32 @@
+@@ -1,13 +1,14 @@
  using System.ComponentModel.DataAnnotations;
 +using Atcbassemblyrecipe.Models;
  
@@ -1610,65 +1797,52 @@
 -        // AWACSWSTYPE.WSDB is NOT NULL and this page only ever writes TBLSAWING,
 -        // so the column was dropped from the grid and the CSV. The value is still
 -        // supplied on save from here.
-+        // AWACSWSTYPE.WSDB names the table that holds a workstation's recipes.
-+        // It is NOT typed in: it follows from WSTYPE, so the two can never
-+        // disagree and nobody can point a SAWING workstation at TBLWIREBOND.
-+        // AwacsWstypeService.Normalize sets it from WSTYPE on every write.
-         public const string SawingWsDb = "TBLSAWING";
-+        public const string WirebondWsDb = "TBLWIREBOND";
-+
-+        // The workstation types this page manages. Add a pair here and the
-+        // grid's WSTYPE list, the validation and the derived WSDB all follow.
-+        public static readonly IReadOnlyDictionary<string, string> WsDbByWsType =
-+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-+            {
-+                [RecipeWsTypes.Sawing] = SawingWsDb,
-+                [RecipeWsTypes.Wirebond] = WirebondWsDb
-+            };
-+
-+        public static string WsDbFor(string? wsType)
-+        {
-+            return WsDbByWsType.TryGetValue((wsType ?? string.Empty).Trim(), out var wsDb)
-+                ? wsDb
-+                : string.Empty;
-+        }
+-        public const string SawingWsDb = "TBLSAWING";
++        // The workstation types this page manages. The table holds others
++        // (MOULD, DIEBOND, CLIPBOND, OVEN, TAPING ...) which have no recipe grid
++        // here and are deliberately left alone.
++        public static readonly string[] PageWsTypes = [RecipeWsTypes.Sawing, RecipeWsTypes.Wirebond];
  
          public string? TblRowId { get; set; }
  
-@@ -17,13 +36,15 @@
+@@ -17,13 +18,20 @@
  
          [Required, StringLength(16)]
          [Display(Name = "WSTYPE")]
 -        public string WsType { get; set; } = "SAWING";
 +        public string WsType { get; set; } = RecipeWsTypes.Sawing;
  
--        [Required, StringLength(16)]
-+        // Derived, never posted. Kept as a property because the service writes
-+        // it to the column and the duplicate check reads it.
-+        [StringLength(16)]
++        // The business group the machine belongs to - SENSORS, POWER and so on.
++        // Plant data, typed in by the user and offered as a pick list built from
++        // the values already in the table.
++        //
++        // This is NOT a table name. An earlier version of this page treated it as
++        // one and wrote TBLSAWING into it, which is why some rows carry that
++        // value; see Database/awacswstype-wsdb-repair.sql.
+         [Required, StringLength(16)]
          [Display(Name = "WSDB")]
-         public string WsDb { get; set; } = SawingWsDb;
+-        public string WsDb { get; set; } = SawingWsDb;
++        public string WsDb { get; set; } = string.Empty;
  
 -        [Display(Name = "I verified this AWACSWSTYPE row maps to TBLSAWING")]
 +        [Display(Name = "I verified this AWACSWSTYPE row")]
          public bool Confirmed { get; set; }
  
          public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-@@ -41,26 +62,17 @@
+@@ -41,6 +49,12 @@
              {
                  yield return new ValidationResult("WSTYPE is required.", [nameof(WsType)]);
              }
--
--            if (string.IsNullOrWhiteSpace(WsDb))
-+            else if (string.IsNullOrEmpty(WsDbFor(WsType)))
-             {
--                yield return new ValidationResult("WSDB is required.", [nameof(WsDb)]);
++            else if (!PageWsTypes.Contains(WsType.Trim().ToUpperInvariant(), StringComparer.Ordinal))
++            {
 +                yield return new ValidationResult(
-+                    $"WSTYPE must be one of: {string.Join(", ", WsDbByWsType.Keys)}.",
++                    $"This page manages {string.Join(" and ", PageWsTypes)} workstations only.",
 +                    [nameof(WsType)]);
-             }
++            }
  
-             if (!Confirmed)
+             if (string.IsNullOrWhiteSpace(WsDb))
+             {
+@@ -51,16 +65,6 @@
              {
                  yield return new ValidationResult("Confirm validation before saving.", [nameof(Confirmed)]);
              }
@@ -1685,9 +1859,30 @@
          }
      }
  }
+--- a/ViewModels/AwacsDashboardViewModel.cs
++++ b/ViewModels/AwacsDashboardViewModel.cs
+@@ -11,6 +11,10 @@
+         public int TotalRows { get; set; }
+         public string SortBy { get; set; } = "lastupdate";
+         public string SortDirection { get; set; } = "desc";
++
++        // WSDB values already in AWACSWSTYPE - SENSORS, POWER and whatever else
++        // the plant uses - offered as the pick list on the add and edit rows.
++        public IReadOnlyList<string> WsDbOptions { get; set; } = [];
+         public int TotalPages => TotalRows == 0 ? 1 : (int)Math.Ceiling(TotalRows / (double)PageSize);
+     }
+ }
 --- a/Services/AwacsWstypeService.cs
 +++ b/Services/AwacsWstypeService.cs
-@@ -57,7 +57,7 @@
+@@ -21,6 +21,7 @@
+         Task<(bool Success, string Message)> DeleteRecipeRowAsync(string tblRowId, string userName);
+         Task<AwacsWstypeInputModel?> GetForEditAsync(string tblRowId);
+         Task<int> GetTblSawingCountAsync();
++        Task<IReadOnlyList<string>> GetWsDbOptionsAsync();
+         Task<(bool Success, string Message)> CreateAsync(AwacsWstypeInputModel model, string userName);
+         Task<(bool Success, int Inserted, string Message)> CreateManyAsync(IReadOnlyList<AwacsWstypeInputModel> models, string userName);
+         Task<(bool Success, string Message)> UpdateAsync(AwacsWstypeInputModel model, string userName);
+@@ -57,7 +58,7 @@
              command.CommandText = $"""
                  SELECT tblrowid, lastupdate, lastupdatedby, wsid, wstype, wsdb
                  FROM awacswstype
@@ -1696,7 +1891,7 @@
                    AND (:search IS NULL
                         OR UPPER(tblrowid) LIKE :search
                         OR UPPER(lastupdatedby) LIKE :search
-@@ -98,7 +98,7 @@
+@@ -98,7 +99,7 @@
              command.CommandText = $"""
                  SELECT tblrowid, lastupdate, lastupdatedby, wsid, wstype, wsdb
                  FROM awacswstype
@@ -1705,7 +1900,54 @@
                    AND (:search IS NULL
                         OR UPPER(tblrowid) LIKE :search
                         OR UPPER(lastupdatedby) LIKE :search
-@@ -768,7 +768,7 @@
+@@ -474,6 +475,46 @@
+             return Convert.ToInt32(await command.ExecuteScalarTracedAsync());
+         }
+ 
++        // The WSDB values already in AWACSWSTYPE, offered as the pick list on the
++        // grid. Read from the data rather than hardcoded: the business groups are
++        // the plant's to name, not this app's.
++        //
++        // Swallows database errors on purpose - it is a convenience list, and an
++        // empty one just means the field stays free text.
++        public async Task<IReadOnlyList<string>> GetWsDbOptionsAsync()
++        {
++            var values = new List<string>();
++
++            try
++            {
++                await using var connection = _connectionFactory.CreateConnection();
++                await connection.OpenAsync();
++
++                await using var command = connection.CreateCommand();
++                command.CommandText = """
++                    SELECT DISTINCT wsdb
++                    FROM awacswstype
++                    WHERE wsdb IS NOT NULL
++                    ORDER BY wsdb
++                    """;
++
++                await using var reader = await command.ExecuteReaderTracedAsync();
++                while (await reader.ReadAsync())
++                {
++                    if (!reader.IsDBNull(0))
++                    {
++                        values.Add(reader.GetString(0));
++                    }
++                }
++            }
++            catch (Exception ex) when (ex is OracleException or InvalidOperationException)
++            {
++                return [];
++            }
++
++            return values;
++        }
++
+         public async Task<(bool Success, string Message)> CreateAsync(AwacsWstypeInputModel model, string userName)
+         {
+             Normalize(model);
+@@ -768,7 +809,7 @@
              command.CommandText = """
                  SELECT COUNT(1)
                  FROM awacswstype
@@ -1714,35 +1956,71 @@
                    AND (:search IS NULL
                         OR UPPER(tblrowid) LIKE :search
                         OR UPPER(lastupdatedby) LIKE :search
-@@ -900,7 +900,13 @@
-             model.TblRowId = model.TblRowId?.Trim();
-             model.WsId = InputText.CleanUpper(model.WsId);
-             model.WsType = InputText.CleanUpper(model.WsType);
--            model.WsDb = InputText.CleanUpper(model.WsDb);
-+
-+            // Never taken from the form: WSTYPE decides which table holds that
-+            // workstation's recipes. An unknown WSTYPE leaves whatever was
-+            // there, so validation reports the WSTYPE rather than a confusing
-+            // empty WSDB.
-+            var derived = AwacsWstypeInputModel.WsDbFor(model.WsType);
-+            model.WsDb = string.IsNullOrEmpty(derived) ? InputText.CleanUpper(model.WsDb) : derived;
-         }
- 
-         private static void Normalize(SawingRecipeInputModel model)
 --- a/Controllers/HomeController.cs
 +++ b/Controllers/HomeController.cs
-@@ -139,8 +139,9 @@
+@@ -28,7 +28,8 @@
+         private static readonly CsvColumn[] AwacsWstypeCsvColumns =
+         [
+             new CsvColumn("WSID", true, "WS ID", "WORKSTATION", "WORKSTATION ID"),
+-            new CsvColumn("WSTYPE", true, "WS TYPE", "WORKSTATION TYPE")
++            new CsvColumn("WSTYPE", true, "WS TYPE", "WORKSTATION TYPE"),
++            new CsvColumn("WSDB", true, "WS DB", "BFG", "BUSINESS GROUP")
+         ];
+ 
+         [ModuleAccess(ModuleNames.AwacsWstype, ModuleAction.View)]
+@@ -48,7 +49,8 @@
+                     PageSize = result.PageSize,
+                     TotalRows = result.TotalRows,
+                     SortBy = normalizedSortBy,
+-                    SortDirection = normalizedSortDirection
++                    SortDirection = normalizedSortDirection,
++                    WsDbOptions = await _awacsWstypeService.GetWsDbOptionsAsync()
+                 };
+ 
+                 return View(model);
+@@ -65,7 +67,7 @@
+         [Authorize]
+         public IActionResult DownloadAwacsTemplate()
+         {
+-            const string csv = "WSID,WSTYPE\r\nDB-AD3-014,SAWING\r\n";
++            const string csv = "WSID,WSTYPE,WSDB\r\nDB-AD3-014,SAWING,SENSORS\r\nWB-007,WIREBOND,POWER\r\n";
+             return File(Encoding.UTF8.GetBytes(csv), "text/csv", "awacswstype-template.csv");
+         }
+ 
+@@ -76,13 +78,14 @@
+             {
+                 var rows = await _awacsWstypeService.GetAwacsWstypeForExportAsync(search, sortBy, sortDirection);
+                 var builder = new StringBuilder();
+-                builder.AppendLine("WSID,WSTYPE,Last Updated By,Timestamp");
++                builder.AppendLine("WSID,WSTYPE,WSDB,Last Updated By,Timestamp");
+ 
+                 foreach (var row in rows)
+                 {
+                     builder
+                         .Append(EscapeCsv(row.WsId)).Append(',')
+                         .Append(EscapeCsv(row.WsType)).Append(',')
++                        .Append(EscapeCsv(row.WsDb)).Append(',')
+                         .Append(EscapeCsv(row.LastUpdatedBy)).Append(',')
+                         .Append(EscapeCsv(row.LastUpdate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty))
+                         .AppendLine();
+@@ -139,8 +142,7 @@
                  {
                      WsId = row["WSID"],
                      WsType = row["WSTYPE"],
 -                    // WSDB is no longer a CSV column; AWACSWSTYPE still requires the value.
 -                    WsDb = AwacsWstypeInputModel.SawingWsDb,
-+                    // WSDB is not a CSV column and is not set here: the service
-+                    // derives it from WSTYPE, so an uploaded WIREBOND row gets
-+                    // TBLWIREBOND and a SAWING row gets TBLSAWING.
++                    WsDb = row["WSDB"],
                      Confirmed = true
                  };
  
+@@ -225,6 +227,7 @@
+                 "sequence" => "sequence",
+                 "wsid" => "wsid",
+                 "wstype" => "wstype",
++                "wsdb" => "wsdb",
+                 "lastupdatedby" => "lastupdatedby",
+                 "lastupdate" => "lastupdate",
+                 _ => "lastupdate"
 --- a/Views/Home/Index.cshtml
 +++ b/Views/Home/Index.cshtml
 @@ -15,7 +15,7 @@
@@ -1754,24 +2032,78 @@
      </div>
  </div>
  
-@@ -94,7 +94,15 @@
+@@ -58,6 +58,16 @@
+     </div>
+ </section>
+ 
++@* SENSORS, POWER and whatever else is already in AWACSWSTYPE. A hint, not a
++   constraint - the field still accepts a new business group without a code
++   change. *@
++<datalist id="wsDbOptions">
++    @foreach (var value in Model.WsDbOptions)
++    {
++        <option value="@value"></option>
++    }
++</datalist>
++
+ <div class="table-responsive data-panel excel-panel">
+     <table class="table table-hover align-middle excel-table" id="awacsWstypeTable" data-resizable-table="awacswstype">
+         <colgroup>
+@@ -65,6 +75,7 @@
+             <col class="col-sequence" />
+             <col class="col-wsid" />
+             <col class="col-wstype" />
++            <col class="col-wsdb" />
+             <col class="col-user" />
+             <col class="col-date" />
+             <col class="col-action" />
+@@ -94,7 +105,17 @@
                          <input name="WsId" form="createAwacsForm" class="form-control cell-input" maxlength="16" placeholder="DB-AD3-014" required aria-label="WSID" />
                      </td>
                      <td>
 -                        <input class="form-control cell-input" value="SAWING" readonly aria-label="WSTYPE" />
-+                        @* WSDB is not here and is not posted - the server derives it
-+                           from WSTYPE (AwacsWstypeInputModel.WsDbFor), so a SAWING
-+                           workstation cannot be pointed at TBLWIREBOND by hand. *@
++                        @* The table also holds MOULD, DIEBOND, OVEN and others.
++                           This page manages the two that have a recipe grid. *@
 +                        <select name="WsType" form="createAwacsForm" class="form-select cell-input" aria-label="WSTYPE">
-+                            @foreach (var wsType in AwacsWstypeInputModel.WsDbByWsType.Keys)
++                            @foreach (var wsType in AwacsWstypeInputModel.PageWsTypes)
 +                            {
 +                                <option value="@wsType">@wsType</option>
 +                            }
 +                        </select>
++                    </td>
++                    <td>
++                        <input name="WsDb" form="createAwacsForm" class="form-control cell-input" maxlength="16" list="wsDbOptions" placeholder="SENSORS" required aria-label="WSDB" />
                      </td>
                      <td><span class="cell-muted">Current user</span></td>
                      <td><span class="cell-muted">Set on save</span></td>
-@@ -195,8 +203,6 @@
+@@ -114,7 +135,7 @@
+             @if (Model.Rows.Count == 0)
+             {
+                 <tr>
+-                    <td colspan="8" class="text-center text-muted py-4">No AWACSWSTYPE rows found.</td>
++                    <td colspan="9" class="text-center text-muted py-4">No AWACSWSTYPE rows found.</td>
+                 </tr>
+             }
+             else
+@@ -127,6 +148,7 @@
+                         <td>@rowNumber</td>
+                         <td>@row.WsId</td>
+                         <td class="fw-semibold">@row.WsType</td>
++                        <td>@row.WsDb</td>
+                         <td title="@row.LastUpdatedBy">@(await Directory.GetDisplayNameAsync(row.LastUpdatedBy))</td>
+                         <td>@row.LastUpdate?.ToString("yyyy-MM-dd HH:mm")</td>
+                         <td class="text-center">
+@@ -159,6 +181,9 @@
+                             <td>
+                                 <input name="WsType" form="@editFormId" class="form-control cell-input" value="@row.WsType" readonly aria-label="WSTYPE" />
+                             </td>
++                            <td>
++                                <input name="WsDb" form="@editFormId" class="form-control cell-input" maxlength="16" list="wsDbOptions" value="@row.WsDb" data-original-value="@row.WsDb" required aria-label="WSDB" />
++                            </td>
+                             <td><span class="cell-muted">Save user</span></td>
+                             <td><span class="cell-muted">Set on save</span></td>
+                             <td class="text-center">
+@@ -195,8 +220,6 @@
      @if (canAdd)
      {
          <form id="createAwacsForm" asp-controller="Awacs" asp-action="Create" method="post">
@@ -1780,7 +2112,7 @@
              <input type="hidden" name="Confirmed" value="true" />
          </form>
      }
-@@ -209,7 +215,6 @@
+@@ -209,7 +232,6 @@
                  <input type="hidden" name="TblRowId" value="@row.TblRowId" />
                  @* WSDB is no longer shown in the grid; the column is still NOT NULL
                     in AWACSWSTYPE, so the row's existing value rides along here. *@
@@ -1788,24 +2120,42 @@
                  <input type="hidden" name="Confirmed" value="true" />
              </form>
          }
-@@ -280,12 +285,16 @@
+@@ -273,19 +295,26 @@
+                             <tr>
+                                 <th>WSID</th>
+                                 <th>WSTYPE</th>
++                                <th>WSDB</th>
+                             </tr>
+                         </thead>
+                         <tbody>
+                             <tr>
                                  <td>DB-AD3-014</td>
                                  <td>SAWING</td>
-                             </tr>
++                                <td>SENSORS</td>
++                            </tr>
 +                            <tr>
 +                                <td>WB-007</td>
 +                                <td>WIREBOND</td>
-+                            </tr>
++                                <td>POWER</td>
+                             </tr>
                          </tbody>
                      </table>
                  </div>
  
                  <div class="template-note">
 -                    Required columns: WSID, WSTYPE. WSTYPE must be SAWING.
-+                    Required columns: WSID, WSTYPE. WSTYPE must be SAWING or WIREBOND - it decides which recipe table the machine is pointed at, so a typo is rejected rather than guessed.
++                    Required columns: WSID, WSTYPE, WSDB. WSTYPE must be SAWING or WIREBOND - this page manages those two. WSDB is the machine's business group, e.g. SENSORS or POWER.
                      The header row itself is optional: a file that starts straight at the values is read
                      in the column order above.
                  </div>
+@@ -342,6 +371,7 @@
+         ("sequence", "#"),
+         ("wsid", "WSID"),
+         ("wstype", "WSTYPE"),
++        ("wsdb", "WSDB"),
+         ("lastupdatedby", "Last Updated By"),
+         ("lastupdate", "Timestamp")
+     };
 --- a/Database/tblwirebond.sql
 +++ b/Database/tblwirebond.sql
 @@ -1,113 +1,122 @@
@@ -2712,7 +3062,7 @@
 +-- SELECT table_name, COUNT(1) FROM tblrecipetrash   GROUP BY table_name;
 --- a/README.md
 +++ b/README.md
-@@ -1,103 +1,172 @@
+@@ -1,103 +1,208 @@
 -# Wirebond OCAP page (OCAPSYS.TBLWIREBOND)
 +# Wirebond page (OCAPSYS.TBLWIREBOND)
  
@@ -2727,10 +3077,46 @@
 +Route: `/WireBond/Index`. Sidebar: **Operations → Wirebond**.
  
 -## Install
-+The columns, and only these:
++The columns:
 +
-+| | # | WSTYPE | PACKAGE | Product | Leadframe 12NC | Recipe | Last Updated By | Timestamp | Edit | Delete |
-+|---|---|---|---|---|---|---|---|---|---|---|
++| | # | WSTYPE | Machine | PACKAGE | Product | Leadframe 12NC | Recipe | Last Updated By | Timestamp | Edit | Delete |
++|---|---|---|---|---|---|---|---|---|---|---|---|
++
++## AWACSWSTYPE is the parent, TBLWIREBOND is the child
++
++`AWACSWSTYPE` holds one row per machine, keyed by `WSID`. `TBLWIREBOND` holds
++one row per recipe, and **Machine** is that recipe's `WSID` — the child's
++reference back to the parent, the same way `TBLSAWING.SAWMACHINE` points at a
++`WSID`.
++
++Run `Database/tblwirebond-wsid.sql` to add the column. After that:
++
++- The Machine cell is a dropdown of the wire bonders registered in AWACSWSTYPE
++  (`WSTYPE = 'WIREBOND'`). Register them first — Operations → AWACSWSTYPE → Add
++  Row — or the grid tells you there is nothing to pick.
++- **The reference is checked in the database on every save**, not just in the
++  dropdown: add, edit and CSV import all refuse a machine that is not registered
++  as a wire bonder, so a hand-made POST cannot write a dangling row either.
++- Step 4 of that script adds a real foreign key as well, if AWACSWSTYPE has no
++  duplicate WSIDs. Worth doing — but keep the app check too, because a foreign
++  key can only say the WSID exists, not that its WSTYPE is WIREBOND.
++
++Saving a recipe still does not *write* to AWACSWSTYPE, and should not — the
++machine record did not change. What changed is that the recipe now names its
++machine, so the two tables can be joined.
++
++## A correction: WSDB is not a table name
++
++`AWACSWSTYPE.WSDB` is the machine's **business group** — `SENSORS`, `POWER` —
++matching `SAWBFG` in TBLSAWING. An earlier version of this app treated it as a
++table name and wrote `TBLSAWING` into it, and for one build derived it from
++WSTYPE on every save, which overwrote the real value whenever an existing row
++was edited.
++
++That is gone. WSDB is a normal field on the AWACSWSTYPE grid now, with the
++values already in the table offered as a pick list.
++`Database/awacswstype-wsdb-repair.sql` finds the rows that were written wrongly
++and suggests the right value from TBLSAWING.
 +
 +**WSTYPE always reads `WIREBOND` and cannot be edited** — it is a read-only cell
 +on the add row and on every edit row, exactly like `SAWING` on the Sawing grid.
@@ -2739,7 +3125,8 @@
 +by definition, so storing the same word on all of them would buy nothing and
 +give somebody a way to set it wrong. The page states the value instead. Nothing
 +posts it, so nothing can change it.
-+
+ 
+-Copy the files over the project, keeping the folder structure:
 +If you do want it in the table — say the MES joins on it — one statement does it,
 +and the page keeps working either way because it never reads the column:
 +
@@ -2753,8 +3140,7 @@
 +
 +Until the table is changed the page cannot load at all — the app asks for
 +`RECIPE` and Oracle answers **ORA-00904: "RECIPE": invalid identifier**.
- 
--Copy the files over the project, keeping the folder structure:
++
 +Two ways to change it. **Use the first one** if TBLWIREBOND already exists:
 +
 +| Script | |
@@ -3513,6 +3899,208 @@
 +--  WHERE wstype = 'WIREBOND'
 +--    AND (wsdb IS NULL OR wsdb <> 'TBLWIREBOND');
 +-- COMMIT;
+--- a/Database/tblwirebond-wsid.sql
++++ b/Database/tblwirebond-wsid.sql
+@@ -0,0 +1,109 @@
++-- =====================================================================
++-- Relate TBLWIREBOND to AWACSWSTYPE
++--
++-- AWACSWSTYPE is the parent: one row per machine, keyed by WSID.
++-- TBLWIREBOND is the child: one row per recipe. Until now the child had
++-- nothing pointing back at the parent, which is why saving a recipe
++-- could not touch AWACSWSTYPE - there was no machine on the recipe.
++--
++-- This adds that pointer. Same shape as TBLSAWING.SAWMACHINE, which
++-- already holds WSID values like DS12-004 and 2O1F-002.
++--
++-- Run the whole file: F5 (Execute as Script in Toad, Run Script in SQL
++-- Developer). Every statement is safe to run twice.
++-- =====================================================================
++
++
++-- ---------------------------------------------------------------------
++-- 1. The column
++--
++-- VARCHAR2(16) to match AWACSWSTYPE.WSID exactly. Nullable to start with,
++-- so existing recipes are not rejected before you have assigned them a
++-- machine; step 4 tightens it once they are.
++-- ---------------------------------------------------------------------
++ALTER TABLE OCAPSYS.TBLWIREBOND ADD (WSID VARCHAR2(16 BYTE));
++
++
++-- ---------------------------------------------------------------------
++-- 2. Which machines can a recipe name?
++--
++-- The wire bonders registered in AWACSWSTYPE. If this comes back empty,
++-- register them first - the page will not let you save a recipe without
++-- one. Operations > AWACSWSTYPE > Add Row, WSTYPE WIREBOND, or
++-- Database/awacswstype-wirebond.sql.
++-- ---------------------------------------------------------------------
++SELECT wsid, wstype, wsdb
++FROM   OCAPSYS.AWACSWSTYPE
++WHERE  wstype = 'WIREBOND'
++ORDER  BY wsid;
++
++
++-- ---------------------------------------------------------------------
++-- 3. Give the existing recipes a machine
++--
++-- Rows written before this column existed have WSID NULL. They still
++-- show on the page, but they cannot be saved again until a machine is
++-- picked, so set one now. Replace WB-007 with the right machine.
++-- ---------------------------------------------------------------------
++SELECT COUNT(1) AS recipes_with_no_machine
++FROM   OCAPSYS.TBLWIREBOND
++WHERE  wsid IS NULL;
++
++-- UPDATE OCAPSYS.TBLWIREBOND SET wsid = 'WB-007' WHERE wsid IS NULL;
++-- COMMIT;
++
++
++-- ---------------------------------------------------------------------
++-- 4. OPTIONAL - make the database enforce the relationship too
++--
++-- The app already refuses a recipe whose machine is not registered as a
++-- wire bonder (WireBondService.MachineIsRegisteredAsync), on the page and
++-- on CSV import. These two statements make Oracle refuse it as well, so
++-- SQL*Plus and the MES cannot write a dangling row either.
++--
++-- A foreign key needs a unique key on the parent, and AWACSWSTYPE has
++-- none - WSID is not unique across the whole table if the same machine
++-- id appears under two WSTYPEs. CHECK THAT FIRST: this must return no
++-- rows, or the unique index will fail.
++-- ---------------------------------------------------------------------
++SELECT wsid, COUNT(*) AS duplicate_rows
++FROM   OCAPSYS.AWACSWSTYPE
++GROUP  BY wsid
++HAVING COUNT(*) > 1
++ORDER  BY wsid;
++
++-- Only if the query above returns nothing:
++-- ALTER TABLE OCAPSYS.AWACSWSTYPE ADD CONSTRAINT uk_awacswstype_wsid UNIQUE (wsid);
++-- ALTER TABLE OCAPSYS.TBLWIREBOND ADD CONSTRAINT fk_tblwirebond_wsid
++--     FOREIGN KEY (wsid) REFERENCES OCAPSYS.AWACSWSTYPE (wsid);
++
++-- Note what the foreign key does NOT do: it checks the WSID exists, not
++-- that its WSTYPE is WIREBOND. The app checks both. Keep both.
++
++
++-- ---------------------------------------------------------------------
++-- 5. OPTIONAL - require a machine on every recipe
++--    Run only after step 3 has left no NULLs.
++-- ---------------------------------------------------------------------
++-- ALTER TABLE OCAPSYS.TBLWIREBOND MODIFY (WSID NOT NULL);
++
++
++-- ---------------------------------------------------------------------
++-- 6. The relationship, end to end
++-- ---------------------------------------------------------------------
++SELECT w.wsid          AS machine,
++       a.wstype,
++       a.wsdb          AS business_group,
++       w."PACKAGE",
++       w.product,
++       w.leadframe12nc,
++       w.recipe
++FROM   OCAPSYS.TBLWIREBOND w
++       LEFT JOIN OCAPSYS.AWACSWSTYPE a
++              ON UPPER(a.wsid) = UPPER(w.wsid)
++             AND a.wstype = 'WIREBOND'
++ORDER  BY w.wsid, w.product;
++
++-- Any recipe whose machine is not a registered wire bonder shows up here
++-- with an empty WSTYPE. The app will refuse to save those rows until the
++-- machine is registered.
+--- a/Database/awacswstype-wsdb-repair.sql
++++ b/Database/awacswstype-wsdb-repair.sql
+@@ -0,0 +1,87 @@
++-- =====================================================================
++-- AWACSWSTYPE.WSDB - repair rows the app wrote wrongly
++--
++-- WSDB is the machine's business group: SENSORS, POWER and so on. It
++-- matches SAWBFG in TBLSAWING.
++--
++-- An earlier version of the AWACSWSTYPE page treated WSDB as a table
++-- name and wrote 'TBLSAWING' into it - first as a hidden field on the
++-- add row, then (briefly) derived from WSTYPE on every save, which also
++-- overwrote the real value when an existing row was edited. Both are
++-- gone: WSDB is a normal field on the grid now, with the values already
++-- in the table offered as a pick list.
++--
++-- This file finds and fixes the rows that were written wrongly.
++--
++-- Run one statement at a time, or F5 for the whole file - nothing below
++-- changes data unless you uncomment it.
++-- =====================================================================
++
++
++-- ---------------------------------------------------------------------
++-- 1. What WSDB values are in the table, and how many rows each?
++--    Expect SENSORS and POWER. TBLSAWING or TBLWIREBOND in this list
++--    means rows were written by the old page.
++-- ---------------------------------------------------------------------
++SELECT NVL(wsdb, '(null)') AS wsdb,
++       COUNT(*)            AS machines
++FROM   OCAPSYS.AWACSWSTYPE
++GROUP  BY wsdb
++ORDER  BY machines DESC;
++
++
++-- ---------------------------------------------------------------------
++-- 2. The affected rows, with a suggestion.
++--
++-- TBLSAWING tells you what the machine's real business group is:
++-- SAWMACHINE is the WSID and SAWBFG is the group. Where the machine
++-- appears there, suggested_wsdb is filled in.
++-- ---------------------------------------------------------------------
++SELECT a.wsid,
++       a.wstype,
++       a.wsdb                AS current_wsdb,
++       (SELECT MAX(s.sawbfg)
++        FROM   OCAPSYS.TBLSAWING s
++        WHERE  UPPER(s.sawmachine) = UPPER(a.wsid)) AS suggested_wsdb,
++       a.lastupdatedby,
++       TO_CHAR(a.lastupdate, 'YYYY-MM-DD HH24:MI')  AS lastupdate
++FROM   OCAPSYS.AWACSWSTYPE a
++WHERE  a.wsdb IN ('TBLSAWING', 'TBLWIREBOND')
++ORDER  BY a.wsid;
++
++
++-- ---------------------------------------------------------------------
++-- 3. Apply the suggestion, where there is one.
++--    Leaves alone any row TBLSAWING has never seen - set those by hand
++--    with block 4.
++-- ---------------------------------------------------------------------
++-- UPDATE OCAPSYS.AWACSWSTYPE a
++--    SET a.wsdb = (SELECT MAX(s.sawbfg)
++--                  FROM   OCAPSYS.TBLSAWING s
++--                  WHERE  UPPER(s.sawmachine) = UPPER(a.wsid))
++--  WHERE a.wsdb IN ('TBLSAWING', 'TBLWIREBOND')
++--    AND EXISTS (SELECT 1
++--                FROM   OCAPSYS.TBLSAWING s
++--                WHERE  UPPER(s.sawmachine) = UPPER(a.wsid)
++--                  AND  s.sawbfg IS NOT NULL);
++-- COMMIT;
++
++
++-- ---------------------------------------------------------------------
++-- 4. Set the rest by hand. One machine at a time.
++-- ---------------------------------------------------------------------
++-- UPDATE OCAPSYS.AWACSWSTYPE
++--    SET wsdb = 'SENSORS', lastupdate = SYSDATE
++--  WHERE wsid = 'DSDI-002';
++-- COMMIT;
++
++
++-- ---------------------------------------------------------------------
++-- 5. Check nothing is left.
++--    No rows back means every machine carries a real business group.
++-- ---------------------------------------------------------------------
++SELECT wsid, wstype, wsdb
++FROM   OCAPSYS.AWACSWSTYPE
++WHERE  wsdb IN ('TBLSAWING', 'TBLWIREBOND')
++    OR wsdb IS NULL
++ORDER  BY wstype, wsid;
 --- a/Views/WireBond/_WireBondFields.cshtml
 +++ b/Views/WireBond/_WireBondFields.cshtml
 @@ -1,217 +0,0 @@

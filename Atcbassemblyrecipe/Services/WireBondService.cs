@@ -10,6 +10,7 @@ namespace Atcbassemblyrecipe.Services
     {
         Task<PagedResult<WireBond>> GetAsync(string? search, int page, int pageSize, string? sortBy, string? sortDirection);
         Task<IReadOnlyList<WireBond>> GetForExportAsync(string? search, string? sortBy, string? sortDirection);
+        Task<IReadOnlyList<string>> GetMachineOptionsAsync();
         Task<(bool Success, string Message)> CreateAsync(WireBondInputModel model, string userName);
         Task<(bool Success, int Inserted, string Message)> CreateManyAsync(IReadOnlyList<WireBondInputModel> models, string userName);
         Task<(bool Success, string Message)> UpdateAsync(WireBondInputModel model, string userName);
@@ -34,12 +35,13 @@ namespace Atcbassemblyrecipe.Services
     {
         // Order matters: ReadRow reads by index.
         private const string SelectColumns = """
-            ROWIDTOCHAR(ROWID), lastupdate, lastupdatedby, "PACKAGE", product,
+            ROWIDTOCHAR(ROWID), lastupdate, lastupdatedby, wsid, "PACKAGE", product,
             leadframe12nc, recipe
             """;
 
         private const string FilterSql = """
             WHERE (:search IS NULL
+                   OR UPPER(wsid) LIKE :search
                    OR UPPER("PACKAGE") LIKE :search
                    OR UPPER(product) LIKE :search
                    OR UPPER(leadframe12nc) LIKE :search
@@ -49,10 +51,10 @@ namespace Atcbassemblyrecipe.Services
 
         private const string InsertSql = """
             INSERT INTO tblwirebond
-                (tblrowid, lastupdate, lastupdatedby, "PACKAGE", product,
+                (tblrowid, lastupdate, lastupdatedby, wsid, "PACKAGE", product,
                  leadframe12nc, recipe)
             VALUES
-                (RAWTOHEX(SYS_GUID()), SYSDATE, :lastupdatedby, :package, :product,
+                (RAWTOHEX(SYS_GUID()), SYSDATE, :lastupdatedby, :wsid, :package, :product,
                  :leadframe12nc, :recipe)
             """;
 
@@ -62,7 +64,7 @@ namespace Atcbassemblyrecipe.Services
         // adding the key here silently sorts by lastupdate instead.
         private static readonly string[] SortableColumns =
         [
-            "package", "product", "leadframe12nc", "recipe", "lastupdatedby", "lastupdate"
+            "wsid", "package", "product", "leadframe12nc", "recipe", "lastupdatedby", "lastupdate"
         ];
 
         private readonly IOracleConnectionFactory _connectionFactory;
@@ -144,6 +146,76 @@ namespace Atcbassemblyrecipe.Services
             return rows;
         }
 
+        // The wire bonders registered in AWACSWSTYPE. AWACSWSTYPE is the parent
+        // table - one row per machine - and this is the list the Machine cell
+        // offers.
+        //
+        // Swallows database errors: an unreadable AWACSWSTYPE means an empty list
+        // and a grid that says so, rather than a page that will not load.
+        public async Task<IReadOnlyList<string>> GetMachineOptionsAsync()
+        {
+            var values = new List<string>();
+
+            try
+            {
+                await using var connection = _connectionFactory.CreateConnection();
+                await connection.OpenAsync();
+
+                await using var command = connection.CreateCommand();
+                command.CommandText = """
+                    SELECT DISTINCT wsid
+                    FROM awacswstype
+                    WHERE UPPER(wstype) = 'WIREBOND'
+                      AND wsid IS NOT NULL
+                    ORDER BY wsid
+                    """;
+
+                await using var reader = await command.ExecuteReaderTracedAsync();
+                while (await reader.ReadAsync())
+                {
+                    if (!reader.IsDBNull(0))
+                    {
+                        values.Add(reader.GetString(0));
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is OracleException or InvalidOperationException)
+            {
+                return [];
+            }
+
+            return values;
+        }
+
+        // The parent-child check. A recipe names a machine, so the machine has to
+        // exist in AWACSWSTYPE as a wire bonder. Enforced here rather than only in
+        // the dropdown: a POST that names an unregistered machine is refused too.
+        //
+        // The database has no foreign key doing this - AWACSWSTYPE has no unique
+        // key on WSID to point one at. Database/tblwirebond-wsid.sql carries the
+        // index and the constraint if you want the database enforcing it as well.
+        private static async Task<bool> MachineIsRegisteredAsync(OracleConnection connection, OracleTransaction transaction, string wsId)
+        {
+            await using var command = connection.CreateCommand();
+            command.BindByName = true;
+            command.Transaction = transaction;
+            command.CommandText = """
+                SELECT COUNT(1)
+                FROM awacswstype
+                WHERE UPPER(wsid) = UPPER(:wsid)
+                  AND UPPER(wstype) = 'WIREBOND'
+                """;
+            command.Parameters.Add(new OracleParameter("wsid", wsId));
+
+            return Convert.ToInt32(await command.ExecuteScalarTracedAsync()) > 0;
+        }
+
+        private static string UnregisteredMachineMessage(string wsId)
+        {
+            return $"Machine {wsId} is not registered in AWACSWSTYPE as a WIREBOND workstation. "
+                 + "Add it on the AWACSWSTYPE page first (Add Row, WSTYPE WIREBOND), then save this recipe.";
+        }
+
         public async Task<(bool Success, string Message)> CreateAsync(WireBondInputModel model, string userName)
         {
             Normalize(model);
@@ -154,6 +226,12 @@ namespace Atcbassemblyrecipe.Services
 
             try
             {
+                if (!await MachineIsRegisteredAsync(connection, transaction, model.WsId))
+                {
+                    await transaction.RollbackAsync();
+                    return (false, UnregisteredMachineMessage(model.WsId));
+                }
+
                 if (await RecipeExistsAsync(connection, transaction, model))
                 {
                     await transaction.RollbackAsync();
@@ -200,6 +278,12 @@ namespace Atcbassemblyrecipe.Services
                 foreach (var model in models)
                 {
                     Normalize(model);
+
+                    if (!await MachineIsRegisteredAsync(connection, transaction, model.WsId))
+                    {
+                        await transaction.RollbackAsync();
+                        return (false, 0, $"Import cancelled. {UnregisteredMachineMessage(model.WsId)} No rows were uploaded.");
+                    }
 
                     if (await RecipeExistsAsync(connection, transaction, model))
                     {
@@ -253,6 +337,12 @@ namespace Atcbassemblyrecipe.Services
                     return (false, "TBLWIREBOND row was not found. It may have been deleted - check Trash.");
                 }
 
+                if (!await MachineIsRegisteredAsync(connection, transaction, model.WsId))
+                {
+                    await transaction.RollbackAsync();
+                    return (false, UnregisteredMachineMessage(model.WsId));
+                }
+
                 var oldValues = await _auditRepository.CaptureRowAsync(
                     connection, transaction, AuditedTableNames.WireBond, model.TblRowId);
 
@@ -263,6 +353,7 @@ namespace Atcbassemblyrecipe.Services
                     UPDATE tblwirebond
                     SET lastupdate = SYSDATE,
                         lastupdatedby = :lastupdatedby,
+                        wsid = :wsid,
                         "PACKAGE" = :package,
                         product = :product,
                         leadframe12nc = :leadframe12nc,
@@ -400,6 +491,7 @@ namespace Atcbassemblyrecipe.Services
         private static void AddWriteParameters(OracleCommand command, WireBondInputModel model, string userName)
         {
             command.Parameters.Add(new OracleParameter("lastupdatedby", userName));
+            command.Parameters.Add(new OracleParameter("wsid", model.WsId));
             command.Parameters.Add(Text("package", model.Package));
             command.Parameters.Add(new OracleParameter("product", model.Product));
             command.Parameters.Add(new OracleParameter("leadframe12nc", model.Leadframe12Nc));
@@ -420,6 +512,7 @@ namespace Atcbassemblyrecipe.Services
         private static void Normalize(WireBondInputModel model)
         {
             model.TblRowId = model.TblRowId?.Trim();
+            model.WsId = InputText.CleanUpper(model.WsId);
             model.Package = InputText.CleanUpperOrNull(model.Package);
             model.Product = InputText.CleanUpper(model.Product);
             model.Leadframe12Nc = InputText.CleanUpper(model.Leadframe12Nc);
@@ -471,10 +564,11 @@ namespace Atcbassemblyrecipe.Services
                 TblRowId = ReadString(reader, 0),
                 LastUpdate = ReadDate(reader, 1),
                 LastUpdatedBy = ReadString(reader, 2),
-                Package = ReadString(reader, 3),
-                Product = ReadString(reader, 4),
-                Leadframe12Nc = ReadString(reader, 5),
-                Recipe = ReadString(reader, 6)
+                WsId = ReadString(reader, 3),
+                Package = ReadString(reader, 4),
+                Product = ReadString(reader, 5),
+                Leadframe12Nc = ReadString(reader, 6),
+                Recipe = ReadString(reader, 7)
             };
         }
 

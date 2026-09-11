@@ -28,7 +28,8 @@ namespace Atcbassemblyrecipe.Controllers
         private static readonly CsvColumn[] AwacsWstypeCsvColumns =
         [
             new CsvColumn("WSID", true, "WS ID", "WORKSTATION", "WORKSTATION ID"),
-            new CsvColumn("WSTYPE", true, "WS TYPE", "WORKSTATION TYPE")
+            new CsvColumn("WSTYPE", true, "WS TYPE", "WORKSTATION TYPE"),
+            new CsvColumn("WSDB", true, "WS DB", "BFG", "BUSINESS GROUP")
         ];
 
         [ModuleAccess(ModuleNames.AwacsWstype, ModuleAction.View)]
@@ -48,7 +49,8 @@ namespace Atcbassemblyrecipe.Controllers
                     PageSize = result.PageSize,
                     TotalRows = result.TotalRows,
                     SortBy = normalizedSortBy,
-                    SortDirection = normalizedSortDirection
+                    SortDirection = normalizedSortDirection,
+                    WsDbOptions = await _awacsWstypeService.GetWsDbOptionsAsync()
                 };
 
                 return View(model);
@@ -65,7 +67,7 @@ namespace Atcbassemblyrecipe.Controllers
         [Authorize]
         public IActionResult DownloadAwacsTemplate()
         {
-            const string csv = "WSID,WSTYPE\r\nDB-AD3-014,SAWING\r\n";
+            const string csv = "WSID,WSTYPE,WSDB\r\nDB-AD3-014,SAWING,SENSORS\r\nWB-007,WIREBOND,POWER\r\n";
             return File(Encoding.UTF8.GetBytes(csv), "text/csv", "awacswstype-template.csv");
         }
 
@@ -76,13 +78,14 @@ namespace Atcbassemblyrecipe.Controllers
             {
                 var rows = await _awacsWstypeService.GetAwacsWstypeForExportAsync(search, sortBy, sortDirection);
                 var builder = new StringBuilder();
-                builder.AppendLine("WSID,WSTYPE,Last Updated By,Timestamp");
+                builder.AppendLine("WSID,WSTYPE,WSDB,Last Updated By,Timestamp");
 
                 foreach (var row in rows)
                 {
                     builder
                         .Append(EscapeCsv(row.WsId)).Append(',')
                         .Append(EscapeCsv(row.WsType)).Append(',')
+                        .Append(EscapeCsv(row.WsDb)).Append(',')
                         .Append(EscapeCsv(row.LastUpdatedBy)).Append(',')
                         .Append(EscapeCsv(row.LastUpdate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty))
                         .AppendLine();
@@ -139,9 +142,7 @@ namespace Atcbassemblyrecipe.Controllers
                 {
                     WsId = row["WSID"],
                     WsType = row["WSTYPE"],
-                    // WSDB is not a CSV column and is not set here: the service
-                    // derives it from WSTYPE, so an uploaded WIREBOND row gets
-                    // TBLWIREBOND and a SAWING row gets TBLSAWING.
+                    WsDb = row["WSDB"],
                     Confirmed = true
                 };
 
@@ -226,6 +227,7 @@ namespace Atcbassemblyrecipe.Controllers
                 "sequence" => "sequence",
                 "wsid" => "wsid",
                 "wstype" => "wstype",
+                "wsdb" => "wsdb",
                 "lastupdatedby" => "lastupdatedby",
                 "lastupdate" => "lastupdate",
                 _ => "lastupdate"

@@ -21,6 +21,7 @@ namespace Atcbassemblyrecipe.Services
         Task<(bool Success, string Message)> DeleteRecipeRowAsync(string tblRowId, string userName);
         Task<AwacsWstypeInputModel?> GetForEditAsync(string tblRowId);
         Task<int> GetTblSawingCountAsync();
+        Task<IReadOnlyList<string>> GetWsDbOptionsAsync();
         Task<(bool Success, string Message)> CreateAsync(AwacsWstypeInputModel model, string userName);
         Task<(bool Success, int Inserted, string Message)> CreateManyAsync(IReadOnlyList<AwacsWstypeInputModel> models, string userName);
         Task<(bool Success, string Message)> UpdateAsync(AwacsWstypeInputModel model, string userName);
@@ -474,6 +475,46 @@ namespace Atcbassemblyrecipe.Services
             return Convert.ToInt32(await command.ExecuteScalarTracedAsync());
         }
 
+        // The WSDB values already in AWACSWSTYPE, offered as the pick list on the
+        // grid. Read from the data rather than hardcoded: the business groups are
+        // the plant's to name, not this app's.
+        //
+        // Swallows database errors on purpose - it is a convenience list, and an
+        // empty one just means the field stays free text.
+        public async Task<IReadOnlyList<string>> GetWsDbOptionsAsync()
+        {
+            var values = new List<string>();
+
+            try
+            {
+                await using var connection = _connectionFactory.CreateConnection();
+                await connection.OpenAsync();
+
+                await using var command = connection.CreateCommand();
+                command.CommandText = """
+                    SELECT DISTINCT wsdb
+                    FROM awacswstype
+                    WHERE wsdb IS NOT NULL
+                    ORDER BY wsdb
+                    """;
+
+                await using var reader = await command.ExecuteReaderTracedAsync();
+                while (await reader.ReadAsync())
+                {
+                    if (!reader.IsDBNull(0))
+                    {
+                        values.Add(reader.GetString(0));
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is OracleException or InvalidOperationException)
+            {
+                return [];
+            }
+
+            return values;
+        }
+
         public async Task<(bool Success, string Message)> CreateAsync(AwacsWstypeInputModel model, string userName)
         {
             Normalize(model);
@@ -900,13 +941,7 @@ namespace Atcbassemblyrecipe.Services
             model.TblRowId = model.TblRowId?.Trim();
             model.WsId = InputText.CleanUpper(model.WsId);
             model.WsType = InputText.CleanUpper(model.WsType);
-
-            // Never taken from the form: WSTYPE decides which table holds that
-            // workstation's recipes. An unknown WSTYPE leaves whatever was
-            // there, so validation reports the WSTYPE rather than a confusing
-            // empty WSDB.
-            var derived = AwacsWstypeInputModel.WsDbFor(model.WsType);
-            model.WsDb = string.IsNullOrEmpty(derived) ? InputText.CleanUpper(model.WsDb) : derived;
+            model.WsDb = InputText.CleanUpper(model.WsDb);
         }
 
         private static void Normalize(SawingRecipeInputModel model)

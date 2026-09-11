@@ -58,6 +58,16 @@
     </div>
 </section>
 
+@* SENSORS, POWER and whatever else is already in AWACSWSTYPE. A hint, not a
+   constraint - the field still accepts a new business group without a code
+   change. *@
+<datalist id="wsDbOptions">
+    @foreach (var value in Model.WsDbOptions)
+    {
+        <option value="@value"></option>
+    }
+</datalist>
+
 <div class="table-responsive data-panel excel-panel">
     <table class="table table-hover align-middle excel-table" id="awacsWstypeTable" data-resizable-table="awacswstype">
         <colgroup>
@@ -65,6 +75,7 @@
             <col class="col-sequence" />
             <col class="col-wsid" />
             <col class="col-wstype" />
+            <col class="col-wsdb" />
             <col class="col-user" />
             <col class="col-date" />
             <col class="col-action" />
@@ -94,15 +105,17 @@
                         <input name="WsId" form="createAwacsForm" class="form-control cell-input" maxlength="16" placeholder="DB-AD3-014" required aria-label="WSID" />
                     </td>
                     <td>
-                        @* WSDB is not here and is not posted - the server derives it
-                           from WSTYPE (AwacsWstypeInputModel.WsDbFor), so a SAWING
-                           workstation cannot be pointed at TBLWIREBOND by hand. *@
+                        @* The table also holds MOULD, DIEBOND, OVEN and others.
+                           This page manages the two that have a recipe grid. *@
                         <select name="WsType" form="createAwacsForm" class="form-select cell-input" aria-label="WSTYPE">
-                            @foreach (var wsType in AwacsWstypeInputModel.WsDbByWsType.Keys)
+                            @foreach (var wsType in AwacsWstypeInputModel.PageWsTypes)
                             {
                                 <option value="@wsType">@wsType</option>
                             }
                         </select>
+                    </td>
+                    <td>
+                        <input name="WsDb" form="createAwacsForm" class="form-control cell-input" maxlength="16" list="wsDbOptions" placeholder="SENSORS" required aria-label="WSDB" />
                     </td>
                     <td><span class="cell-muted">Current user</span></td>
                     <td><span class="cell-muted">Set on save</span></td>
@@ -122,7 +135,7 @@
             @if (Model.Rows.Count == 0)
             {
                 <tr>
-                    <td colspan="8" class="text-center text-muted py-4">No AWACSWSTYPE rows found.</td>
+                    <td colspan="9" class="text-center text-muted py-4">No AWACSWSTYPE rows found.</td>
                 </tr>
             }
             else
@@ -135,6 +148,7 @@
                         <td>@rowNumber</td>
                         <td>@row.WsId</td>
                         <td class="fw-semibold">@row.WsType</td>
+                        <td>@row.WsDb</td>
                         <td title="@row.LastUpdatedBy">@(await Directory.GetDisplayNameAsync(row.LastUpdatedBy))</td>
                         <td>@row.LastUpdate?.ToString("yyyy-MM-dd HH:mm")</td>
                         <td class="text-center">
@@ -166,6 +180,9 @@
                             </td>
                             <td>
                                 <input name="WsType" form="@editFormId" class="form-control cell-input" value="@row.WsType" readonly aria-label="WSTYPE" />
+                            </td>
+                            <td>
+                                <input name="WsDb" form="@editFormId" class="form-control cell-input" maxlength="16" list="wsDbOptions" value="@row.WsDb" data-original-value="@row.WsDb" required aria-label="WSDB" />
                             </td>
                             <td><span class="cell-muted">Save user</span></td>
                             <td><span class="cell-muted">Set on save</span></td>
@@ -278,23 +295,26 @@
                             <tr>
                                 <th>WSID</th>
                                 <th>WSTYPE</th>
+                                <th>WSDB</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
                                 <td>DB-AD3-014</td>
                                 <td>SAWING</td>
+                                <td>SENSORS</td>
                             </tr>
                             <tr>
                                 <td>WB-007</td>
                                 <td>WIREBOND</td>
+                                <td>POWER</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
                 <div class="template-note">
-                    Required columns: WSID, WSTYPE. WSTYPE must be SAWING or WIREBOND - it decides which recipe table the machine is pointed at, so a typo is rejected rather than guessed.
+                    Required columns: WSID, WSTYPE, WSDB. WSTYPE must be SAWING or WIREBOND - this page manages those two. WSDB is the machine's business group, e.g. SENSORS or POWER.
                     The header row itself is optional: a file that starts straight at the values is read
                     in the column order above.
                 </div>
@@ -351,6 +371,7 @@
         ("sequence", "#"),
         ("wsid", "WSID"),
         ("wstype", "WSTYPE"),
+        ("wsdb", "WSDB"),
         ("lastupdatedby", "Last Updated By"),
         ("lastupdate", "Timestamp")
     };

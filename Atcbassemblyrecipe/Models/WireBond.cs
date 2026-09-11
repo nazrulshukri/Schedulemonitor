@@ -16,6 +16,11 @@ namespace Atcbassemblyrecipe.Models
         public string TblRowId { get; set; } = string.Empty;
         public DateTime? LastUpdate { get; set; }
         public string LastUpdatedBy { get; set; } = string.Empty;
+
+        // The machine this recipe belongs to: AWACSWSTYPE.WSID. AWACSWSTYPE is
+        // the parent - one row per machine - and this is the child's reference
+        // back to it, the same way TBLSAWING.SAWMACHINE points at a WSID.
+        public string WsId { get; set; } = string.Empty;
         public string Package { get; set; } = string.Empty;
         public string Product { get; set; } = string.Empty;
         public string Leadframe12Nc { get; set; } = string.Empty;

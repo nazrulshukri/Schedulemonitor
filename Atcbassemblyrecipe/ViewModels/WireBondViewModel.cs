@@ -13,6 +13,11 @@ namespace Atcbassemblyrecipe.ViewModels
         public string SortDirection { get; set; } = "desc";
         public bool PromptAdd { get; set; }
 
+        // The wire bonders registered in AWACSWSTYPE (WSTYPE = 'WIREBOND'), which
+        // is what the Machine cell offers. Empty means none are registered yet -
+        // the grid says so rather than presenting an empty dropdown.
+        public IReadOnlyList<string> MachineOptions { get; set; } = [];
+
         // PRODUCT of the row that was just inserted or updated. The grid flashes
         // it and scrolls to it, so a save visibly lands instead of the user
         // having to look for it.

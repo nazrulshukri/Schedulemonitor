@@ -5,10 +5,46 @@ shape as the Sawing and Marker grids.
 
 Route: `/WireBond/Index`. Sidebar: **Operations → Wirebond**.
 
-The columns, and only these:
+The columns:
 
-| | # | WSTYPE | PACKAGE | Product | Leadframe 12NC | Recipe | Last Updated By | Timestamp | Edit | Delete |
-|---|---|---|---|---|---|---|---|---|---|---|
+| | # | WSTYPE | Machine | PACKAGE | Product | Leadframe 12NC | Recipe | Last Updated By | Timestamp | Edit | Delete |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+
+## AWACSWSTYPE is the parent, TBLWIREBOND is the child
+
+`AWACSWSTYPE` holds one row per machine, keyed by `WSID`. `TBLWIREBOND` holds
+one row per recipe, and **Machine** is that recipe's `WSID` — the child's
+reference back to the parent, the same way `TBLSAWING.SAWMACHINE` points at a
+`WSID`.
+
+Run `Database/tblwirebond-wsid.sql` to add the column. After that:
+
+- The Machine cell is a dropdown of the wire bonders registered in AWACSWSTYPE
+  (`WSTYPE = 'WIREBOND'`). Register them first — Operations → AWACSWSTYPE → Add
+  Row — or the grid tells you there is nothing to pick.
+- **The reference is checked in the database on every save**, not just in the
+  dropdown: add, edit and CSV import all refuse a machine that is not registered
+  as a wire bonder, so a hand-made POST cannot write a dangling row either.
+- Step 4 of that script adds a real foreign key as well, if AWACSWSTYPE has no
+  duplicate WSIDs. Worth doing — but keep the app check too, because a foreign
+  key can only say the WSID exists, not that its WSTYPE is WIREBOND.
+
+Saving a recipe still does not *write* to AWACSWSTYPE, and should not — the
+machine record did not change. What changed is that the recipe now names its
+machine, so the two tables can be joined.
+
+## A correction: WSDB is not a table name
+
+`AWACSWSTYPE.WSDB` is the machine's **business group** — `SENSORS`, `POWER` —
+matching `SAWBFG` in TBLSAWING. An earlier version of this app treated it as a
+table name and wrote `TBLSAWING` into it, and for one build derived it from
+WSTYPE on every save, which overwrote the real value whenever an existing row
+was edited.
+
+That is gone. WSDB is a normal field on the AWACSWSTYPE grid now, with the
+values already in the table offered as a pick list.
+`Database/awacswstype-wsdb-repair.sql` finds the rows that were written wrongly
+and suggests the right value from TBLSAWING.
 
 **WSTYPE always reads `WIREBOND` and cannot be edited** — it is a read-only cell
 on the add row and on every edit row, exactly like `SAWING` on the Sawing grid.

@@ -13,6 +13,13 @@ namespace Atcbassemblyrecipe.ViewModels
     {
         public string? TblRowId { get; set; }
 
+        // Must be a WSID that exists in AWACSWSTYPE as a WIREBOND workstation.
+        // The list is checked in the database on every save, not just in the
+        // dropdown - see WireBondService.MachineIsRegisteredAsync.
+        [Required, StringLength(16)]
+        [Display(Name = "Machine")]
+        public string WsId { get; set; } = string.Empty;
+
         [StringLength(64)]
         [Display(Name = "Package")]
         public string? Package { get; set; }
@@ -34,6 +41,11 @@ namespace Atcbassemblyrecipe.ViewModels
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
+            if (string.IsNullOrWhiteSpace(WsId))
+            {
+                yield return new ValidationResult("Machine is required - pick the wire bonder this recipe belongs to.", [nameof(WsId)]);
+            }
+
             if (string.IsNullOrWhiteSpace(Product))
             {
                 yield return new ValidationResult("Product is required.", [nameof(Product)]);

@@ -37,6 +37,7 @@ namespace Atcbassemblyrecipe.Controllers
             // ignored: every row in TBLWIREBOND is a wirebond row whatever this
             // column says.
             new CsvColumn("WSTYPE", false, "WS TYPE"),
+            new CsvColumn("WSID", true, "MACHINE", "WS ID", "WIREBONDER"),
             new CsvColumn("PACKAGE", false, "PKG"),
             new CsvColumn("PRODUCT", true, "DEVICE"),
             new CsvColumn("LEADFRAME12NC", true, "LEADFRAME 12NC", "LF12NC", "LEADFRAME"),
@@ -64,6 +65,10 @@ namespace Atcbassemblyrecipe.Controllers
                 model.Page = result.Page;
                 model.PageSize = result.PageSize;
                 model.TotalRows = result.TotalRows;
+
+                // The wire bonders AWACSWSTYPE knows about. Never fatal: the
+                // service answers with an empty list if it cannot read them.
+                model.MachineOptions = await _wireBondService.GetMachineOptionsAsync();
             }
             catch (Exception ex) when (ex is OracleException or InvalidOperationException)
             {
@@ -77,8 +82,8 @@ namespace Atcbassemblyrecipe.Controllers
         public IActionResult DownloadTemplate()
         {
             const string csv =
-                "WSTYPE,PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE\r\n"
-                + "WIREBOND,SOT669,BUK9K6-40E,934123456789,WB_SOT669_STD\r\n";
+                "WSTYPE,WSID,PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE\r\n"
+                + "WIREBOND,WB-007,SOT669,BUK9K6-40E,934123456789,WB_SOT669_STD\r\n";
             return File(Encoding.UTF8.GetBytes(csv), "text/csv", "tblwirebond-template.csv");
         }
 
@@ -89,12 +94,13 @@ namespace Atcbassemblyrecipe.Controllers
             {
                 var rows = await _wireBondService.GetForExportAsync(search, sortBy, sortDirection);
                 var builder = new StringBuilder();
-                builder.AppendLine("WSTYPE,PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE,Last Updated By,Timestamp");
+                builder.AppendLine("WSTYPE,WSID,PACKAGE,PRODUCT,LEADFRAME12NC,RECIPE,Last Updated By,Timestamp");
 
                 foreach (var row in rows)
                 {
                     builder
                         .Append(RecipeWsTypes.Wirebond).Append(',')
+                        .Append(EscapeCsv(row.WsId)).Append(',')
                         .Append(EscapeCsv(row.Package)).Append(',')
                         .Append(EscapeCsv(row.Product)).Append(',')
                         .Append(EscapeCsv(row.Leadframe12Nc)).Append(',')
@@ -164,6 +170,7 @@ namespace Atcbassemblyrecipe.Controllers
 
                 var model = new WireBondInputModel
                 {
+                    WsId = row["WSID"],
                     Package = row["PACKAGE"],
                     Product = row["PRODUCT"],
                     Leadframe12Nc = leadframe,

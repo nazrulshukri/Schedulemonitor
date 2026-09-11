@@ -27,7 +27,7 @@
         <input type="hidden" name="sortDirection" value="@Model.SortDirection" />
         <div>
             <label for="search" class="form-label">Search</label>
-            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Search product, recipe, leadframe 12NC, or package" />
+            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Search machine, product, recipe, leadframe 12NC, or package" />
         </div>
         <div>
             <label for="pageSize" class="form-label">Rows</label>
@@ -66,6 +66,7 @@
             <col class="col-select" />
             <col class="col-sequence" />
             <col class="col-wstype" />
+            <col class="col-wsid" />
             <col class="col-package" />
             <col class="col-product" />
             <col class="col-leadframe" />
@@ -111,6 +112,19 @@
                         <input class="form-control cell-input" value="@RecipeWsTypes.Wirebond" readonly aria-label="WSTYPE" />
                     </td>
                     <td>
+                        @* AWACSWSTYPE is the parent table: a recipe has to name a
+                           machine that is registered there as a wire bonder. The
+                           server checks it again on save, so a hand-made POST
+                           naming an unregistered machine is refused too. *@
+                        <select name="WsId" form="createWireBondForm" class="form-select cell-input" required aria-label="Machine">
+                            <option value="">- machine -</option>
+                            @foreach (var machine in Model.MachineOptions)
+                            {
+                                <option value="@machine">@machine</option>
+                            }
+                        </select>
+                    </td>
+                    <td>
                         <input name="Package" form="createWireBondForm" class="form-control cell-input" maxlength="64" placeholder="Package" aria-label="Package" />
                     </td>
                     <td>
@@ -140,7 +154,13 @@
             @if (Model.Rows.Count == 0)
             {
                 <tr>
-                    <td colspan="11" class="text-center text-muted py-4">No rows found.</td>
+                    <td colspan="12" class="text-center text-muted py-4">
+                        No rows found.
+                        @if (Model.MachineOptions.Count == 0)
+                        {
+                            <div class="mt-2">No wire bonders are registered in AWACSWSTYPE yet, so a recipe has no machine to belong to. Add them on the AWACSWSTYPE page first: Add Row, WSTYPE WIREBOND.</div>
+                        }
+                    </td>
                 </tr>
             }
             else
@@ -157,6 +177,7 @@
                         <td><input class="form-check-input" type="checkbox" aria-label="Select @row.Product" /></td>
                         <td>@rowNumber</td>
                         <td class="fw-semibold">@RecipeWsTypes.Wirebond</td>
+                        <td>@row.WsId</td>
                         <td>@row.Package</td>
                         <td>@row.Product</td>
                         <td>@row.Leadframe12Nc</td>
@@ -184,11 +205,26 @@
                     @if (canUpdate)
                     {
                         var editFormId = $"editWireBondForm-{row.TblRowId}";
+
+                        // The row's own machine is always in the list, even if it has
+                        // since been removed from AWACSWSTYPE. Otherwise opening an edit
+                        // would quietly repoint the row at whatever happened to be first.
+                        var machineOptions = Model.MachineOptions.Contains(row.WsId)
+                            ? Model.MachineOptions.AsEnumerable()
+                            : Model.MachineOptions.Append(row.WsId);
                         <tr class="excel-edit-row d-none" data-edit-panel="@row.TblRowId">
                             <td><input class="form-check-input" type="checkbox" aria-label="Editing @row.Product" disabled /></td>
                             <td><span class="cell-muted">@rowNumber</span></td>
                             <td>
                                 <input class="form-control cell-input" value="@RecipeWsTypes.Wirebond" readonly aria-label="WSTYPE" />
+                            </td>
+                            <td>
+                                <select name="WsId" form="@editFormId" class="form-select cell-input" required aria-label="Machine">
+                                    @foreach (var machine in machineOptions)
+                                    {
+                                        <option value="@machine" selected="@(machine == row.WsId)">@machine</option>
+                                    }
+                                </select>
                             </td>
                             <td>
                                 <input name="Package" form="@editFormId" class="form-control cell-input" maxlength="64" value="@row.Package" data-original-value="@row.Package" aria-label="Package" />
@@ -310,6 +346,7 @@
                         <thead>
                             <tr>
                                 <th>WSTYPE</th>
+                                <th>WSID</th>
                                 <th>PACKAGE</th>
                                 <th>PRODUCT</th>
                                 <th>LEADFRAME12NC</th>
@@ -319,6 +356,7 @@
                         <tbody>
                             <tr>
                                 <td>WIREBOND</td>
+                                <td>WB-007</td>
                                 <td>SOT669</td>
                                 <td>BUK9K6-40E</td>
                                 <td>934123456789</td>
@@ -329,7 +367,10 @@
                 </div>
 
                 <div class="template-note">
-                    Required columns: PRODUCT, LEADFRAME12NC, RECIPE. PACKAGE is optional, and
+                    Required columns: WSID, PRODUCT, LEADFRAME12NC, RECIPE. WSID is the
+                    machine and must already be registered in AWACSWSTYPE as a WIREBOND
+                    workstation - a row naming an unregistered machine cancels the whole
+                    import. PACKAGE is optional, and
                     WSTYPE is ignored - every uploaded row is a wirebond row whatever that
                     column says.
                     The header row itself is optional: a file that starts straight at the values is read
@@ -419,6 +460,7 @@
     {
         ("sequence", "#", true),
         ("wstype", "WSTYPE", false),
+        ("wsid", "Machine", true),
         ("package", "PACKAGE", true),
         ("product", "Product", true),
         ("leadframe12nc", "Leadframe 12NC", true),

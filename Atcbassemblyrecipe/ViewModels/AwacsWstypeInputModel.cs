@@ -5,28 +5,10 @@ namespace Atcbassemblyrecipe.ViewModels
 {
     public class AwacsWstypeInputModel : IValidatableObject
     {
-        // AWACSWSTYPE.WSDB names the table that holds a workstation's recipes.
-        // It is NOT typed in: it follows from WSTYPE, so the two can never
-        // disagree and nobody can point a SAWING workstation at TBLWIREBOND.
-        // AwacsWstypeService.Normalize sets it from WSTYPE on every write.
-        public const string SawingWsDb = "TBLSAWING";
-        public const string WirebondWsDb = "TBLWIREBOND";
-
-        // The workstation types this page manages. Add a pair here and the
-        // grid's WSTYPE list, the validation and the derived WSDB all follow.
-        public static readonly IReadOnlyDictionary<string, string> WsDbByWsType =
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                [RecipeWsTypes.Sawing] = SawingWsDb,
-                [RecipeWsTypes.Wirebond] = WirebondWsDb
-            };
-
-        public static string WsDbFor(string? wsType)
-        {
-            return WsDbByWsType.TryGetValue((wsType ?? string.Empty).Trim(), out var wsDb)
-                ? wsDb
-                : string.Empty;
-        }
+        // The workstation types this page manages. The table holds others
+        // (MOULD, DIEBOND, CLIPBOND, OVEN, TAPING ...) which have no recipe grid
+        // here and are deliberately left alone.
+        public static readonly string[] PageWsTypes = [RecipeWsTypes.Sawing, RecipeWsTypes.Wirebond];
 
         public string? TblRowId { get; set; }
 
@@ -38,11 +20,16 @@ namespace Atcbassemblyrecipe.ViewModels
         [Display(Name = "WSTYPE")]
         public string WsType { get; set; } = RecipeWsTypes.Sawing;
 
-        // Derived, never posted. Kept as a property because the service writes
-        // it to the column and the duplicate check reads it.
-        [StringLength(16)]
+        // The business group the machine belongs to - SENSORS, POWER and so on.
+        // Plant data, typed in by the user and offered as a pick list built from
+        // the values already in the table.
+        //
+        // This is NOT a table name. An earlier version of this page treated it as
+        // one and wrote TBLSAWING into it, which is why some rows carry that
+        // value; see Database/awacswstype-wsdb-repair.sql.
+        [Required, StringLength(16)]
         [Display(Name = "WSDB")]
-        public string WsDb { get; set; } = SawingWsDb;
+        public string WsDb { get; set; } = string.Empty;
 
         [Display(Name = "I verified this AWACSWSTYPE row")]
         public bool Confirmed { get; set; }
@@ -62,11 +49,16 @@ namespace Atcbassemblyrecipe.ViewModels
             {
                 yield return new ValidationResult("WSTYPE is required.", [nameof(WsType)]);
             }
-            else if (string.IsNullOrEmpty(WsDbFor(WsType)))
+            else if (!PageWsTypes.Contains(WsType.Trim().ToUpperInvariant(), StringComparer.Ordinal))
             {
                 yield return new ValidationResult(
-                    $"WSTYPE must be one of: {string.Join(", ", WsDbByWsType.Keys)}.",
+                    $"This page manages {string.Join(" and ", PageWsTypes)} workstations only.",
                     [nameof(WsType)]);
+            }
+
+            if (string.IsNullOrWhiteSpace(WsDb))
+            {
+                yield return new ValidationResult("WSDB is required.", [nameof(WsDb)]);
             }
 
             if (!Confirmed)
