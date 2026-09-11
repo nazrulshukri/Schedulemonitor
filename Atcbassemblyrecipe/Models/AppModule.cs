@@ -33,7 +33,7 @@ namespace Atcbassemblyrecipe.Models
             new()
             {
                 Name = ModuleNames.AwacsWstype,
-                Description = "Main SAWING workstation table: WSID, WSTYPE, last updated by, timestamp."
+                Description = "Workstation master: WSID, WSTYPE, last updated by, timestamp. Covers the SAWING and WIREBOND machines."
             },
             new()
             {

@@ -1,0 +1,377 @@
+@model AwacsDashboardViewModel
+
+@{
+    ViewData["Title"] = "AWACSWSTYPE";
+    // Per-module permissions come from this user's TBLACCESS grants (see
+    // Services/AccessEvaluator.cs), not from their role, so what Access Management
+    // saves is what actually shows up here.
+    var permission = await Access.GetAsync(ModuleNames.AwacsWstype);
+    var canAdd = permission.CanAdd;
+    var canUpdate = permission.CanUpdate;
+    var canDelete = permission.CanDelete;
+}
+
+<div class="page-heading awacs-heading">
+    <div>
+        <span class="eyebrow">Recipe Workspace</span>
+        <h1>AWACSWSTYPE</h1>
+        <p>Workstation master for the recipe grids: SAWING machines and WIREBOND machines, with validation controls.</p>
+    </div>
+</div>
+
+<section class="data-panel excel-toolbar-panel">
+    <form asp-controller="Home" asp-action="Index" method="get" class="excel-search">
+        <input type="hidden" name="sortBy" value="@Model.SortBy" />
+        <input type="hidden" name="sortDirection" value="@Model.SortDirection" />
+        <div>
+            <label for="search" class="form-label">Search</label>
+            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Search WSID or updated by" />
+        </div>
+        <div>
+            <label for="pageSize" class="form-label">Rows</label>
+            <select id="pageSize" name="pageSize" class="form-select">
+                <option value="25" selected="@(Model.PageSize == 25)">25</option>
+                <option value="50" selected="@(Model.PageSize == 50)">50</option>
+                <option value="100" selected="@(Model.PageSize == 100)">100</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary"><partial name="_Icon" model="@("search")" /> Search</button>
+        <a asp-controller="Home" asp-action="Index" class="btn btn-outline-secondary"><partial name="_Icon" model="@("clear")" /> Clear</a>
+    </form>
+
+    <div class="excel-actions">
+        @if (canAdd)
+        {
+            <button type="button" class="btn btn-primary" id="showAddRow"><partial name="_Icon" model="@("plus")" /> Add Row</button>
+        }
+        <button type="button" class="btn btn-outline-secondary" data-template-modal><partial name="_Icon" model="@("template")" /> Template</button>
+        <a class="btn btn-outline-secondary" asp-controller="Home" asp-action="ExportAwacsWstype" asp-route-search="@Model.Search" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection"><partial name="_Icon" model="@("export")" /> Export CSV</a>
+        @if (canAdd)
+        {
+            <form asp-controller="Home" asp-action="ImportAwacsWstype" method="post" enctype="multipart/form-data" class="csv-import-form">
+                <label class="btn btn-outline-secondary mb-0" for="csvFile"><partial name="_Icon" model="@("import")" /> Import CSV</label>
+                <input id="csvFile" name="csvFile" type="file" accept=".csv,.txt,.tsv" />
+                <button type="submit" class="btn btn-primary"><partial name="_Icon" model="@("upload")" /> Upload</button>
+                <span class="csv-file-error" data-csv-file-error aria-live="polite"></span>
+            </form>
+        }
+    </div>
+</section>
+
+<div class="table-responsive data-panel excel-panel">
+    <table class="table table-hover align-middle excel-table" id="awacsWstypeTable" data-resizable-table="awacswstype">
+        <colgroup>
+            <col class="col-select" />
+            <col class="col-sequence" />
+            <col class="col-wsid" />
+            <col class="col-wstype" />
+            <col class="col-user" />
+            <col class="col-date" />
+            <col class="col-action" />
+            <col class="col-action" />
+        </colgroup>
+        <thead>
+            <tr>
+                <th data-col-key="select"><input class="form-check-input" type="checkbox" aria-label="Select all rows" disabled /><span class="column-resizer"></span></th>
+                @foreach (var column in SortableColumns)
+                {
+                    <th data-col-key="@column.Key">
+                        <a class="sort-header @SortClass(Model, column.Key)" asp-controller="Home" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="1" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@column.Key" asp-route-sortDirection="@NextSortDirection(Model, column.Key)">@column.Label<span></span></a>
+                        <span class="column-resizer"></span>
+                    </th>
+                }
+                <th data-col-key="edit">Edit<span class="column-resizer"></span></th>
+                <th data-col-key="delete">Delete<span class="column-resizer"></span></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (canAdd)
+            {
+                <tr id="addRow" class="excel-edit-row d-none">
+                    <td><input class="form-check-input" type="checkbox" aria-label="New row" disabled /></td>
+                    <td><span class="cell-muted">New</span></td>
+                    <td>
+                        <input name="WsId" form="createAwacsForm" class="form-control cell-input" maxlength="16" placeholder="DB-AD3-014" required aria-label="WSID" />
+                    </td>
+                    <td>
+                        @* WSDB is not here and is not posted - the server derives it
+                           from WSTYPE (AwacsWstypeInputModel.WsDbFor), so a SAWING
+                           workstation cannot be pointed at TBLWIREBOND by hand. *@
+                        <select name="WsType" form="createAwacsForm" class="form-select cell-input" aria-label="WSTYPE">
+                            @foreach (var wsType in AwacsWstypeInputModel.WsDbByWsType.Keys)
+                            {
+                                <option value="@wsType">@wsType</option>
+                            }
+                        </select>
+                    </td>
+                    <td><span class="cell-muted">Current user</span></td>
+                    <td><span class="cell-muted">Set on save</span></td>
+                    <td class="text-center">
+                        <button type="submit" form="createAwacsForm" class="icon-btn icon-save" title="Save new row" aria-label="Save new AWACSWSTYPE row">
+                            <span></span>
+                        </button>
+                    </td>
+                    <td class="text-center">
+                        <button type="button" class="icon-btn icon-cancel" id="cancelAddRow" title="Cancel add row" aria-label="Cancel add row">
+                            <span></span>
+                        </button>
+                    </td>
+                </tr>
+            }
+
+            @if (Model.Rows.Count == 0)
+            {
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">No AWACSWSTYPE rows found.</td>
+                </tr>
+            }
+            else
+            {
+                var rowNumber = ((Model.Page - 1) * Model.PageSize) + 1;
+                foreach (var row in Model.Rows)
+                {
+                    <tr class="excel-display-row" data-row-id="@row.TblRowId">
+                        <td><input class="form-check-input" type="checkbox" aria-label="Select @row.WsId" /></td>
+                        <td>@rowNumber</td>
+                        <td>@row.WsId</td>
+                        <td class="fw-semibold">@row.WsType</td>
+                        <td title="@row.LastUpdatedBy">@(await Directory.GetDisplayNameAsync(row.LastUpdatedBy))</td>
+                        <td>@row.LastUpdate?.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td class="text-center">
+                            @if (canUpdate)
+                            {
+                                <button type="button" class="icon-btn icon-edit" data-edit-row="@row.TblRowId" title="Edit AWACSWSTYPE" aria-label="Edit @row.WsId">
+                                    <span></span>
+                                </button>
+                            }
+                        </td>
+                        <td class="text-center">
+                            @if (canDelete)
+                            {
+                                <button type="button" class="icon-btn icon-delete" data-delete-form="deleteAwacsForm-@row.TblRowId" data-delete-label="@row.WsId" title="Move AWACSWSTYPE row to Trash" aria-label="Delete @row.WsId">
+                                    <span></span>
+                                </button>
+                            }
+                        </td>
+                    </tr>
+
+                    @if (canUpdate)
+                    {
+                        var editFormId = $"editAwacsForm-{row.TblRowId}";
+                        <tr class="excel-edit-row d-none" data-edit-panel="@row.TblRowId">
+                            <td><input class="form-check-input" type="checkbox" aria-label="Editing @row.WsId" disabled /></td>
+                            <td><span class="cell-muted">@rowNumber</span></td>
+                            <td>
+                                <input name="WsId" form="@editFormId" class="form-control cell-input" maxlength="16" value="@row.WsId" data-original-value="@row.WsId" required aria-label="WSID" />
+                            </td>
+                            <td>
+                                <input name="WsType" form="@editFormId" class="form-control cell-input" value="@row.WsType" readonly aria-label="WSTYPE" />
+                            </td>
+                            <td><span class="cell-muted">Save user</span></td>
+                            <td><span class="cell-muted">Set on save</span></td>
+                            <td class="text-center">
+                                <button type="submit" form="@editFormId" class="icon-btn icon-save" title="Save edit" aria-label="Save @row.WsId">
+                                    <span></span>
+                                </button>
+                            </td>
+                            <td class="text-center">
+                                <button type="button" class="icon-btn icon-cancel" data-cancel-edit="@row.TblRowId" title="Cancel edit" aria-label="Cancel edit @row.WsId">
+                                    <span></span>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                    rowNumber += 1;
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+@*
+    Every row form lives here, outside the table.
+
+    A <form> written between two <tr> elements does not survive HTML parsing: the
+    browser closes it straight away and moves its hidden inputs - row id,
+    confirmation flag and the antiforgery token - out of it, so the POST arrives
+    without them and the save fails with nothing to show for it. That was the
+    "Edit does not update" bug. The inputs in the row cells above reach these
+    forms through their form="..." attribute instead, which works from anywhere on
+    the page.
+*@
+<div class="row-forms d-none" aria-hidden="true">
+    @if (canAdd)
+    {
+        <form id="createAwacsForm" asp-controller="Awacs" asp-action="Create" method="post">
+            <input type="hidden" name="Confirmed" value="true" />
+        </form>
+    }
+
+    @foreach (var row in Model.Rows)
+    {
+        if (canUpdate)
+        {
+            <form id="editAwacsForm-@row.TblRowId" asp-controller="Awacs" asp-action="Edit" method="post">
+                <input type="hidden" name="TblRowId" value="@row.TblRowId" />
+                @* WSDB is no longer shown in the grid; the column is still NOT NULL
+                   in AWACSWSTYPE, so the row's existing value rides along here. *@
+                <input type="hidden" name="Confirmed" value="true" />
+            </form>
+        }
+
+        if (canDelete)
+        {
+            <form id="deleteAwacsForm-@row.TblRowId" asp-controller="Awacs" asp-action="Delete" method="post">
+                <input type="hidden" name="id" value="@row.TblRowId" />
+                <input type="hidden" name="confirmed" value="true" />
+            </form>
+        }
+    }
+</div>
+
+@{
+    var startPage = Math.Max(1, Model.Page - 2);
+    var endPage = Math.Min(Model.TotalPages, startPage + 4);
+    startPage = Math.Max(1, endPage - 4);
+}
+
+<div class="pagination-bar">
+    <span>Showing page @Model.Page of @Model.TotalPages, @Model.TotalRows total rows</span>
+    <nav aria-label="AWACSWSTYPE pages">
+        <ul class="pagination mb-0">
+            <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
+                <a class="page-link" asp-controller="Home" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection">Prev</a>
+            </li>
+            @for (var pageNumber = startPage; pageNumber <= endPage; pageNumber++)
+            {
+                <li class="page-item @(pageNumber == Model.Page ? "active" : "")">
+                    <a class="page-link" asp-controller="Home" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@pageNumber" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection">@pageNumber</a>
+                </li>
+            }
+            <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : "")">
+                <a class="page-link" asp-controller="Home" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page + 1)" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection">Next</a>
+            </li>
+        </ul>
+    </nav>
+</div>
+
+<div class="modal fade" id="awacsTemplateModal" tabindex="-1" aria-labelledby="awacsTemplateTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content modern-modal template-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="eyebrow">CSV Template</span>
+                    <h5 class="modal-title" id="awacsTemplateTitle">AWACSWSTYPE upload format</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ol class="template-steps">
+                    <li>Download the template below.</li>
+                    <li>Key in the values under the same headers - or delete the header row and key in the values only, in the same left-to-right order.</li>
+                    <li>In Excel, use Save As and choose CSV (Comma delimited) (*.csv).</li>
+                </ol>
+
+                <div class="template-preview-wrap">
+                    <table class="table template-preview-table align-middle">
+                        <thead>
+                            <tr>
+                                <th>WSID</th>
+                                <th>WSTYPE</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>DB-AD3-014</td>
+                                <td>SAWING</td>
+                            </tr>
+                            <tr>
+                                <td>WB-007</td>
+                                <td>WIREBOND</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="template-note">
+                    Required columns: WSID, WSTYPE. WSTYPE must be SAWING or WIREBOND - it decides which recipe table the machine is pointed at, so a typo is rejected rather than guessed.
+                    The header row itself is optional: a file that starts straight at the values is read
+                    in the column order above.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a class="btn btn-primary" asp-controller="Home" asp-action="DownloadAwacsTemplate"><partial name="_Icon" model="@("download")" /> Download CSV Template</a>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><partial name="_Icon" model="@("close")" /> Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (canDelete)
+{
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modern-modal delete-confirm-modal">
+                <div class="modal-header">
+                    <div>
+                        <span class="eyebrow">Delete Validation</span>
+                        <h5 class="modal-title" id="deleteConfirmTitle">Move AWACSWSTYPE row to Trash</h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">This moves <strong id="deleteTargetName"></strong> to Trash, where it can be restored.</p>
+                    <label for="deletePhrase" class="form-label">Type DELETE to continue</label>
+                    <input id="deletePhrase" class="form-control" autocomplete="off" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><partial name="_Icon" model="@("cancel")" /> Cancel</button>
+                    <button type="button" class="btn btn-nxp-orange" id="confirmDeleteButton" disabled><partial name="_Icon" model="@("delete")" /> Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script src="~/js/excel-grid.js" asp-append-version="true"></script>
+    <script>
+        window.excelGrid.init({
+            tableId: 'awacsWstypeTable',
+            storageKey: 'awacswstype',
+            csvInputId: 'csvFile',
+            templateModalId: 'awacsTemplateModal'
+        });
+    </script>
+}
+
+@functions {
+    private static readonly (string Key, string Label)[] SortableColumns = new (string Key, string Label)[]
+    {
+        ("sequence", "#"),
+        ("wsid", "WSID"),
+        ("wstype", "WSTYPE"),
+        ("lastupdatedby", "Last Updated By"),
+        ("lastupdate", "Timestamp")
+    };
+
+    private static string NextSortDirection(AwacsDashboardViewModel model, string column)
+    {
+        return string.Equals(model.SortBy, column, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(model.SortDirection, "asc", StringComparison.OrdinalIgnoreCase)
+                ? "desc"
+                : "asc";
+    }
+
+    private static string SortClass(AwacsDashboardViewModel model, string column)
+    {
+        if (!string.Equals(model.SortBy, column, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        return string.Equals(model.SortDirection, "asc", StringComparison.OrdinalIgnoreCase)
+            ? "is-active is-asc"
+            : "is-active is-desc";
+    }
+}

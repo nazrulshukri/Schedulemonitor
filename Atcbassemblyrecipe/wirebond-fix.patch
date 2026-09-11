@@ -1568,6 +1568,15 @@
          public const string TableWirebond = "Wirebond";
          public const string TableMarker = "Marker";
          public const string AwacsLf = "AWACSLF";
+@@ -32,7 +33,7 @@
+             new()
+             {
+                 Name = ModuleNames.AwacsWstype,
+-                Description = "Main SAWING workstation table: WSID, WSTYPE, last updated by, timestamp."
++                Description = "Workstation master: WSID, WSTYPE, last updated by, timestamp. Covers the SAWING and WIREBOND machines."
+             },
+             new()
+             {
 @@ -47,7 +48,7 @@
               new()
              {
@@ -1588,6 +1597,215 @@
          // by ROWID like the two above rather than by a key half the table lacks.
          private static readonly AuditedTable WireBond =
              new(AuditedTableNames.WireBond, "ROWID = CHARTOROWID(:row_key)");
+--- a/ViewModels/AwacsWstypeInputModel.cs
++++ b/ViewModels/AwacsWstypeInputModel.cs
+@@ -1,13 +1,32 @@
+ using System.ComponentModel.DataAnnotations;
++using Atcbassemblyrecipe.Models;
+ 
+ namespace Atcbassemblyrecipe.ViewModels
+ {
+     public class AwacsWstypeInputModel : IValidatableObject
+     {
+-        // AWACSWSTYPE.WSDB is NOT NULL and this page only ever writes TBLSAWING,
+-        // so the column was dropped from the grid and the CSV. The value is still
+-        // supplied on save from here.
++        // AWACSWSTYPE.WSDB names the table that holds a workstation's recipes.
++        // It is NOT typed in: it follows from WSTYPE, so the two can never
++        // disagree and nobody can point a SAWING workstation at TBLWIREBOND.
++        // AwacsWstypeService.Normalize sets it from WSTYPE on every write.
+         public const string SawingWsDb = "TBLSAWING";
++        public const string WirebondWsDb = "TBLWIREBOND";
++
++        // The workstation types this page manages. Add a pair here and the
++        // grid's WSTYPE list, the validation and the derived WSDB all follow.
++        public static readonly IReadOnlyDictionary<string, string> WsDbByWsType =
++            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
++            {
++                [RecipeWsTypes.Sawing] = SawingWsDb,
++                [RecipeWsTypes.Wirebond] = WirebondWsDb
++            };
++
++        public static string WsDbFor(string? wsType)
++        {
++            return WsDbByWsType.TryGetValue((wsType ?? string.Empty).Trim(), out var wsDb)
++                ? wsDb
++                : string.Empty;
++        }
+ 
+         public string? TblRowId { get; set; }
+ 
+@@ -17,13 +36,15 @@
+ 
+         [Required, StringLength(16)]
+         [Display(Name = "WSTYPE")]
+-        public string WsType { get; set; } = "SAWING";
++        public string WsType { get; set; } = RecipeWsTypes.Sawing;
+ 
+-        [Required, StringLength(16)]
++        // Derived, never posted. Kept as a property because the service writes
++        // it to the column and the duplicate check reads it.
++        [StringLength(16)]
+         [Display(Name = "WSDB")]
+         public string WsDb { get; set; } = SawingWsDb;
+ 
+-        [Display(Name = "I verified this AWACSWSTYPE row maps to TBLSAWING")]
++        [Display(Name = "I verified this AWACSWSTYPE row")]
+         public bool Confirmed { get; set; }
+ 
+         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+@@ -41,26 +62,17 @@
+             {
+                 yield return new ValidationResult("WSTYPE is required.", [nameof(WsType)]);
+             }
+-
+-            if (string.IsNullOrWhiteSpace(WsDb))
++            else if (string.IsNullOrEmpty(WsDbFor(WsType)))
+             {
+-                yield return new ValidationResult("WSDB is required.", [nameof(WsDb)]);
++                yield return new ValidationResult(
++                    $"WSTYPE must be one of: {string.Join(", ", WsDbByWsType.Keys)}.",
++                    [nameof(WsType)]);
+             }
+ 
+             if (!Confirmed)
+             {
+                 yield return new ValidationResult("Confirm validation before saving.", [nameof(Confirmed)]);
+             }
+-
+-            if (!string.IsNullOrWhiteSpace(WsType) && !string.Equals(WsType.Trim(), "SAWING", StringComparison.OrdinalIgnoreCase))
+-            {
+-                yield return new ValidationResult("Only WSTYPE SAWING is allowed for this page.", [nameof(WsType)]);
+-            }
+-
+-            if (!string.IsNullOrWhiteSpace(WsDb) && !string.Equals(WsDb.Trim(), "TBLSAWING", StringComparison.OrdinalIgnoreCase))
+-            {
+-                yield return new ValidationResult("Only WSDB TBLSAWING is allowed for this page.", [nameof(WsDb)]);
+-            }
+         }
+     }
+ }
+--- a/Services/AwacsWstypeService.cs
++++ b/Services/AwacsWstypeService.cs
+@@ -57,7 +57,7 @@
+             command.CommandText = $"""
+                 SELECT tblrowid, lastupdate, lastupdatedby, wsid, wstype, wsdb
+                 FROM awacswstype
+-                WHERE wstype = 'SAWING'
++                WHERE wstype IN ('SAWING', 'WIREBOND')
+                   AND (:search IS NULL
+                        OR UPPER(tblrowid) LIKE :search
+                        OR UPPER(lastupdatedby) LIKE :search
+@@ -98,7 +98,7 @@
+             command.CommandText = $"""
+                 SELECT tblrowid, lastupdate, lastupdatedby, wsid, wstype, wsdb
+                 FROM awacswstype
+-                WHERE wstype = 'SAWING'
++                WHERE wstype IN ('SAWING', 'WIREBOND')
+                   AND (:search IS NULL
+                        OR UPPER(tblrowid) LIKE :search
+                        OR UPPER(lastupdatedby) LIKE :search
+@@ -768,7 +768,7 @@
+             command.CommandText = """
+                 SELECT COUNT(1)
+                 FROM awacswstype
+-                WHERE wstype = 'SAWING'
++                WHERE wstype IN ('SAWING', 'WIREBOND')
+                   AND (:search IS NULL
+                        OR UPPER(tblrowid) LIKE :search
+                        OR UPPER(lastupdatedby) LIKE :search
+@@ -900,7 +900,13 @@
+             model.TblRowId = model.TblRowId?.Trim();
+             model.WsId = InputText.CleanUpper(model.WsId);
+             model.WsType = InputText.CleanUpper(model.WsType);
+-            model.WsDb = InputText.CleanUpper(model.WsDb);
++
++            // Never taken from the form: WSTYPE decides which table holds that
++            // workstation's recipes. An unknown WSTYPE leaves whatever was
++            // there, so validation reports the WSTYPE rather than a confusing
++            // empty WSDB.
++            var derived = AwacsWstypeInputModel.WsDbFor(model.WsType);
++            model.WsDb = string.IsNullOrEmpty(derived) ? InputText.CleanUpper(model.WsDb) : derived;
+         }
+ 
+         private static void Normalize(SawingRecipeInputModel model)
+--- a/Controllers/HomeController.cs
++++ b/Controllers/HomeController.cs
+@@ -139,8 +139,9 @@
+                 {
+                     WsId = row["WSID"],
+                     WsType = row["WSTYPE"],
+-                    // WSDB is no longer a CSV column; AWACSWSTYPE still requires the value.
+-                    WsDb = AwacsWstypeInputModel.SawingWsDb,
++                    // WSDB is not a CSV column and is not set here: the service
++                    // derives it from WSTYPE, so an uploaded WIREBOND row gets
++                    // TBLWIREBOND and a SAWING row gets TBLSAWING.
+                     Confirmed = true
+                 };
+ 
+--- a/Views/Home/Index.cshtml
++++ b/Views/Home/Index.cshtml
+@@ -15,7 +15,7 @@
+     <div>
+         <span class="eyebrow">Recipe Workspace</span>
+         <h1>AWACSWSTYPE</h1>
+-        <p>SAWING workstation type records with validation controls.</p>
++        <p>Workstation master for the recipe grids: SAWING machines and WIREBOND machines, with validation controls.</p>
+     </div>
+ </div>
+ 
+@@ -94,7 +94,15 @@
+                         <input name="WsId" form="createAwacsForm" class="form-control cell-input" maxlength="16" placeholder="DB-AD3-014" required aria-label="WSID" />
+                     </td>
+                     <td>
+-                        <input class="form-control cell-input" value="SAWING" readonly aria-label="WSTYPE" />
++                        @* WSDB is not here and is not posted - the server derives it
++                           from WSTYPE (AwacsWstypeInputModel.WsDbFor), so a SAWING
++                           workstation cannot be pointed at TBLWIREBOND by hand. *@
++                        <select name="WsType" form="createAwacsForm" class="form-select cell-input" aria-label="WSTYPE">
++                            @foreach (var wsType in AwacsWstypeInputModel.WsDbByWsType.Keys)
++                            {
++                                <option value="@wsType">@wsType</option>
++                            }
++                        </select>
+                     </td>
+                     <td><span class="cell-muted">Current user</span></td>
+                     <td><span class="cell-muted">Set on save</span></td>
+@@ -195,8 +203,6 @@
+     @if (canAdd)
+     {
+         <form id="createAwacsForm" asp-controller="Awacs" asp-action="Create" method="post">
+-            <input type="hidden" name="WsType" value="SAWING" />
+-            <input type="hidden" name="WsDb" value="TBLSAWING" />
+             <input type="hidden" name="Confirmed" value="true" />
+         </form>
+     }
+@@ -209,7 +215,6 @@
+                 <input type="hidden" name="TblRowId" value="@row.TblRowId" />
+                 @* WSDB is no longer shown in the grid; the column is still NOT NULL
+                    in AWACSWSTYPE, so the row's existing value rides along here. *@
+-                <input type="hidden" name="WsDb" value="@row.WsDb" />
+                 <input type="hidden" name="Confirmed" value="true" />
+             </form>
+         }
+@@ -280,12 +285,16 @@
+                                 <td>DB-AD3-014</td>
+                                 <td>SAWING</td>
+                             </tr>
++                            <tr>
++                                <td>WB-007</td>
++                                <td>WIREBOND</td>
++                            </tr>
+                         </tbody>
+                     </table>
+                 </div>
+ 
+                 <div class="template-note">
+-                    Required columns: WSID, WSTYPE. WSTYPE must be SAWING.
++                    Required columns: WSID, WSTYPE. WSTYPE must be SAWING or WIREBOND - it decides which recipe table the machine is pointed at, so a typo is rejected rather than guessed.
+                     The header row itself is optional: a file that starts straight at the values is read
+                     in the column order above.
+                 </div>
 --- a/Database/tblwirebond.sql
 +++ b/Database/tblwirebond.sql
 @@ -1,113 +1,122 @@
@@ -3195,6 +3413,106 @@
 +
 +-- Drop the backup once the page is working:
 +-- DROP TABLE TBLWIREBOND_BAK;
+--- a/Database/awacswstype-wirebond.sql
++++ b/Database/awacswstype-wirebond.sql
+@@ -0,0 +1,97 @@
++-- =====================================================================
++-- Register the wire bonders in OCAPSYS.AWACSWSTYPE
++--
++-- AWACSWSTYPE is the workstation master: one row per machine.
++--   WSID    the machine, e.g. DS12-009
++--   WSTYPE  what kind of machine it is, e.g. SAWING
++--   WSDB    the table holding that machine's recipes, e.g. TBLSAWING
++--
++-- Until now it only carried SAWING. Wirebond recipes live in
++-- TBLWIREBOND, so the wire bonders belong here too, as
++-- WSTYPE = 'WIREBOND', WSDB = 'TBLWIREBOND'.
++--
++-- YOU PROBABLY DO NOT NEED THIS FILE. The AWACSWSTYPE page can now do
++-- it: Operations > AWACSWSTYPE > Add Row, type the WSID, pick WIREBOND
++-- in the WSTYPE list, save. WSDB is filled in for you. Use this script
++-- to load a batch of machines in one go, or when the app cannot be
++-- reached.
++--
++-- Run one statement at a time (Ctrl+Enter in SQL Developer, F9 in
++-- Toad), or F5 for the whole file.
++-- =====================================================================
++
++
++-- ---------------------------------------------------------------------
++-- 1. What is in there today?
++--    Shows every WSTYPE in the table and how many machines carry it, so
++--    you can see whether the wire bonders are already listed under some
++--    other WSTYPE before adding them again.
++-- ---------------------------------------------------------------------
++SELECT wstype,
++       COUNT(*)        AS machines,
++       MIN(wsid)       AS example_wsid,
++       MAX(wsdb)       AS wsdb
++FROM   OCAPSYS.AWACSWSTYPE
++GROUP  BY wstype
++ORDER  BY wstype;
++
++
++-- ---------------------------------------------------------------------
++-- 2. One wire bonder.
++--    Replace WB-001 with the real WSID. Repeat for each machine, or use
++--    block 3.
++-- ---------------------------------------------------------------------
++INSERT INTO OCAPSYS.AWACSWSTYPE
++    (TBLROWID, LASTUPDATE, LASTUPDATEDBY, WSID, WSTYPE, WSDB)
++VALUES
++    (RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', 'WB-001', 'WIREBOND', 'TBLWIREBOND');
++
++COMMIT;
++
++
++-- ---------------------------------------------------------------------
++-- 3. A batch of them.
++--    Put your real WSIDs in the list at the top. Add or remove lines as
++--    needed - nothing else changes.
++--
++--    Skips any WSID already registered as WIREBOND, so it is safe to
++--    re-run after adding more machines to the list.
++-- ---------------------------------------------------------------------
++INSERT INTO OCAPSYS.AWACSWSTYPE
++    (TBLROWID, LASTUPDATE, LASTUPDATEDBY, WSID, WSTYPE, WSDB)
++SELECT RAWTOHEX(SYS_GUID()), SYSDATE, 'NX487878', m.wsid, 'WIREBOND', 'TBLWIREBOND'
++FROM   (SELECT 'WB-001' AS wsid FROM dual UNION ALL
++        SELECT 'WB-002'         FROM dual UNION ALL
++        SELECT 'WB-003'         FROM dual UNION ALL
++        SELECT 'WB-007'         FROM dual UNION ALL
++        SELECT 'WB-012'         FROM dual) m
++WHERE  NOT EXISTS (SELECT 1
++                   FROM   OCAPSYS.AWACSWSTYPE a
++                   WHERE  UPPER(a.wsid)   = UPPER(m.wsid)
++                     AND  UPPER(a.wstype) = 'WIREBOND');
++
++COMMIT;
++
++
++-- ---------------------------------------------------------------------
++-- 4. Check the result.
++--    Every WIREBOND row must have WSDB = TBLWIREBOND. The app derives
++--    WSDB from WSTYPE on every save, so rows written from the page are
++--    always right; this catches rows keyed in by hand.
++-- ---------------------------------------------------------------------
++SELECT wsid,
++       wstype,
++       wsdb,
++       lastupdatedby,
++       TO_CHAR(lastupdate, 'YYYY-MM-DD HH24:MI') AS lastupdate
++FROM   OCAPSYS.AWACSWSTYPE
++WHERE  wstype IN ('SAWING', 'WIREBOND')
++ORDER  BY wstype, wsid;
++
++
++-- Wrong WSDB on a WIREBOND row? This repairs them:
++-- UPDATE OCAPSYS.AWACSWSTYPE
++--    SET wsdb = 'TBLWIREBOND', lastupdate = SYSDATE
++--  WHERE wstype = 'WIREBOND'
++--    AND (wsdb IS NULL OR wsdb <> 'TBLWIREBOND');
++-- COMMIT;
 --- a/Views/WireBond/_WireBondFields.cshtml
 +++ b/Views/WireBond/_WireBondFields.cshtml
 @@ -1,217 +0,0 @@

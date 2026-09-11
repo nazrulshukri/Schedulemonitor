@@ -1,58 +1,51 @@
-ORA-00904: "RECIPE": invalid identifier
-=======================================
-The page asks TBLWIREBOND for PACKAGE / PRODUCT / LEADFRAME12NC / RECIPE
-and the table still has the old OCAP columns. Oracle names the first
-column it cannot find, which is RECIPE. The database has to change.
+REGISTER THE WIRE BONDERS IN AWACSWSTYPE
+========================================
+AWACSWSTYPE is the workstation master: one row per machine, saying what
+kind of machine it is (WSTYPE) and which table holds its recipes (WSDB).
+It only ever carried SAWING / TBLSAWING. Wirebond recipes now live in
+TBLWIREBOND, so the wire bonders belong in it too.
 
-STEP 1 - RUN Database/tblwirebond-migrate.sql
----------------------------------------------
-Open it, click anywhere in it, press F5.
-   Toad for Oracle ... F5 = Execute as Script
-   SQL Developer ..... F5 = Run Script
+WHAT CHANGED IN THE APP
+-----------------------
+The AWACSWSTYPE page (Operations > AWACSWSTYPE) used to be locked to
+SAWING in three places: the list query filtered WHERE wstype = 'SAWING',
+the add row posted a hidden SAWING, and the validation rejected anything
+that was not SAWING / TBLSAWING.
 
-The file is ONE PL/SQL block and ENDS at the / on the last line. There is
-deliberately nothing after it, and it is saved with Windows line endings,
-because both of those broke the two earlier versions of this script:
+Now:
+  * the list, the export and the row count cover SAWING and WIREBOND
+  * the add row has a WSTYPE dropdown with both
+  * WSDB is no longer typed in or posted at all. The server derives it
+    from WSTYPE on every save - SAWING gets TBLSAWING, WIREBOND gets
+    TBLWIREBOND - so the two can never disagree and nobody can point a
+    sawing machine at the wirebond table.
+  * the CSV import reads WSTYPE from the file and derives WSDB the same
+    way, so a mixed file loads correctly
 
-   ORA-00933: SQL command not properly ended
-      the file was many statements between comment blocks and the client
-      picked a range that was not a statement
+Other WSTYPEs in the table (TRIMFORM and so on) are deliberately still
+out of this page. They have no recipe grid here.
 
-   PLS-00103: Encountered the symbol "SELECT"
-      the client read straight past the / and swallowed the verification
-      queries that followed it into the PL/SQL block
+HOW TO ADD THE MACHINES
+-----------------------
+Easiest, once the app is rebuilt:
+   Operations > AWACSWSTYPE > Add Row
+   type the WSID, pick WIREBOND in the WSTYPE list, save.
+   WSDB is filled in for you.
 
-Safe to run twice. Every step checks the database first and skips itself
-if it is already done, so a half-finished attempt is repaired by running
-the whole thing again. If anything is still wrong at the end the block
-raises an error naming exactly which column is missing.
+For a batch, use Database/awacswstype-wirebond.sql. Block 1 shows what is
+already in the table, block 3 loads a list of WSIDs in one statement and
+skips any already registered, block 4 checks the result.
 
-Turn on DBMS Output first if you want to watch it: View > DBMS Output,
-green +, pick your connection. Step 8 prints the finished table.
-
-STEP 2 - RUN Database/tblwirebond-verify.sql
---------------------------------------------
-Plain queries, no PL/SQL. F5. Check 1 must show seven columns and check 2
-must show TBLWIREBOND in BOTH constraints.
-
-WHY CHECK 2 MATTERS
--------------------
-It is a separate problem from ORA-00904 and it hits the moment the grid
-starts working. Edit writes to TBLRECIPEHISTORY and Delete writes to
-TBLRECIPETRASH, both inside the same transaction as the save. Both tables
-CHECK the table name against a fixed list that never included
-TBLWIREBOND, so Edit and Delete fail with ORA-02290 and roll back - while
-Add works fine, which is what makes it confusing. The migration fixes it;
-check 2 proves it.
+WHAT THIS DOES NOT DO
+---------------------
+Saving a wirebond RECIPE still does not touch AWACSWSTYPE, and should
+not. Machines and recipes are separate records - editing a Sawing recipe
+does not stamp AWACSWSTYPE either. This change puts the wire bonders in
+the machine master; it does not tie the two tables together.
 
 THE REST
 --------
 1. Copy the source files over your project, keeping the folder structure.
-2. DELETE these two - nothing references them any more:
-      Views/WireBond/_WireBondFields.cshtml
-      ViewModels/WireBondPanelModel.cs
-3. dotnet build, then dotnet run.
-
-Optional: block 3 of Database/tblwirebond-insert.sql copies the existing
-WIREBOND rows out of AWACSRECIPEBYWSTYPE into TBLWIREBOND, so you do not
-have to key them in again. It skips anything already there.
+2. dotnet build, then dotnet run.
+No database change is required for the code - only the machine rows you
+choose to add.
