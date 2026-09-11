@@ -25,5 +25,11 @@ namespace Atcbassemblyrecipe.Models
         public string Product { get; set; } = string.Empty;
         public string Leadframe12Nc { get; set; } = string.Empty;
         public string Recipe { get; set; } = string.Empty;
+
+        // True for a wire bonder that is registered in AWACSWSTYPE but has no
+        // recipe in TBLWIREBOND yet. The grid shows it as an empty row ready to
+        // be filled in; nothing is written to the table until it is saved, so
+        // TBLWIREBOND never collects placeholder records.
+        public bool IsPlaceholder { get; set; }
     }
 }

@@ -33,13 +33,76 @@ namespace Atcbassemblyrecipe.Services
     //     still get a RAWTOHEX(SYS_GUID()) TBLROWID for the MES side.
     public class WireBondService : IWireBondService
     {
+        // The grid is every wire bonder AWACSWSTYPE knows about, not just the ones
+        // that already have a recipe: the recipes in TBLWIREBOND, plus one empty
+        // row for each registered WIREBOND machine that has none yet. Register a
+        // machine on the AWACSWSTYPE page and it turns up here immediately,
+        // waiting to be filled in - and nothing is written to TBLWIREBOND until
+        // somebody actually saves it, so the table never collects blank records.
+        //
+        // A recipe whose machine is NOT registered still shows. Hiding rows the
+        // table really contains would be worse than showing one that no longer
+        // has a parent.
+        //
+        // PACKAGE is a reserved word, so it is quoted on the way out of the table
+        // and aliased to pkg inside the query - which is also why the filter and
+        // the ORDER BY below name pkg rather than "PACKAGE".
+        //
         // Order matters: ReadRow reads by index.
-        private const string SelectColumns = """
-            ROWIDTOCHAR(ROWID), lastupdate, lastupdatedby, wsid, "PACKAGE", product,
-            leadframe12nc, recipe
+        private const string GridSql = """
+            WITH grid AS (
+                SELECT ROWIDTOCHAR(ROWID) AS row_handle,
+                       lastupdate,
+                       lastupdatedby,
+                       wsid,
+                       "PACKAGE" AS pkg,
+                       product,
+                       leadframe12nc,
+                       recipe,
+                       0 AS is_placeholder
+                FROM   tblwirebond
+                UNION ALL
+                SELECT CAST(NULL AS VARCHAR2(18)),
+                       CAST(NULL AS DATE),
+                       CAST(NULL AS VARCHAR2(50)),
+                       a.wsid,
+                       CAST(NULL AS VARCHAR2(64)),
+                       CAST(NULL AS VARCHAR2(64)),
+                       CAST(NULL AS VARCHAR2(16)),
+                       CAST(NULL AS VARCHAR2(120)),
+                       1
+                FROM   awacswstype a
+                WHERE  UPPER(a.wstype) = 'WIREBOND'
+                  AND  a.wsid IS NOT NULL
+                  AND  NOT EXISTS (SELECT 1
+                                   FROM   tblwirebond w
+                                   WHERE  UPPER(w.wsid) = UPPER(a.wsid))
+            )
+            """;
+
+        private const string GridColumns = """
+            row_handle, lastupdate, lastupdatedby, wsid, pkg, product,
+            leadframe12nc, recipe, is_placeholder
             """;
 
         private const string FilterSql = """
+            WHERE (:search IS NULL
+                   OR UPPER(wsid) LIKE :search
+                   OR UPPER(pkg) LIKE :search
+                   OR UPPER(product) LIKE :search
+                   OR UPPER(leadframe12nc) LIKE :search
+                   OR UPPER(recipe) LIKE :search
+                   OR UPPER(lastupdatedby) LIKE :search)
+            """;
+
+        // The export is the table's real contents, so it reads TBLWIREBOND
+        // directly - a machine with no recipe is not a row anybody can export.
+        private const string ExportColumns = """
+            ROWIDTOCHAR(ROWID), lastupdate, lastupdatedby, wsid, "PACKAGE", product,
+            leadframe12nc, recipe, 0
+            """;
+
+        private const string ExportFilterSql = """
             WHERE (:search IS NULL
                    OR UPPER(wsid) LIKE :search
                    OR UPPER("PACKAGE") LIKE :search
@@ -92,8 +155,9 @@ namespace Atcbassemblyrecipe.Services
             await using var command = connection.CreateCommand();
             command.BindByName = true;
             command.CommandText = $"""
-                SELECT {SelectColumns}
-                FROM tblwirebond
+                {GridSql}
+                SELECT {GridColumns}
+                FROM grid
                 {FilterSql}
                 ORDER BY {orderBy}
                 OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY
@@ -130,10 +194,10 @@ namespace Atcbassemblyrecipe.Services
             await using var command = connection.CreateCommand();
             command.BindByName = true;
             command.CommandText = $"""
-                SELECT {SelectColumns}
+                SELECT {ExportColumns}
                 FROM tblwirebond
-                {FilterSql}
-                ORDER BY {orderBy}
+                {ExportFilterSql}
+                ORDER BY {ExportOrderBy(orderBy)}
                 """;
             command.Parameters.Add(new OracleParameter("search", OracleDbType.Varchar2) { Value = (object?)normalizedSearch ?? DBNull.Value });
 
@@ -446,8 +510,9 @@ namespace Atcbassemblyrecipe.Services
             await using var command = connection.CreateCommand();
             command.BindByName = true;
             command.CommandText = $"""
+                {GridSql}
                 SELECT COUNT(1)
-                FROM tblwirebond
+                FROM grid
                 {FilterSql}
                 """;
             command.Parameters.Add(new OracleParameter("search", OracleDbType.Varchar2) { Value = (object?)search ?? DBNull.Value });
@@ -525,18 +590,33 @@ namespace Atcbassemblyrecipe.Services
             var nulls = direction == "ASC" ? "NULLS FIRST" : "NULLS LAST";
             var column = NormalizeSortBy(sortBy);
 
-            return column switch
+            // Machines with no recipe yet come first whatever the sort, so a
+            // machine registered a minute ago is at the top of page 1 rather than
+            // buried by whichever column the user happened to be sorting on.
+            var byColumn = column switch
             {
                 // The grid's own numbering: insertion order, as close as this table
                 // gets to one without a sequence column.
-                "sequence" => $"ROWIDTOCHAR(ROWID) {direction}",
+                "sequence" => $"row_handle {direction}",
                 "lastupdate" => $"lastupdate {direction} {nulls}, product ASC",
-                // PACKAGE stays quoted - it is a reserved word.
-                "package" => $"\"PACKAGE\" {direction} {nulls}, product ASC",
+                "package" => $"pkg {direction} {nulls}, product ASC",
                 // Every other column ties on the timestamp, so equal values still
                 // come back newest first instead of in whatever order Oracle chose.
                 _ => $"{column} {direction} {nulls}, lastupdate DESC NULLS LAST"
             };
+
+            return $"is_placeholder DESC, {byColumn}";
+        }
+
+        // The export reads TBLWIREBOND directly, so the grid's aliases do not
+        // exist there: pkg is "PACKAGE" again, row_handle is the ROWID, and there
+        // is no is_placeholder to sort by.
+        private static string ExportOrderBy(string gridOrderBy)
+        {
+            return gridOrderBy
+                .Replace("is_placeholder DESC, ", string.Empty)
+                .Replace("row_handle", "ROWIDTOCHAR(ROWID)")
+                .Replace("pkg ", "\"PACKAGE\" ");
         }
 
         // Whitelist, not string concatenation - see SortableColumns.
@@ -568,7 +648,8 @@ namespace Atcbassemblyrecipe.Services
                 Package = ReadString(reader, 4),
                 Product = ReadString(reader, 5),
                 Leadframe12Nc = ReadString(reader, 6),
-                Recipe = ReadString(reader, 7)
+                Recipe = ReadString(reader, 7),
+                IsPlaceholder = !reader.IsDBNull(8) && Convert.ToInt32(reader.GetValue(8)) == 1
             };
         }
 

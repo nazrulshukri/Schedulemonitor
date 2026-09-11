@@ -1,59 +1,31 @@
-TWO THINGS IN THIS DROP
-=======================
+THE WIREBOND GRID IS NOW THE MACHINE LIST
+=========================================
+Add a wire bonder in AWACSWSTYPE (WSTYPE WIREBOND) and it appears on the
+Wirebond page straight away - as an empty row at the top of the grid,
+with its machine already filled in and PACKAGE / Product / Leadframe 12NC
+/ Recipe waiting to be typed. Fill them in, click the save icon, and that
+is when the row is written to TBLWIREBOND.
 
-1. THE RELATIONSHIP YOU ASKED FOR
----------------------------------
-AWACSWSTYPE is the parent (one row per machine, keyed by WSID).
-TBLWIREBOND is the child (one row per recipe). The child had nothing
-pointing back at the parent, which is exactly why saving a recipe could
-not touch AWACSWSTYPE - there was no machine on the recipe to relate.
+Nothing is written to the table for a machine that has no recipe yet, so
+TBLWIREBOND never collects blank records. That is why Toad will not show
+a row for machine 32233 until you save a recipe for it.
 
-TBLWIREBOND now has a WSID column, the same way TBLSAWING.SAWMACHINE
-holds WSID values like DS12-004.
+Machines with no recipe sort to the TOP whatever column you sort by, so a
+machine you registered a minute ago is never buried on page 3.
 
-   RUN: Database/tblwirebond-wsid.sql     (F5, whole file)
+A recipe whose machine is no longer registered in AWACSWSTYPE still
+shows. Hiding rows the table really contains would be worse than showing
+one whose parent has gone.
 
-Then on the Wirebond page, Machine is a dropdown of the wire bonders
-registered in AWACSWSTYPE. Register them first if you have not:
-Operations > AWACSWSTYPE > Add Row, WSTYPE WIREBOND.
+NO DATABASE CHANGE IN THIS DROP
+-------------------------------
+Three files changed - Models/WireBond.cs, Services/WireBondService.cs,
+Views/WireBond/Index.cshtml. Copy them over and rebuild.
 
-The reference is checked in the DATABASE on every save - add, edit and
-CSV import all refuse a machine that is not registered as a wire bonder.
-Step 4 of that script adds a real foreign key too, if your AWACSWSTYPE
-has no duplicate WSIDs.
+If you have not run it yet, the WSID column is still required:
+    ALTER TABLE OCAPSYS.TBLWIREBOND ADD (WSID VARCHAR2(16 BYTE));
 
-Saving a recipe still does not WRITE to AWACSWSTYPE, and should not - the
-machine record did not change. What changed is that the recipe now names
-its machine, so the two tables join.
-
-
-2. A BUG I INTRODUCED, AND THE FIX
-----------------------------------
-Your screenshot showed AWACSWSTYPE.WSDB holding SENSORS and POWER. It is
-the machine's BUSINESS GROUP - it matches SAWBFG in TBLSAWING. It is not
-a table name.
-
-The app had it wrong, and the version I sent you yesterday made it worse:
-it derived WSDB from WSTYPE and wrote TBLSAWING / TBLWIREBOND into that
-column on EVERY save, including edits of existing rows. Editing a machine
-whose WSDB was SENSORS would have silently replaced it with TBLSAWING.
-
-Fixed in this drop. WSDB is a normal field on the AWACSWSTYPE grid now,
-with the values already in your table offered as a pick list. Nothing
-derives or overwrites it.
-
-   RUN: Database/awacswstype-wsdb-repair.sql
-        Block 1 shows which WSDB values are in the table. If TBLSAWING
-        appears, block 2 lists the affected rows and suggests the right
-        value from TBLSAWING.SAWBFG, and block 3 applies it.
-
-If you have not yet rebuilt with yesterday's drop, only rows added
-through the page carry TBLSAWING - no existing row was overwritten.
-
-
-THE REST
---------
-1. Copy the source files over your project, keeping the folder structure.
-2. dotnet build, then dotnet run.
-   (Stop the running app first, or the build fails with
-    "Could not copy Atcbassemblyrecipe.dll".)
+WHAT YOU SHOULD SEE AFTER REBUILDING
+------------------------------------
+Your machine 32233 as row 1, empty, ready to fill in.
+Below it, the two WB-007 recipes you already have.

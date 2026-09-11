@@ -27,7 +27,7 @@
 -        <p>TBLWIREBOND: OCAP records raised on the wire bonders - defect, 4M1E difference, action taken and disposition. The work week is calculated by the database from the OCAP date.</p>
 +        <span class="eyebrow">Operations</span>
 +        <h1>Wirebond</h1>
-+        <p>Wirebond recipe columns from TBLWIREBOND.</p>
++        <p>Every wire bonder registered in AWACSWSTYPE, with its recipes from TBLWIREBOND. A machine with no recipe yet shows as an empty row at the top - fill it in and save.</p>
      </div>
  </div>
  
@@ -190,13 +190,13 @@
 +                        No rows found.
 +                        @if (Model.MachineOptions.Count == 0)
 +                        {
-+                            <div class="mt-2">No wire bonders are registered in AWACSWSTYPE yet, so a recipe has no machine to belong to. Add them on the AWACSWSTYPE page first: Add Row, WSTYPE WIREBOND.</div>
++                            <div class="mt-2">No wire bonders are registered in AWACSWSTYPE yet. Add them there first - Add Row, WSTYPE WIREBOND - and each one appears here as an empty row ready for its recipe.</div>
 +                        }
 +                    </td>
                  </tr>
              }
              else
-@@ -141,18 +168,26 @@
+@@ -141,18 +168,67 @@
                  var rowNumber = ((Model.Page - 1) * Model.PageSize) + 1;
                  foreach (var row in Model.Rows)
                  {
@@ -206,6 +206,47 @@
 +                    // save visibly lands instead of the user having to hunt for it.
 +                    var isJustSaved = !string.IsNullOrEmpty(Model.Highlight)
 +                        && string.Equals(row.Product, Model.Highlight, StringComparison.OrdinalIgnoreCase);
++
++                    if (row.IsPlaceholder)
++                    {
++                        // A registered wire bonder with no recipe in TBLWIREBOND yet.
++                        // Nothing has been written for it, so there is nothing to edit
++                        // or delete - it is an open form on the machine, and saving it
++                        // is what creates the row.
++                        var newFormId = $"newWireBondForm-{row.WsId}";
++
++                        <tr class="excel-edit-row" data-placeholder="@row.WsId">
++                            <td><input class="form-check-input" type="checkbox" aria-label="New recipe for @row.WsId" disabled /></td>
++                            <td><span class="cell-muted">New</span></td>
++                            <td class="fw-semibold">@RecipeWsTypes.Wirebond</td>
++                            <td>
++                                <input class="form-control cell-input" value="@row.WsId" readonly aria-label="Machine" />
++                            </td>
++                            <td>
++                                <input name="Package" form="@newFormId" class="form-control cell-input" maxlength="64" placeholder="Package" aria-label="Package" />
++                            </td>
++                            <td>
++                                <input name="Product" form="@newFormId" class="form-control cell-input" maxlength="64" placeholder="Product" required aria-label="Product" />
++                            </td>
++                            <td>
++                                <input name="Leadframe12Nc" form="@newFormId" class="form-control cell-input" maxlength="16" placeholder="Leadframe 12NC" required aria-label="Leadframe 12NC" />
++                            </td>
++                            <td>
++                                <input name="Recipe" form="@newFormId" class="form-control cell-input" maxlength="120" placeholder="Recipe" required aria-label="Recipe" />
++                            </td>
++                            <td><span class="cell-muted">Current user</span></td>
++                            <td><span class="cell-muted">Set on save</span></td>
++                            <td class="text-center">
++                                <button type="submit" form="@newFormId" class="icon-btn icon-save" title="Save the first recipe for @row.WsId" aria-label="Save recipe for @row.WsId">
++                                    <span></span>
++                                </button>
++                            </td>
++                            <td class="text-center"><span class="cell-muted">-</span></td>
++                        </tr>
++
++                        rowNumber += 1;
++                        continue;
++                    }
 +
 +                    <tr class="excel-display-row @(isJustSaved ? "row-just-saved" : "")" data-row-id="@row.TblRowId">
 +                        <td><input class="form-check-input" type="checkbox" aria-label="Select @row.Product" /></td>
@@ -229,7 +270,7 @@
                                      <span></span>
                                  </button>
                              }
-@@ -160,7 +195,7 @@
+@@ -160,7 +236,7 @@
                          <td class="text-center">
                              @if (canDelete)
                              {
@@ -238,7 +279,7 @@
                                      <span></span>
                                  </button>
                              }
-@@ -170,13 +205,50 @@
+@@ -170,13 +246,50 @@
                      @if (canUpdate)
                      {
                          var editFormId = $"editWireBondForm-{row.TblRowId}";
@@ -295,7 +336,7 @@
                              </td>
                          </tr>
                      }
-@@ -188,7 +260,16 @@
+@@ -188,7 +301,16 @@
      </table>
  </div>
  
@@ -313,7 +354,27 @@
  <div class="row-forms d-none" aria-hidden="true">
      @if (canAdd)
      {
-@@ -225,7 +306,7 @@
+@@ -199,6 +321,19 @@
+ 
+     @foreach (var row in Model.Rows)
+     {
++        if (row.IsPlaceholder)
++        {
++            if (canAdd)
++            {
++                <form id="newWireBondForm-@row.WsId" asp-controller="WireBond" asp-action="Create" method="post">
++                    <input type="hidden" name="WsId" value="@row.WsId" />
++                    <input type="hidden" name="Confirmed" value="true" />
++                </form>
++            }
++
++            continue;
++        }
++
+         if (canUpdate)
+         {
+             <form id="editWireBondForm-@row.TblRowId" asp-controller="WireBond" asp-action="Edit" method="post">
+@@ -225,7 +360,7 @@
  
  <div class="pagination-bar">
      <span>Showing page @Model.Page of @Model.TotalPages, @Model.TotalRows total rows</span>
@@ -322,7 +383,7 @@
          <ul class="pagination mb-0">
              <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
                  <a class="page-link" asp-controller="WireBond" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection">Prev</a>
-@@ -249,7 +330,7 @@
+@@ -249,7 +384,7 @@
              <div class="modal-header">
                  <div>
                      <span class="eyebrow">CSV Template</span>
@@ -331,7 +392,7 @@
                  </div>
                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
              </div>
-@@ -257,8 +338,6 @@
+@@ -257,8 +392,6 @@
                  <ol class="template-steps">
                      <li>Download the template below.</li>
                      <li>Key in the values under the same headers - or delete the header row and key in the values only, in the same left-to-right order.</li>
@@ -340,7 +401,7 @@
                      <li>In Excel, use Save As and choose CSV (Comma delimited) (*.csv).</li>
                  </ol>
  
-@@ -266,46 +345,38 @@
+@@ -266,46 +399,38 @@
                      <table class="table template-preview-table align-middle">
                          <thead>
                              <tr>
@@ -407,7 +468,7 @@
                  </div>
              </div>
              <div class="modal-footer">
-@@ -324,7 +395,7 @@
+@@ -324,7 +449,7 @@
                  <div class="modal-header">
                      <div>
                          <span class="eyebrow">Delete Validation</span>
@@ -416,7 +477,7 @@
                      </div>
                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                  </div>
-@@ -342,39 +413,60 @@
+@@ -342,39 +467,60 @@
      </div>
  }
  
@@ -498,7 +559,7 @@
      private static string NextSortDirection(WireBondViewModel model, string column)
 --- a/Models/WireBond.cs
 +++ b/Models/WireBond.cs
-@@ -1,85 +1,29 @@
+@@ -1,85 +1,35 @@
  namespace Atcbassemblyrecipe.Models
  {
 -    // One row of OCAPSYS.TBLWIREBOND: a wire bond OCAP record - who raised it,
@@ -598,6 +659,12 @@
 +        public string Product { get; set; } = string.Empty;
 +        public string Leadframe12Nc { get; set; } = string.Empty;
 +        public string Recipe { get; set; } = string.Empty;
++
++        // True for a wire bonder that is registered in AWACSWSTYPE but has no
++        // recipe in TBLWIREBOND yet. The grid shows it as an empty row ready to
++        // be filled in; nothing is written to the table until it is saved, so
++        // TBLWIREBOND never collects placeholder records.
++        public bool IsPlaceholder { get; set; }
      }
  }
 --- a/ViewModels/WireBondInputModel.cs
@@ -1163,7 +1230,7 @@
          private static string Describe(Exception ex)
 --- a/Services/WireBondService.cs
 +++ b/Services/WireBondService.cs
-@@ -10,71 +10,63 @@
+@@ -10,71 +10,126 @@
      {
          Task<PagedResult<WireBond>> GetAsync(string? search, int page, int pageSize, string? sortBy, string? sortDirection);
          Task<IReadOnlyList<WireBond>> GetForExportAsync(string? search, string? sortBy, string? sortDirection);
@@ -1203,16 +1270,63 @@
 +    //     still get a RAWTOHEX(SYS_GUID()) TBLROWID for the MES side.
      public class WireBondService : IWireBondService
      {
++        // The grid is every wire bonder AWACSWSTYPE knows about, not just the ones
++        // that already have a recipe: the recipes in TBLWIREBOND, plus one empty
++        // row for each registered WIREBOND machine that has none yet. Register a
++        // machine on the AWACSWSTYPE page and it turns up here immediately,
++        // waiting to be filled in - and nothing is written to TBLWIREBOND until
++        // somebody actually saves it, so the table never collects blank records.
++        //
++        // A recipe whose machine is NOT registered still shows. Hiding rows the
++        // table really contains would be worse than showing one that no longer
++        // has a parent.
++        //
++        // PACKAGE is a reserved word, so it is quoted on the way out of the table
++        // and aliased to pkg inside the query - which is also why the filter and
++        // the ORDER BY below name pkg rather than "PACKAGE".
++        //
          // Order matters: ReadRow reads by index.
-         private const string SelectColumns = """
+-        private const string SelectColumns = """
 -            ROWIDTOCHAR(ROWID), lastupdate, lastupdatedby, wbocapno, wbocapwwk,
 -            wbissuedby, wbbfg, wbdate, wboperatorid, wbprocess, wbmachine,
 -            wbpackage, wbsoqty, wbdefect, wbdefectcat, wbdefectothers, wbdiff4m1e,
 -            wbdiffaffected, wbdifffabsite, wbdiffno, wbdiffnotaffected,
 -            wbdiffrejectqty, wbdiffremarks, wbverifiedby, wbactiontaken,
 -            wbdisposition, wbremarks, wbrcmachineerror, wbmachineerror
-+            ROWIDTOCHAR(ROWID), lastupdate, lastupdatedby, wsid, "PACKAGE", product,
-+            leadframe12nc, recipe
++        private const string GridSql = """
++            WITH grid AS (
++                SELECT ROWIDTOCHAR(ROWID) AS row_handle,
++                       lastupdate,
++                       lastupdatedby,
++                       wsid,
++                       "PACKAGE" AS pkg,
++                       product,
++                       leadframe12nc,
++                       recipe,
++                       0 AS is_placeholder
++                FROM   tblwirebond
++                UNION ALL
++                SELECT CAST(NULL AS VARCHAR2(18)),
++                       CAST(NULL AS DATE),
++                       CAST(NULL AS VARCHAR2(50)),
++                       a.wsid,
++                       CAST(NULL AS VARCHAR2(64)),
++                       CAST(NULL AS VARCHAR2(64)),
++                       CAST(NULL AS VARCHAR2(16)),
++                       CAST(NULL AS VARCHAR2(120)),
++                       1
++                FROM   awacswstype a
++                WHERE  UPPER(a.wstype) = 'WIREBOND'
++                  AND  a.wsid IS NOT NULL
++                  AND  NOT EXISTS (SELECT 1
++                                   FROM   tblwirebond w
++                                   WHERE  UPPER(w.wsid) = UPPER(a.wsid))
++            )
++            """;
++
++        private const string GridColumns = """
++            row_handle, lastupdate, lastupdatedby, wsid, pkg, product,
++            leadframe12nc, recipe, is_placeholder
              """;
  
          private const string FilterSql = """
@@ -1227,6 +1341,23 @@
 -                   OR UPPER(wbissuedby) LIKE :search
 -                   OR UPPER(wbverifiedby) LIKE :search
 -                   OR UPPER(wboperatorid) LIKE :search
++                   OR UPPER(wsid) LIKE :search
++                   OR UPPER(pkg) LIKE :search
++                   OR UPPER(product) LIKE :search
++                   OR UPPER(leadframe12nc) LIKE :search
++                   OR UPPER(recipe) LIKE :search
++                   OR UPPER(lastupdatedby) LIKE :search)
++            """;
++
++        // The export is the table's real contents, so it reads TBLWIREBOND
++        // directly - a machine with no recipe is not a row anybody can export.
++        private const string ExportColumns = """
++            ROWIDTOCHAR(ROWID), lastupdate, lastupdatedby, wsid, "PACKAGE", product,
++            leadframe12nc, recipe, 0
++            """;
++
++        private const string ExportFilterSql = """
++            WHERE (:search IS NULL
 +                   OR UPPER(wsid) LIKE :search
 +                   OR UPPER("PACKAGE") LIKE :search
 +                   OR UPPER(product) LIKE :search
@@ -1268,7 +1399,33 @@
          private readonly IOracleConnectionFactory _connectionFactory;
          private readonly IRecipeAuditRepository _auditRepository;
  
-@@ -154,6 +146,76 @@
+@@ -100,8 +155,9 @@
+             await using var command = connection.CreateCommand();
+             command.BindByName = true;
+             command.CommandText = $"""
+-                SELECT {SelectColumns}
+-                FROM tblwirebond
++                {GridSql}
++                SELECT {GridColumns}
++                FROM grid
+                 {FilterSql}
+                 ORDER BY {orderBy}
+                 OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY
+@@ -138,10 +194,10 @@
+             await using var command = connection.CreateCommand();
+             command.BindByName = true;
+             command.CommandText = $"""
+-                SELECT {SelectColumns}
++                SELECT {ExportColumns}
+                 FROM tblwirebond
+-                {FilterSql}
+-                ORDER BY {orderBy}
++                {ExportFilterSql}
++                ORDER BY {ExportOrderBy(orderBy)}
+                 """;
+             command.Parameters.Add(new OracleParameter("search", OracleDbType.Varchar2) { Value = (object?)normalizedSearch ?? DBNull.Value });
+ 
+@@ -154,6 +210,76 @@
              return rows;
          }
  
@@ -1345,26 +1502,26 @@
          public async Task<(bool Success, string Message)> CreateAsync(WireBondInputModel model, string userName)
          {
              Normalize(model);
-@@ -164,10 +226,16 @@
+@@ -164,10 +290,16 @@
  
              try
              {
 -                if (await OcapNoExistsAsync(connection, transaction, model.OcapNo))
 +                if (!await MachineIsRegisteredAsync(connection, transaction, model.WsId))
-                 {
-                     await transaction.RollbackAsync();
--                    return (false, $"TBLWIREBOND already has a record for OCAP No {model.OcapNo}. Edit that row instead of adding a second one.");
++                {
++                    await transaction.RollbackAsync();
 +                    return (false, UnregisteredMachineMessage(model.WsId));
 +                }
 +
 +                if (await RecipeExistsAsync(connection, transaction, model))
-+                {
-+                    await transaction.RollbackAsync();
+                 {
+                     await transaction.RollbackAsync();
+-                    return (false, $"TBLWIREBOND already has a record for OCAP No {model.OcapNo}. Edit that row instead of adding a second one.");
 +                    return (false, $"TBLWIREBOND already has {model.Product} / {model.Leadframe12Nc} / {model.Recipe}. Edit that row instead of adding a second one.");
                  }
  
                  await using var command = connection.CreateCommand();
-@@ -177,18 +245,14 @@
+@@ -177,18 +309,14 @@
                  AddWriteParameters(command, model, userName);
  
                  var inserted = await command.ExecuteNonQueryTracedAsync();
@@ -1385,7 +1542,7 @@
              }
              catch
              {
-@@ -215,10 +279,16 @@
+@@ -215,10 +343,16 @@
                  {
                      Normalize(model);
  
@@ -1404,7 +1561,7 @@
                      }
  
                      await using var command = connection.CreateCommand();
-@@ -267,42 +337,27 @@
+@@ -267,42 +401,27 @@
                      return (false, "TBLWIREBOND row was not found. It may have been deleted - check Trash.");
                  }
  
@@ -1458,7 +1615,7 @@
                      WHERE ROWID = CHARTOROWID(:tblrowid)
                      """;
                  AddWriteParameters(command, model, userName);
-@@ -322,14 +377,14 @@
+@@ -322,14 +441,14 @@
                      connection,
                      transaction,
                      AuditedTableNames.WireBond,
@@ -1475,7 +1632,7 @@
              }
              catch
              {
-@@ -359,7 +414,7 @@
+@@ -359,7 +478,7 @@
                      connection,
                      transaction,
                      AuditedTableNames.WireBond,
@@ -1484,7 +1641,7 @@
                      rowData,
                      userName);
  
-@@ -377,7 +432,7 @@
+@@ -377,7 +496,7 @@
                  }
  
                  await transaction.CommitAsync();
@@ -1493,7 +1650,18 @@
              }
              catch
              {
-@@ -400,17 +455,24 @@
+@@ -391,8 +510,9 @@
+             await using var command = connection.CreateCommand();
+             command.BindByName = true;
+             command.CommandText = $"""
++                {GridSql}
+                 SELECT COUNT(1)
+-                FROM tblwirebond
++                FROM grid
+                 {FilterSql}
+                 """;
+             command.Parameters.Add(new OracleParameter("search", OracleDbType.Varchar2) { Value = (object?)search ?? DBNull.Value });
+@@ -400,17 +520,24 @@
              return Convert.ToInt32(await command.ExecuteScalarTracedAsync());
          }
  
@@ -1525,7 +1693,7 @@
  
              return Convert.ToInt32(await command.ExecuteScalarTracedAsync()) > 0;
          }
-@@ -426,51 +488,14 @@
+@@ -426,51 +553,14 @@
              return Convert.ToInt32(await command.ExecuteScalarTracedAsync()) == 1;
          }
  
@@ -1582,7 +1750,7 @@
          }
  
          private static OracleParameter Text(string name, string? value)
-@@ -481,86 +506,50 @@
+@@ -481,86 +571,65 @@
              };
          }
  
@@ -1643,11 +1811,8 @@
 +            var column = NormalizeSortBy(sortBy);
  
 -            return NormalizeSortBy(sortBy) switch
-+            return column switch
-             {
-+                // The grid's own numbering: insertion order, as close as this table
-+                // gets to one without a sequence column.
-                 "sequence" => $"ROWIDTOCHAR(ROWID) {direction}",
+-            {
+-                "sequence" => $"ROWIDTOCHAR(ROWID) {direction}",
 -                "wbocapno" => $"wbocapno {direction} {nulls}, wbdate DESC NULLS LAST",
 -                "wbocapwwk" => $"wbocapwwk {direction} {nulls}, wbdate DESC NULLS LAST",
 -                "wbdate" => $"wbdate {direction} {nulls}, wbocapno ASC",
@@ -1657,17 +1822,37 @@
 -                "lastupdatedby" => $"lastupdatedby {direction} {nulls}, wbdate DESC NULLS LAST",
 -                "lastupdate" => $"lastupdate {direction} {nulls}, wbocapno ASC",
 -                _ => "lastupdate DESC NULLS LAST, wbocapno ASC"
++            // Machines with no recipe yet come first whatever the sort, so a
++            // machine registered a minute ago is at the top of page 1 rather than
++            // buried by whichever column the user happened to be sorting on.
++            var byColumn = column switch
++            {
++                // The grid's own numbering: insertion order, as close as this table
++                // gets to one without a sequence column.
++                "sequence" => $"row_handle {direction}",
 +                "lastupdate" => $"lastupdate {direction} {nulls}, product ASC",
-+                // PACKAGE stays quoted - it is a reserved word.
-+                "package" => $"\"PACKAGE\" {direction} {nulls}, product ASC",
++                "package" => $"pkg {direction} {nulls}, product ASC",
 +                // Every other column ties on the timestamp, so equal values still
 +                // come back newest first instead of in whatever order Oracle chose.
 +                _ => $"{column} {direction} {nulls}, lastupdate DESC NULLS LAST"
              };
++
++            return $"is_placeholder DESC, {byColumn}";
          }
  
 -        // Whitelist, not string concatenation: the value reaches an ORDER BY that
 -        // cannot be parameterized, so anything unrecognized falls back.
++        // The export reads TBLWIREBOND directly, so the grid's aliases do not
++        // exist there: pkg is "PACKAGE" again, row_handle is the ROWID, and there
++        // is no is_placeholder to sort by.
++        private static string ExportOrderBy(string gridOrderBy)
++        {
++            return gridOrderBy
++                .Replace("is_placeholder DESC, ", string.Empty)
++                .Replace("row_handle", "ROWIDTOCHAR(ROWID)")
++                .Replace("pkg ", "\"PACKAGE\" ");
++        }
++
 +        // Whitelist, not string concatenation - see SortableColumns.
          public static string NormalizeSortBy(string? sortBy)
          {
@@ -1694,7 +1879,7 @@
          }
  
          private static string? NormalizeSearch(string? search)
-@@ -575,32 +564,11 @@
+@@ -575,32 +644,12 @@
                  TblRowId = ReadString(reader, 0),
                  LastUpdate = ReadDate(reader, 1),
                  LastUpdatedBy = ReadString(reader, 2),
@@ -1728,11 +1913,12 @@
 +                Package = ReadString(reader, 4),
 +                Product = ReadString(reader, 5),
 +                Leadframe12Nc = ReadString(reader, 6),
-+                Recipe = ReadString(reader, 7)
++                Recipe = ReadString(reader, 7),
++                IsPlaceholder = !reader.IsDBNull(8) && Convert.ToInt32(reader.GetValue(8)) == 1
              };
          }
  
-@@ -613,10 +581,5 @@
+@@ -613,10 +662,5 @@
          {
              return reader.IsDBNull(index) ? null : reader.GetDateTime(index);
          }
@@ -4101,249 +4287,3 @@
 +WHERE  wsdb IN ('TBLSAWING', 'TBLWIREBOND')
 +    OR wsdb IS NULL
 +ORDER  BY wstype, wsid;
---- a/Views/WireBond/_WireBondFields.cshtml
-+++ b/Views/WireBond/_WireBondFields.cshtml
-@@ -1,217 +0,0 @@
--@model WireBondPanelModel
--
--@*
--    The 25 writable TBLWIREBOND fields. Rendered once for the add panel and once
--    per row for the edit panels, so the two can never fall out of step.
--
--    Every input reaches its form through form="@Model.FormId" - the forms
--    themselves live outside the table (see the note in _AwacsForm.cshtml and
--    excel-grid.js: a <form> written between two <tr> elements is closed by the
--    HTML parser and its hidden inputs are moved out of it).
--
--    data-original-value is what excel-grid.js reads to put a cancelled edit back;
--    the page's own script extends that to the textareas.
--
--    WBOCAPWWK has no input: the database trigger derives it from the OCAP date.
--*@
--
--@{
--    var row = Model.Row;
--}
--
--<div class="wirebond-panel">
--    <div class="row g-2">
--        <div class="col-12">
--            <span class="eyebrow">@(Model.IsEdit ? "Edit OCAP record" : "New OCAP record")</span>
--        </div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-OcapNo">OCAP No <span class="text-danger">*</span></label>
--            <input id="@(Model.FormId)-OcapNo" name="OcapNo" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" placeholder="OCAP-WB-2026-001" required
--                   value="@row?.OcapNo" data-original-value="@row?.OcapNo" />
--        </div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-OcapDate">OCAP Date <span class="text-danger">*</span></label>
--            <input id="@(Model.FormId)-OcapDate" name="OcapDate" form="@Model.FormId" type="datetime-local"
--                   class="form-control cell-input" required
--                   value="@(row?.OcapDate?.ToString("yyyy-MM-ddTHH:mm"))"
--                   data-original-value="@(row?.OcapDate?.ToString("yyyy-MM-ddTHH:mm"))" />
--        </div>
--
--        <div class="col-md-3">
--            <label class="form-label">Work Week</label>
--            <input class="form-control cell-input bg-light text-muted" readonly aria-readonly="true"
--                   value="@(Model.IsEdit ? row?.OcapWorkWeek : "Set by the database")"
--                   title="WBOCAPWWK is calculated by the OCAP_WIREBOND_WORKWEEK trigger from the OCAP date" />
--        </div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-Bfg">BFG</label>
--            <input id="@(Model.FormId)-Bfg" name="Bfg" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" placeholder="BFG1"
--                   value="@row?.Bfg" data-original-value="@row?.Bfg" />
--        </div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-IssuedBy">Issued By</label>
--            <input id="@(Model.FormId)-IssuedBy" name="IssuedBy" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" placeholder="NX487878"
--                   value="@row?.IssuedBy" data-original-value="@row?.IssuedBy" />
--        </div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-OperatorId">Operator ID</label>
--            <input id="@(Model.FormId)-OperatorId" name="OperatorId" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="50" placeholder="OP1023"
--                   value="@row?.OperatorId" data-original-value="@row?.OperatorId" />
--        </div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-Process">Process</label>
--            <input id="@(Model.FormId)-Process" name="Process" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" list="wireBondProcessOptions" placeholder="WIREBOND"
--                   value="@(Model.IsEdit ? row?.Process : "WIREBOND")" data-original-value="@row?.Process" />
--        </div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-Machine">Machine</label>
--            <input id="@(Model.FormId)-Machine" name="Machine" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" placeholder="WB-07"
--                   value="@row?.Machine" data-original-value="@row?.Machine" />
--        </div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-Package">Package</label>
--            <input id="@(Model.FormId)-Package" name="Package" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" placeholder="SOT669"
--                   value="@row?.Package" data-original-value="@row?.Package" />
--        </div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-SoQty">SO Qty</label>
--            <input id="@(Model.FormId)-SoQty" name="SoQty" form="@Model.FormId" type="number" step="1" min="0"
--                   class="form-control cell-input" placeholder="3000"
--                   value="@row?.SoQty" data-original-value="@(row?.SoQty?.ToString())" />
--        </div>
--
--        <div class="col-12"><hr class="my-1" /></div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-Defect">Defect</label>
--            <input id="@(Model.FormId)-Defect" name="Defect" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" list="wireBondDefectOptions" placeholder="NON STICK ON PAD"
--                   value="@row?.Defect" data-original-value="@row?.Defect" />
--        </div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-DefectCategory">Defect Category</label>
--            <input id="@(Model.FormId)-DefectCategory" name="DefectCategory" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" list="wireBondCategoryOptions" placeholder="PROCESS"
--                   value="@row?.DefectCategory" data-original-value="@row?.DefectCategory" />
--        </div>
--
--        <div class="col-md-6">
--            <label class="form-label" for="@(Model.FormId)-DefectOthers">Defect (Others)</label>
--            <input id="@(Model.FormId)-DefectOthers" name="DefectOthers" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" placeholder="Only when Defect is OTHERS"
--                   value="@row?.DefectOthers" data-original-value="@row?.DefectOthers" />
--        </div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-MachineError">Machine Error</label>
--            <input id="@(Model.FormId)-MachineError" name="MachineError" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" placeholder="E-042"
--                   value="@row?.MachineError" data-original-value="@row?.MachineError" />
--        </div>
--
--        <div class="col-md-9">
--            <label class="form-label" for="@(Model.FormId)-RcMachineError">Machine Error - Root Cause</label>
--            <input id="@(Model.FormId)-RcMachineError" name="RcMachineError" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="1000" placeholder="E-042 Z-axis search level fault"
--                   value="@row?.RcMachineError" data-original-value="@row?.RcMachineError" />
--        </div>
--
--        <div class="col-12"><hr class="my-1" /></div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-Diff4M1E">4M1E</label>
--            <input id="@(Model.FormId)-Diff4M1E" name="Diff4M1E" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" list="wireBondDifferenceOptions" placeholder="MACHINE"
--                   value="@row?.Diff4M1E" data-original-value="@row?.Diff4M1E" />
--        </div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-DiffNo">Difference No</label>
--            <input id="@(Model.FormId)-DiffNo" name="DiffNo" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" placeholder="DIFF-2026-0912"
--                   value="@row?.DiffNo" data-original-value="@row?.DiffNo" />
--        </div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-DiffFabSite">Fab Site</label>
--            <input id="@(Model.FormId)-DiffFabSite" name="DiffFabSite" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" placeholder="ATCB"
--                   value="@row?.DiffFabSite" data-original-value="@row?.DiffFabSite" />
--        </div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-DiffRejectQty">Reject Qty</label>
--            <input id="@(Model.FormId)-DiffRejectQty" name="DiffRejectQty" form="@Model.FormId" type="number" step="1" min="0"
--                   class="form-control cell-input" placeholder="120"
--                   value="@row?.DiffRejectQty" data-original-value="@(row?.DiffRejectQty?.ToString())" />
--        </div>
--
--        <div class="col-md-6">
--            <label class="form-label" for="@(Model.FormId)-DiffAffected">Affected</label>
--            <input id="@(Model.FormId)-DiffAffected" name="DiffAffected" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" placeholder="LOT2609001,LOT2609002"
--                   value="@row?.DiffAffected" data-original-value="@row?.DiffAffected" />
--        </div>
--
--        <div class="col-md-6">
--            <label class="form-label" for="@(Model.FormId)-DiffNotAffected">Not Affected</label>
--            <input id="@(Model.FormId)-DiffNotAffected" name="DiffNotAffected" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" placeholder="LOT2609003"
--                   value="@row?.DiffNotAffected" data-original-value="@row?.DiffNotAffected" />
--        </div>
--
--        <div class="col-12">
--            <label class="form-label" for="@(Model.FormId)-DiffRemarks">Difference Remarks</label>
--            <textarea id="@(Model.FormId)-DiffRemarks" name="DiffRemarks" form="@Model.FormId" class="form-control"
--                      rows="2" maxlength="2000" placeholder="What the difference was and how it was found"
--                      data-original-value="@row?.DiffRemarks">@row?.DiffRemarks</textarea>
--        </div>
--
--        <div class="col-12"><hr class="my-1" /></div>
--
--        <div class="col-md-3">
--            <label class="form-label" for="@(Model.FormId)-VerifiedBy">Verified By</label>
--            <input id="@(Model.FormId)-VerifiedBy" name="VerifiedBy" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="100" placeholder="NX000123"
--                   value="@row?.VerifiedBy" data-original-value="@row?.VerifiedBy" />
--        </div>
--
--        <div class="col-md-9">
--            <label class="form-label" for="@(Model.FormId)-Remarks">Remarks</label>
--            <input id="@(Model.FormId)-Remarks" name="Remarks" form="@Model.FormId" class="form-control cell-input"
--                   maxlength="500" placeholder="Raised on night shift"
--                   value="@row?.Remarks" data-original-value="@row?.Remarks" />
--        </div>
--
--        <div class="col-md-6">
--            <label class="form-label" for="@(Model.FormId)-ActionTaken">Action Taken</label>
--            <textarea id="@(Model.FormId)-ActionTaken" name="ActionTaken" form="@Model.FormId" class="form-control"
--                      rows="2" maxlength="2000" placeholder="Capillary replaced, machine requalified"
--                      data-original-value="@row?.ActionTaken">@row?.ActionTaken</textarea>
--        </div>
--
--        <div class="col-md-6">
--            <label class="form-label" for="@(Model.FormId)-Disposition">Disposition</label>
--            <textarea id="@(Model.FormId)-Disposition" name="Disposition" form="@Model.FormId" class="form-control"
--                      rows="2" maxlength="2000" placeholder="Affected lots to 100% visual inspection"
--                      data-original-value="@row?.Disposition">@row?.Disposition</textarea>
--        </div>
--    </div>
--</div>
---- a/ViewModels/WireBondPanelModel.cs
-+++ b/ViewModels/WireBondPanelModel.cs
-@@ -1,23 +0,0 @@
--using Atcbassemblyrecipe.Models;
--
--namespace Atcbassemblyrecipe.ViewModels
--{
--    // Views/WireBond/_WireBondFields.cshtml renders the same 25 fields for the add
--    // panel and for every edit panel, so the two can never drift apart. FormId is
--    // the form each input posts to through its form="..." attribute; Row is null on
--    // the add panel and carries the existing values on an edit.
--    public class WireBondPanelModel
--    {
--        public WireBondPanelModel(string formId, WireBond? row)
--        {
--            FormId = formId;
--            Row = row;
--        }
--
--        public string FormId { get; }
--
--        public WireBond? Row { get; }
--
--        public bool IsEdit => Row is not null;
--    }
--}
