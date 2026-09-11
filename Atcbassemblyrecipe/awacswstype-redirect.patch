@@ -1,0 +1,157 @@
+--- a/Controllers/AwacsController.cs
++++ b/Controllers/AwacsController.cs
+@@ -72,8 +72,8 @@
+         public Task<IActionResult> TableMarker(string? search, int page = 1, int pageSize = 25, string? sortBy = "lastupdate", string? sortDirection = "desc", bool promptAdd = false)
+         {
+             return ShowRecipeGridAsync(RecipeWsTypes.Marker, search, page, pageSize, sortBy, sortDirection, promptAdd);
+-        }
+-
++        }
++
+         [ModuleAccess(ModuleNames.TableWirebond, ModuleAction.View)]
+         public Task<IActionResult> TableWirebond(string? search, int page = 1, int pageSize = 25, string? sortBy = "lastupdate", string? sortDirection = "desc", bool promptAdd = false)
+         {
+@@ -413,11 +413,20 @@
+         [HttpPost]
+         [ValidateAntiForgeryToken]
+         [ModuleAccess(ModuleNames.AwacsWstype, ModuleAction.Add)]
++        // Saving a machine leaves you on the AWACSWSTYPE grid, where the row you
++        // just added is now visible - the same as Edit and Delete already do.
++        //
++        // It used to redirect to the Table Sawing grid with promptAdd, from back
++        // when this page only held SAWING machines and the natural next step was
++        // that grid. It now holds WIREBOND machines too, so that jump was both
++        // unasked for and, for a wire bonder, the wrong grid entirely.
+         public async Task<IActionResult> Create(AwacsWstypeInputModel model)
+         {
+             if (!ModelState.IsValid)
+             {
+-                return View(model);
++                TempData["PopupType"] = "danger";
++                TempData["PopupMessage"] = $"Nothing was saved: {BuildModelStateMessage()}";
++                return RedirectToAction("Index", "Home");
+             }
+ 
+             (bool Success, string Message) result;
+@@ -427,21 +436,23 @@
+             }
+             catch (Exception ex) when (ex is OracleException or InvalidOperationException)
+             {
+-                ModelState.AddModelError(string.Empty, DatabaseErrorMessage.Build(ex));
+-                return View(model);
++                TempData["PopupType"] = "danger";
++                TempData["PopupMessage"] = DatabaseErrorMessage.Build(ex);
++                return RedirectToAction("Index", "Home");
+             }
+ 
+             TempData["PopupType"] = result.Success ? "success" : "danger";
+-            TempData["PopupMessage"] = result.Success
+-                ? $"{result.Message} Please insert the required Table Sawing values: Product, Leadframe 12NC, and Recipe."
+-                : result.Message;
+ 
+-            if (!result.Success)
+-            {
+-                return View(model);
+-            }
++            // Only the Wirebond grid is machine-driven, so only there can we
++            // promise the machine is already waiting with a row of its own.
++            // A new SAWING machine does not appear on the Sawing grid by itself -
++            // that grid is AWACSRECIPEBYWSTYPE, one row per recipe.
++            var isWirebond = string.Equals(model.WsType?.Trim(), RecipeWsTypes.Wirebond, StringComparison.OrdinalIgnoreCase);
++            TempData["PopupMessage"] = result.Success && isWirebond
++                ? $"{result.Message} {model.WsId} is on the Wirebond page now, as an empty row waiting for its recipe."
++                : result.Message;
+ 
+-            return RedirectToAction(nameof(TableSawing), new { promptAdd = true });
++            return RedirectToAction("Index", "Home");
+         }
+ 
+         [ModuleAccess(ModuleNames.AwacsWstype, ModuleAction.Update)]
+@@ -664,37 +675,37 @@
+             }
+ 
+             return RedirectToAction(nameof(RequestDatabaseChange));
+-        }
+-
+-        private static RecipeByWstypeViewModel BuildRecipeGridModel(string wsType) => wsType switch
+-        {
+-            RecipeWsTypes.Marker => new RecipeByWstypeViewModel
+-            {
+-                WsType = RecipeWsTypes.Marker,
+-                ModuleName = ModuleNames.TableMarker,
+-                PageTitle = "Marker",
+-                PageDescription = "MARKER recipe columns from AWACSRECIPEBYWSTYPE.",
+-                GridAction = nameof(TableMarker),
+-                StorageKey = "tablemarker"
+-            },
+-            RecipeWsTypes.Wirebond => new RecipeByWstypeViewModel
+-            {
+-                WsType = RecipeWsTypes.Wirebond,
+-                ModuleName = ModuleNames.TableWirebond,
+-                PageTitle = "Wirebond",
+-                PageDescription = "WIREBOND recipe columns from AWACSRECIPEBYWSTYPE.",
+-                GridAction = nameof(TableWirebond),
+-                StorageKey = "tablewirebond"
+-            },
+-            _ => new RecipeByWstypeViewModel
+-            {
+-                WsType = RecipeWsTypes.Sawing,
+-                ModuleName = ModuleNames.TableSawing,
+-                PageTitle = "Table Sawing",
+-                PageDescription = "SAWING recipe columns from AWACSRECIPEBYWSTYPE.",
+-                GridAction = nameof(TableSawing),
+-                StorageKey = "tablesawing"
+-            }
++        }
++
++        private static RecipeByWstypeViewModel BuildRecipeGridModel(string wsType) => wsType switch
++        {
++            RecipeWsTypes.Marker => new RecipeByWstypeViewModel
++            {
++                WsType = RecipeWsTypes.Marker,
++                ModuleName = ModuleNames.TableMarker,
++                PageTitle = "Marker",
++                PageDescription = "MARKER recipe columns from AWACSRECIPEBYWSTYPE.",
++                GridAction = nameof(TableMarker),
++                StorageKey = "tablemarker"
++            },
++            RecipeWsTypes.Wirebond => new RecipeByWstypeViewModel
++            {
++                WsType = RecipeWsTypes.Wirebond,
++                ModuleName = ModuleNames.TableWirebond,
++                PageTitle = "Wirebond",
++                PageDescription = "WIREBOND recipe columns from AWACSRECIPEBYWSTYPE.",
++                GridAction = nameof(TableWirebond),
++                StorageKey = "tablewirebond"
++            },
++            _ => new RecipeByWstypeViewModel
++            {
++                WsType = RecipeWsTypes.Sawing,
++                ModuleName = ModuleNames.TableSawing,
++                PageTitle = "Table Sawing",
++                PageDescription = "SAWING recipe columns from AWACSRECIPEBYWSTYPE.",
++                GridAction = nameof(TableSawing),
++                StorageKey = "tablesawing"
++            }
+         };
+ 
+         // Table Sawing and Table Marker are separate TBLACCESS modules but share one
+@@ -751,12 +762,12 @@
+             }
+ 
+             return model;
+-        }
+-
+-        // Recipients are every active Super Admin in TBLACCESS plus any fixed
+-        // addresses configured under Email:AdditionalRecipients.
+-        // Recipients are every active Super Admin in TBLACCESS plus any fixed
+-        // addresses configured under Email:AdditionalRecipients.
++        }
++
++        // Recipients are every active Super Admin in TBLACCESS plus any fixed
++        // addresses configured under Email:AdditionalRecipients.
++        // Recipients are every active Super Admin in TBLACCESS plus any fixed
++        // addresses configured under Email:AdditionalRecipients.
+         private async Task<(bool Sent, string Message)> NotifyReviewersAsync(DatabaseChangeRequest request, long requestId)
+         {
+             if (!_emailSender.IsConfigured)

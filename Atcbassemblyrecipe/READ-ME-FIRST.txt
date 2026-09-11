@@ -1,45 +1,41 @@
-TABLE LAYOUT - TWO FILES, NO REBUILD NEEDED FOR THE CSS/JS THEMSELVES
-=====================================================================
-   wwwroot/js/excel-grid.js
-   wwwroot/css/site.css
-
-Copy both over, then HARD REFRESH the browser (Ctrl+F5). Both files are
-static assets; if you are running from Visual Studio you may still want to
-rebuild so the published copies update.
+SAVING IN AWACSWSTYPE NO LONGER JUMPS TO THE SAWING PAGE
+========================================================
+   Controllers/AwacsController.cs   (one file - needs a rebuild)
 
 
 WHAT WAS WRONG
 --------------
-1. WHITE GAP ON THE RIGHT (your Sawing screenshot)
-   The table was being set to exactly the sum of its column widths. When
-   that total was narrower than the panel, the table simply stopped early
-   and left a band of empty white beside it.
+AwacsController.Create ended with:
 
-2. THE WHOLE PAGE SLID SIDEWAYS (your Wirebond screenshot)
-   The Delete column AND the LOGOUT button were both cut off at the right
-   edge - that is the page scrolling, not the grid.
+    return RedirectToAction(nameof(TableSawing), new { promptAdd = true });
 
-   .app-shell is a grid whose content track is minmax(0, 1fr), so the
-   track was fine. But .app-main is a grid ITEM, and a grid item's
-   min-width defaults to auto - "at least as wide as my content". A table
-   wider than the track stretched .app-main past it and took the whole
-   page with it.
+and the popup added "Please insert the required Table Sawing values".
+That is why the URL you landed on was
+
+    /Awacs/TableSawing?promptAdd=True
+
+It dates from when AWACSWSTYPE only held SAWING machines, so adding one
+and going straight to the Sawing grid to type its recipe was the intended
+flow. The page holds WIREBOND machines now, which makes that jump both
+unasked for and - for a wire bonder - the wrong grid entirely.
 
 
 WHAT IT DOES NOW
 ----------------
-The table is width 100% with a min-width of its column total:
+Saving stays on AWACSWSTYPE with the new row visible, the same way Edit
+and Delete on that page already behaved.
 
-  * columns narrower than the panel -> the table still fills the panel,
-    no white gap, columns share the extra space
-  * columns wider than the panel   -> the panel itself scrolls sideways,
-    and the page does not move at all
+Failures stay there too. They used to render the standalone Awacs/Create
+page, which was another jump away from the grid you were working in; a
+validation error or a database error now comes back as a red popup on the
+AWACSWSTYPE page itself.
 
-.app-main gets min-width: 0, so overflow lands inside .excel-panel where
-it belongs instead of pushing the layout.
+The success popup tells you what happened next only when it is true:
+adding a WIREBOND machine says it is already on the Wirebond page as an
+empty row waiting for its recipe. It does not say that for SAWING,
+because a new sawing machine does NOT appear on the Sawing grid by
+itself - that grid is AWACSRECIPEBYWSTYPE, one row per recipe, not one
+row per machine.
 
-Sawing, Marker, AWACSWSTYPE, AWACSLF and Wirebond all get this - it is the
-shared grid script and the shared stylesheet.
-
-If a grid still looks odd, your old saved widths are still in the browser:
-account menu > Reset column widths, once.
+Saving a sawing RECIPE still returns to the Sawing grid, which is correct
+and is untouched.
