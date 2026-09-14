@@ -1,0 +1,30 @@
+@{
+    var ui = await Settings.GetAsync();
+    var authBackground = ui[SettingModules.Login, "BackgroundImageUrl"];
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - @ui[SettingModules.App, "TitleSuffix"]</title>
+    <script>
+        document.documentElement.dataset.theme = localStorage.getItem("assemblyRecipeTheme") || "light";
+        document.documentElement.style.setProperty("--app-zoom", localStorage.getItem("assemblyRecipeZoom") || "1");
+    </script>
+    <link rel="icon" type="image/png" href="@Url.Content(ui[SettingModules.App, "FaviconUrl"])" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @* Colours, animation timings and the backdrop come from TBLAPPSETTING and are
+       written here as CSS variables, so site.css keeps them as its defaults. *@
+    <style>@Html.Raw(ui.ThemeCss(Url.Content(authBackground)))</style>
+</head>
+<body class="auth-body">
+    @RenderBody()
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/theme.js" asp-append-version="true"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

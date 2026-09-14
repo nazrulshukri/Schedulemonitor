@@ -1,0 +1,303 @@
+using System.Text.RegularExpressions;
+using Atcbassemblyrecipe.Data;
+using Atcbassemblyrecipe.Infrastructure;
+using Atcbassemblyrecipe.Models;
+using Microsoft.Extensions.Caching.Memory;
+using Oracle.ManagedDataAccess.Client;
+
+namespace Atcbassemblyrecipe.Services
+{
+    public interface IEngineeringColumnGroupProvider
+    {
+        // Every configured column, shared first then by group and sort order.
+        Task<IReadOnlyList<EngineeringColumn>> GetAllAsync();
+
+        // The columns the signed-in user is entitled to: the shared ones, plus
+        // every group whose TBLACCESS module they can view. This is what the
+        // page renders and what the service selects - a column outside the
+        // user's groups is never read, never written and never exported.
+        Task<IReadOnlyList<EngineeringColumn>> GetVisibleAsync();
+
+        // The group names the signed-in user belongs to, for the page to name
+        // in its heading ("showing the SAWING columns").
+        Task<IReadOnlyList<string>> GetUserGroupsAsync();
+
+        // True when the mapping came from OCAPSYS.ENGINEERINGCOLUMNGROUP, false
+        // when the table is missing or unreadable and the built-in seed is
+        // standing in for it.
+        Task<bool> IsFromDatabaseAsync();
+    }
+
+    // Reads OCAPSYS.ENGINEERINGCOLUMNGROUP - which ENGINEERING column belongs to
+    // which user group - and answers what the current user may see.
+    //
+    // Why a table and not a C# array: ENGINEERING carries 23 recipe columns and
+    // which team owns which is a production decision, not a code one. Moving
+    // RECIPERM from Marker to Wirebond is an UPDATE and a cache expiry, not a
+    // redeploy.
+    //
+    // Two safety rules, because these names reach an Oracle statement as
+    // identifiers and identifiers cannot be bound as parameters:
+    //
+    //   1. A name that is not plain A-Z, 0-9 and underscore is dropped outright.
+    //   2. A name that is not a real column of ENGINEERING is dropped, checked
+    //      against the data dictionary through ITableSchemaProvider.
+    //
+    // So the worst a bad row in the config table can do is hide a column, never
+    // inject SQL.
+    //
+    // The mapping is cached for CacheSeconds (the same AppSettings:CacheSeconds
+    // the UI settings use, default 60) rather than for the process lifetime, so
+    // an UPDATE to the table shows up without a restart.
+    public sealed partial class EngineeringColumnGroupProvider : IEngineeringColumnGroupProvider
+    {
+        private const string CacheKey = "engineering-column-groups";
+
+        [GeneratedRegex("^[A-Z][A-Z0-9_]*$")]
+        private static partial Regex SafeIdentifier();
+
+        private readonly IOracleConnectionFactory _connectionFactory;
+        private readonly ITableSchemaProvider _schemaProvider;
+        private readonly IAccessEvaluator _accessEvaluator;
+        private readonly IMemoryCache _cache;
+        private readonly IConfiguration _configuration;
+        private readonly ILogger<EngineeringColumnGroupProvider> _logger;
+
+        private IReadOnlyList<EngineeringColumn>? _visible;
+        private IReadOnlyList<string>? _userGroups;
+
+        public EngineeringColumnGroupProvider(
+            IOracleConnectionFactory connectionFactory,
+            ITableSchemaProvider schemaProvider,
+            IAccessEvaluator accessEvaluator,
+            IMemoryCache cache,
+            IConfiguration configuration,
+            ILogger<EngineeringColumnGroupProvider> logger)
+        {
+            _connectionFactory = connectionFactory;
+            _schemaProvider = schemaProvider;
+            _accessEvaluator = accessEvaluator;
+            _cache = cache;
+            _configuration = configuration;
+            _logger = logger;
+        }
+
+        public async Task<IReadOnlyList<EngineeringColumn>> GetAllAsync()
+        {
+            return (await LoadAsync()).Columns;
+        }
+
+        public async Task<bool> IsFromDatabaseAsync()
+        {
+            return (await LoadAsync()).FromDatabase;
+        }
+
+        public async Task<IReadOnlyList<string>> GetUserGroupsAsync()
+        {
+            if (_userGroups is not null)
+            {
+                return _userGroups;
+            }
+
+            var groups = new List<string>();
+            foreach (var group in new[] { EngineeringGroups.Sawing, EngineeringGroups.Wirebond, EngineeringGroups.Marker })
+            {
+                var module = EngineeringGroups.ModuleFor(group);
+                if (module is not null && (await _accessEvaluator.GetAsync(module)).CanView)
+                {
+                    groups.Add(group);
+                }
+            }
+
+            _userGroups = groups;
+            return groups;
+        }
+
+        public async Task<IReadOnlyList<EngineeringColumn>> GetVisibleAsync()
+        {
+            if (_visible is not null)
+            {
+                return _visible;
+            }
+
+            var all = await GetAllAsync();
+            var groups = await GetUserGroupsAsync();
+
+            // Shared columns are the row's identity - lot number, package,
+            // product. Without them a user in one group would be looking at a
+            // page of recipes with nothing saying which lot they belong to.
+            var visible = all
+                .Where(column => column.IsShared || groups.Contains(column.GroupName, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+
+            _visible = visible;
+            return visible;
+        }
+
+        private async Task<Mapping> LoadAsync()
+        {
+            if (_cache.TryGetValue<Mapping>(CacheKey, out var cached) && cached is not null)
+            {
+                return cached;
+            }
+
+            var mapping = await ReadAsync();
+
+            var seconds = _configuration.GetValue("AppSettings:CacheSeconds", 60);
+            _cache.Set(CacheKey, mapping, TimeSpan.FromSeconds(seconds <= 0 ? 60 : seconds));
+
+            return mapping;
+        }
+
+        private async Task<Mapping> ReadAsync()
+        {
+            try
+            {
+                await using var connection = _connectionFactory.CreateConnection();
+                await connection.OpenAsync();
+
+                // The real shape of ENGINEERING, so a config row naming a column
+                // that does not exist is dropped instead of reaching a SELECT.
+                //
+                // GetColumnsAsync throws rather than answering an empty list when
+                // the table is not in the data dictionary at all, which is the one
+                // case worth its own message - it names the script to run.
+                HashSet<string> actualColumns;
+                try
+                {
+                    actualColumns = (await _schemaProvider.GetColumnsAsync(connection, null, "ENGINEERING"))
+                        .Select(column => column.Name)
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                }
+                catch (InvalidOperationException)
+                {
+                    _logger.LogWarning(
+                        "ENGINEERING is not in the data dictionary. Run Database/engineering.sql against the OCAPSYS schema. The Engineering page cannot show any rows until it exists.");
+                    return new Mapping(Defaults(), false);
+                }
+
+                await using var command = connection.CreateCommand();
+                command.CommandText = """
+                    SELECT column_name, group_name, wstype, display_label, sort_order
+                    FROM   engineeringcolumngroup
+                    ORDER  BY CASE UPPER(group_name)
+                                WHEN 'SHARED'   THEN 0
+                                WHEN 'SAWING'   THEN 1
+                                WHEN 'WIREBOND' THEN 2
+                                WHEN 'MARKER'   THEN 3
+                                ELSE 4
+                              END,
+                              sort_order,
+                              column_name
+                    """;
+
+                var columns = new List<EngineeringColumn>();
+
+                await using var reader = await command.ExecuteReaderTracedAsync();
+                while (await reader.ReadAsync())
+                {
+                    var name = (reader.IsDBNull(0) ? string.Empty : reader.GetString(0)).Trim().ToUpperInvariant();
+                    var group = (reader.IsDBNull(1) ? string.Empty : reader.GetString(1)).Trim().ToUpperInvariant();
+
+                    if (!SafeIdentifier().IsMatch(name))
+                    {
+                        _logger.LogWarning("ENGINEERINGCOLUMNGROUP row '{Column}' is not a valid column name and was ignored.", name);
+                        continue;
+                    }
+
+                    if (!actualColumns.Contains(name))
+                    {
+                        _logger.LogWarning("ENGINEERINGCOLUMNGROUP names {Column}, which is not a column of ENGINEERING. Ignored.", name);
+                        continue;
+                    }
+
+                    if (EngineeringColumns.Bookkeeping.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (!EngineeringGroups.All.Contains(group, StringComparer.OrdinalIgnoreCase))
+                    {
+                        _logger.LogWarning(
+                            "ENGINEERINGCOLUMNGROUP gives {Column} the group '{Group}', which is not one of SAWING, WIREBOND, MARKER or SHARED. Ignored.",
+                            name, group);
+                        continue;
+                    }
+
+                    var wsType = reader.IsDBNull(2) ? null : reader.GetString(2).Trim().ToUpperInvariant();
+                    var label = reader.IsDBNull(3) ? name : reader.GetString(3).Trim();
+                    var sortOrder = reader.IsDBNull(4) ? 0 : Convert.ToInt32(reader.GetValue(4));
+
+                    columns.Add(new EngineeringColumn(
+                        name,
+                        group,
+                        string.IsNullOrWhiteSpace(wsType) ? null : wsType,
+                        string.IsNullOrWhiteSpace(label) ? name : label,
+                        sortOrder));
+                }
+
+                if (columns.Count == 0)
+                {
+                    _logger.LogWarning(
+                        "ENGINEERINGCOLUMNGROUP is empty, so the built-in column mapping is being used. Run Database/engineeringcolumngroup.sql to manage it from the database.");
+                    return new Mapping(Defaults(), false);
+                }
+
+                return new Mapping(columns, true);
+            }
+            catch (Exception ex) when (ex is OracleException or InvalidOperationException)
+            {
+                // A missing config table must not take the page down: fall back
+                // to the seed the SQL script installs, and say so once.
+                _logger.LogWarning(
+                    ex,
+                    "Could not read ENGINEERINGCOLUMNGROUP, so the built-in column mapping is being used. Run Database/engineeringcolumngroup.sql.");
+                return new Mapping(Defaults(), false);
+            }
+        }
+
+        // The same mapping Database/engineeringcolumngroup.sql seeds. Kept here
+        // so the page works the moment ENGINEERING exists, before anybody has
+        // run the second script - and so the two can be compared when they
+        // disagree.
+        private static List<EngineeringColumn> Defaults()
+        {
+            return
+            [
+                new("NO", EngineeringGroups.Shared, null, "No", 10),
+                new("REQUESTOR", EngineeringGroups.Shared, null, "Requestor", 20),
+                new("LOTNUMBER", EngineeringGroups.Shared, null, "Lot Number", 30),
+                new("PACKAGE", EngineeringGroups.Shared, null, "Package", 40),
+                new("PRODUCT", EngineeringGroups.Shared, null, "Product", 50),
+                new("ADAT", EngineeringGroups.Shared, "ADAT", "ADAT", 60),
+
+                new("RECIPES1", EngineeringGroups.Sawing, "SAWING", "Sawing 1", 10),
+                new("RECIPES2", EngineeringGroups.Sawing, null, "Sawing 2", 20),
+                new("RECIPEBACKGRIND", EngineeringGroups.Sawing, "BACKGRIND", "Backgrind", 30),
+                new("RECIPEWPROBER", EngineeringGroups.Sawing, "WPROBER", "Wafer Prober", 40),
+                new("RECIPEWAFERTEST", EngineeringGroups.Sawing, "WAFERTEST", "Wafer Test", 50),
+                new("RECIPEWAOI", EngineeringGroups.Sawing, "WAOI", "Wafer AOI", 60),
+                new("RECIPEWLTR", EngineeringGroups.Sawing, "WLTR", "WLTR", 70),
+
+                new("RECIPEDA", EngineeringGroups.Wirebond, "DIEBOND", "Die Attach", 10),
+                new("RECIPECA", EngineeringGroups.Wirebond, "CLIPATTACH", "Clip Attach", 20),
+                new("RECIPEMCDWB", EngineeringGroups.Wirebond, "ASMWB", "MCD Wirebond", 30),
+                new("RECIPEAX", EngineeringGroups.Wirebond, "AX", "AX", 40),
+                new("RECIPEAOI", EngineeringGroups.Wirebond, "AOI", "AOI", 50),
+                new("RECIPEL200", EngineeringGroups.Wirebond, "L200", "L200", 60),
+                new("RECIPEPHICOM", EngineeringGroups.Wirebond, "PHICOM", "Phicom", 70),
+
+                new("RECIPEMD", EngineeringGroups.Marker, "MARKER", "Marker", 10),
+                new("RECIPE2DMARKER", EngineeringGroups.Marker, "2DMARKER", "2D Marker", 20),
+                new("RECIPEMOULD", EngineeringGroups.Marker, "MOULD", "Mould", 30),
+                new("RECIPEMOLD", EngineeringGroups.Marker, "MOLD", "Mold", 40),
+                new("RECIPETF", EngineeringGroups.Marker, "TRIMFORM", "Trim Form", 50),
+                new("RECIPERM", EngineeringGroups.Marker, "RM", "RM", 60),
+                new("RECIPESTRIPTEST", EngineeringGroups.Marker, "STRIPTEST", "Strip Test", 70),
+                new("RECIPEFINALTEST", EngineeringGroups.Marker, "FINALTEST", "Final Test", 80)
+            ];
+        }
+
+        private sealed record Mapping(IReadOnlyList<EngineeringColumn> Columns, bool FromDatabase);
+    }
+}

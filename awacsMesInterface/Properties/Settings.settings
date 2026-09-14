@@ -1,0 +1,12 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="EWFM.AwacsMes.Properties" GeneratedClassName="Settings">
+  <Profiles />
+  <Settings>
+    <Setting Name="AwacsMesService_phgcubadm1vwat1_Ad_HocTxn" Type="(Web Service URL)" Scope="Application">
+      <Value Profile="(Default)">http://phgcubadm1vwat1/Minsc.WebService.AI/Ad-HocTxn.asmx</Value>
+    </Setting>
+    <Setting Name="AwacsMesService_phcab01vww01_Ad_HocTxn" Type="(Web Service URL)" Scope="Application">
+      <Value Profile="(Default)">http://phcab01vww01/Minsc.WebService.AI/Ad-HocTxn.asmx</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>

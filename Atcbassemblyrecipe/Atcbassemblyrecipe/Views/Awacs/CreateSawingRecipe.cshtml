@@ -1,0 +1,97 @@
+@model SawingRecipeInputModel
+
+@{
+    ViewData["Title"] = "Add Sawing Recipe";
+}
+
+<div class="page-heading">
+    <div>
+        <h1>Add Sawing Recipe</h1>
+        <p>Saved to AWACSRECIPEBYWSTYPE after duplicate validation.</p>
+    </div>
+</div>
+
+<form asp-action="CreateSawingRecipe" method="post" class="data-panel">
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+    <div class="row g-3">
+        <div class="col-md-3">
+            <label asp-for="WsType" class="form-label"></label>
+            <input asp-for="WsType" class="form-control" readonly />
+            <span asp-validation-for="WsType" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="Package" class="form-label"></label>
+            <input asp-for="Package" class="form-control" placeholder="Example: SOT1210" />
+            <span asp-validation-for="Package" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="Leadframe12Nc" class="form-label"></label>
+            <input asp-for="Leadframe12Nc" class="form-control" placeholder="Example: 340007026203" />
+            <span asp-validation-for="Leadframe12Nc" class="text-danger"></span>
+        </div>
+        <div class="col-md-3 align-self-end">
+            <button type="button" id="validateSawingRecipe" class="btn btn-outline-primary w-100"><partial name="_Icon" model="@("check")" /> Validate Recipe</button>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="CeptDescription" class="form-label"></label>
+            <input asp-for="CeptDescription" class="form-control" placeholder="Example: 9BJ13-100/A200/DMAN" />
+            <span asp-validation-for="CeptDescription" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Product to Save</label>
+            <input id="derivedProduct" class="form-control" value="@Model.Product" readonly />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Recipe to Save</label>
+            <input id="derivedRecipe" class="form-control" value="@Model.Recipe" readonly />
+        </div>
+        <div class="col-12">
+            <div class="form-check">
+                <input asp-for="Confirmed" class="form-check-input" />
+                <label asp-for="Confirmed" class="form-check-label"></label>
+            </div>
+            <span asp-validation-for="Confirmed" class="text-danger"></span>
+        </div>
+    </div>
+
+    <div id="recipePreview" class="reference-preview mt-3 d-none"></div>
+
+    <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary"><partial name="_Icon" model="@("validate")" /> Validate and Save</button>
+        <a asp-controller="Awacs" asp-action="TableSawing" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        const leadframeInput = document.getElementById('Leadframe12Nc');
+        const ceptInput = document.getElementById('CeptDescription');
+        const preview = document.getElementById('recipePreview');
+        const productOutput = document.getElementById('derivedProduct');
+        const recipeOutput = document.getElementById('derivedRecipe');
+
+        document.getElementById('validateSawingRecipe').addEventListener('click', async () => {
+            preview.classList.remove('d-none', 'alert-success', 'alert-danger');
+            preview.classList.add('alert', 'alert-info');
+            preview.textContent = 'Validating recipe...';
+
+            const url = `/Awacs/ValidateSawingRecipe?leadframe12Nc=${encodeURIComponent(leadframeInput.value)}&ceptDescription=${encodeURIComponent(ceptInput.value)}`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            preview.classList.remove('alert-info');
+            if (!response.ok || !data.success) {
+                preview.classList.add('alert-danger');
+                preview.textContent = data.message || 'Recipe validation failed.';
+                return;
+            }
+
+            productOutput.value = data.product;
+            recipeOutput.value = data.recipe;
+            preview.classList.add(data.exists ? 'alert-danger' : 'alert-success');
+            preview.textContent = `${data.message} Product: ${data.product}. Recipe: ${data.recipe}.`;
+        });
+    </script>
+}

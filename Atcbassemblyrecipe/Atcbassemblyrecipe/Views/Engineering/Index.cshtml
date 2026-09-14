@@ -1,0 +1,499 @@
+@model EngineeringViewModel
+
+@{
+    ViewData["Title"] = "Engineering";
+
+    // Two different permissions on this page.
+    //
+    // This one - ModuleNames.Engineering - decides whether the page opens and
+    // whether Add / Edit / Delete are offered. It MUST be the same constant the
+    // controller enforces with [ModuleAccess(...)].
+    var permission = await Access.GetAsync(ModuleNames.Engineering);
+    var canAdd = permission.CanAdd;
+    var canUpdate = permission.CanUpdate;
+    var canDelete = permission.CanDelete;
+
+    // The other one is the Sawing / Wirebond / Marker grants, which decide which
+    // recipe COLUMNS are in Model.Columns at all. That filtering happens in
+    // EngineeringColumnGroupProvider and is enforced again in EngineeringService
+    // on every write - what is hidden here cannot be posted back either.
+    var groupLabel = Model.UserGroups.Count == 0
+        ? "none"
+        : string.Join(", ", Model.UserGroups);
+
+    // Tickbox + # + the columns + Last Updated By + Timestamp + Edit + Delete.
+    var columnCount = Model.Columns.Count + 6;
+
+    // The first column of each group carries the coloured divider and the group
+    // name, so the bands read as bands without a second header row - excel-grid.js
+    // reads thead.rows[0] for the column keys, so there can only be one.
+    var groupStarts = Model.Columns
+        .GroupBy(column => column.GroupName)
+        .Select(group => group.First().Name)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    // Hoisted out of the attributes below: a quoted argument inside an attribute
+    // value reads badly and is easy to break when the markup is edited.
+    var sequenceSort = SortClass(Model, "sequence");
+    var sequenceNext = NextSortDirection(Model, "sequence");
+    var updatedBySort = SortClass(Model, "lastupdatedby");
+    var updatedByNext = NextSortDirection(Model, "lastupdatedby");
+    var updatedSort = SortClass(Model, "lastupdate");
+    var updatedNext = NextSortDirection(Model, "lastupdate");
+}
+
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">Operations</span>
+        <h1>Engineering</h1>
+        <p>
+            Engineering lots and the recipe each process step runs. ENGINEERING carries a recipe column
+            for every step; this page shows the lot's identity plus the columns belonging to your groups -
+            <strong>@groupLabel</strong> - and hides the rest.
+        </p>
+    </div>
+</div>
+
+@if (Model.UserGroups.Count == 0)
+{
+    <div class="alert alert-warning">
+        You are not in any of the Sawing, Wirebond or Marker groups, so no recipe columns are shown -
+        only the lot's identity. Ask a Super Admin to grant you the module for your group on the
+        Access Management page.
+    </div>
+}
+
+@if (!Model.ColumnsFromDatabase)
+{
+    <div class="alert alert-warning">
+        The column groups are the built-in defaults: OCAPSYS.ENGINEERINGCOLUMNGROUP could not be read.
+        Run <code>Database/engineeringcolumngroup.sql</code> to manage which group owns which recipe
+        column from the database.
+    </div>
+}
+
+<section class="data-panel excel-toolbar-panel">
+    <form asp-controller="Engineering" asp-action="Index" method="get" class="excel-search">
+        <input type="hidden" name="sortBy" value="@Model.SortBy" />
+        <input type="hidden" name="sortDirection" value="@Model.SortDirection" />
+        <div>
+            <label for="search" class="form-label">Search</label>
+            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Search lot number, requestor, package, product or recipe" />
+        </div>
+        <div>
+            <label for="pageSize" class="form-label">Rows</label>
+            <select id="pageSize" name="pageSize" class="form-select">
+                <option value="25" selected="@(Model.PageSize == 25)">25</option>
+                <option value="50" selected="@(Model.PageSize == 50)">50</option>
+                <option value="100" selected="@(Model.PageSize == 100)">100</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary"><partial name="_Icon" model="@("search")" /> Search</button>
+        <a asp-controller="Engineering" asp-action="Index" class="btn btn-outline-secondary"><partial name="_Icon" model="@("clear")" /> Clear</a>
+    </form>
+
+    <div class="excel-actions">
+        @if (canAdd)
+        {
+            <button type="button" class="btn btn-primary" id="showAddRow"><partial name="_Icon" model="@("plus")" /> Add Lot</button>
+        }
+        <button type="button" class="btn btn-outline-secondary" data-template-modal><partial name="_Icon" model="@("template")" /> Template</button>
+        <a class="btn btn-outline-secondary" asp-controller="Engineering" asp-action="Export" asp-route-search="@Model.Search" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection"><partial name="_Icon" model="@("export")" /> Export CSV</a>
+        @if (canAdd)
+        {
+            <form asp-controller="Engineering" asp-action="Import" method="post" enctype="multipart/form-data" class="csv-import-form">
+                <label class="btn btn-outline-secondary mb-0" for="engineeringCsvFile"><partial name="_Icon" model="@("import")" /> Import CSV</label>
+                <input id="engineeringCsvFile" name="csvFile" type="file" accept=".csv,.txt,.tsv" />
+                <button type="submit" class="btn btn-primary"><partial name="_Icon" model="@("upload")" /> Upload</button>
+                <span class="csv-file-error" data-csv-file-error aria-live="polite"></span>
+            </form>
+        }
+    </div>
+</section>
+
+<div class="table-responsive data-panel excel-panel">
+    <table class="table table-hover align-middle excel-table" id="engineeringTable" data-resizable-table="engineering-recipe">
+        <thead>
+            @* One header row only. excel-grid.js reads thead.rows[0] for the column
+               keys and widths, so a second "band" row above this one would take its
+               place and silently break resizing. The groups are shown as a coloured
+               divider and a tag on the first column of each instead. *@
+            <tr>
+                <th data-col-key="select"><input class="form-check-input" type="checkbox" aria-label="Select all rows" disabled /><span class="column-resizer"></span></th>
+                <th data-col-key="sequence">
+                    <a class="sort-header @sequenceSort" asp-controller="Engineering" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="1" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="sequence" asp-route-sortDirection="@sequenceNext">#<span></span></a>
+                    <span class="column-resizer"></span>
+                </th>
+                @foreach (var column in Model.Columns)
+                {
+                    <th data-col-key="@(column.Name.ToLowerInvariant())" class="@GroupClass(column, groupStarts)" title="@column.Name">
+                        @if (groupStarts.Contains(column.Name))
+                        {
+                            <span class="col-group-tag">@(column.IsShared ? "Lot" : column.GroupName)</span>
+                        }
+                        <a class="sort-header @SortClass(Model, column.Name)" asp-controller="Engineering" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="1" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@column.Name" asp-route-sortDirection="@NextSortDirection(Model, column.Name)">@column.Label<span></span></a>
+                        <span class="column-resizer"></span>
+                    </th>
+                }
+                <th data-col-key="lastupdatedby">
+                    <a class="sort-header @updatedBySort" asp-controller="Engineering" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="1" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="lastupdatedby" asp-route-sortDirection="@updatedByNext">Last Updated By<span></span></a>
+                    <span class="column-resizer"></span>
+                </th>
+                <th data-col-key="lastupdate">
+                    <a class="sort-header @updatedSort" asp-controller="Engineering" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="1" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="lastupdate" asp-route-sortDirection="@updatedNext">Timestamp<span></span></a>
+                    <span class="column-resizer"></span>
+                </th>
+                <th data-col-key="edit">Edit<span class="column-resizer"></span></th>
+                <th data-col-key="delete">Delete<span class="column-resizer"></span></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (canAdd)
+            {
+                <tr id="addRow" class="excel-edit-row @(Model.PromptAdd ? "" : "d-none")">
+                    <td><input class="form-check-input" type="checkbox" aria-label="New row" disabled /></td>
+                    <td><span class="cell-muted">New</span></td>
+                    @foreach (var column in Model.Columns)
+                    {
+                        <td class="@GroupClass(column, groupStarts)">
+                            <input name="Values[@column.Name]"
+                                   form="createEngineeringForm"
+                                   class="form-control cell-input"
+                                   inputmode="@(column.Name == EngineeringColumns.No ? "numeric" : null)"
+                                   maxlength="@MaxLength(column)"
+                                   placeholder="@column.Label"
+                                   required="@(column.Name == EngineeringColumns.LotNumber)"
+                                   aria-label="@column.Label" />
+                        </td>
+                    }
+                    <td><span class="cell-muted">Current user</span></td>
+                    <td><span class="cell-muted">Set on save</span></td>
+                    <td class="text-center">
+                        <button type="submit" form="createEngineeringForm" class="icon-btn icon-save" title="Save new lot" aria-label="Save new lot">
+                            <span></span>
+                        </button>
+                    </td>
+                    <td class="text-center">
+                        <button type="button" class="icon-btn icon-cancel" id="cancelAddRow" title="Cancel add row" aria-label="Cancel add row">
+                            <span></span>
+                        </button>
+                    </td>
+                </tr>
+            }
+
+            @if (Model.Rows.Count == 0)
+            {
+                <tr>
+                    <td colspan="@columnCount" class="text-center text-muted py-4">
+                        No rows found.
+                    </td>
+                </tr>
+            }
+            else
+            {
+                var rowNumber = ((Model.Page - 1) * Model.PageSize) + 1;
+                foreach (var row in Model.Rows)
+                {
+                    var isJustSaved = !string.IsNullOrEmpty(Model.Highlight)
+                        && string.Equals(row.LotNumber, Model.Highlight, StringComparison.OrdinalIgnoreCase);
+
+                    <tr class="excel-display-row @(isJustSaved ? "row-just-saved" : "")" data-row-id="@row.TblRowId">
+                        <td><input class="form-check-input" type="checkbox" aria-label="Select @row.LotNumber" /></td>
+                        <td>@rowNumber</td>
+                        @foreach (var column in Model.Columns)
+                        {
+                            <td class="@GroupClass(column, groupStarts) @(column.Name == EngineeringColumns.LotNumber ? "fw-semibold" : null)">@row[column.Name]</td>
+                        }
+                        <td title="@row.LastUpdatedBy">@(await Directory.GetDisplayNameAsync(row.LastUpdatedBy))</td>
+                        <td>@row.LastUpdate?.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td class="text-center">
+                            @if (canUpdate)
+                            {
+                                <button type="button" class="icon-btn icon-edit" data-edit-row="@row.TblRowId" title="Edit lot" aria-label="Edit @row.LotNumber">
+                                    <span></span>
+                                </button>
+                            }
+                        </td>
+                        <td class="text-center">
+                            @if (canDelete)
+                            {
+                                <button type="button" class="icon-btn icon-delete" data-delete-form="deleteEngineeringForm-@row.TblRowId" data-delete-label="@row.LotNumber" title="Move lot to Trash" aria-label="Delete @row.LotNumber">
+                                    <span></span>
+                                </button>
+                            }
+                        </td>
+                    </tr>
+
+                    @if (canUpdate)
+                    {
+                        var editFormId = $"editEngineeringForm-{row.TblRowId}";
+                        <tr class="excel-edit-row d-none" data-edit-panel="@row.TblRowId">
+                            <td><input class="form-check-input" type="checkbox" aria-label="Editing @row.LotNumber" disabled /></td>
+                            <td><span class="cell-muted">@rowNumber</span></td>
+                            @foreach (var column in Model.Columns)
+                            {
+                                <td class="@GroupClass(column, groupStarts)">
+                                    <input name="Values[@column.Name]"
+                                           form="@editFormId"
+                                           class="form-control cell-input"
+                                           inputmode="@(column.Name == EngineeringColumns.No ? "numeric" : null)"
+                                           maxlength="@MaxLength(column)"
+                                           value="@row[column.Name]"
+                                           data-original-value="@row[column.Name]"
+                                           required="@(column.Name == EngineeringColumns.LotNumber)"
+                                           aria-label="@column.Label" />
+                                </td>
+                            }
+                            <td><span class="cell-muted">Save user</span></td>
+                            <td><span class="cell-muted">Set on save</span></td>
+                            <td class="text-center">
+                                <button type="submit" form="@editFormId" class="icon-btn icon-save" title="Save edit" aria-label="Save @row.LotNumber">
+                                    <span></span>
+                                </button>
+                            </td>
+                            <td class="text-center">
+                                <button type="button" class="icon-btn icon-cancel" data-cancel-edit="@row.TblRowId" title="Cancel edit" aria-label="Cancel edit @row.LotNumber">
+                                    <span></span>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+
+                    rowNumber += 1;
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+@*
+    Every row form lives here, outside the table.
+
+    A <form> written between two <tr> elements does not survive HTML parsing: the
+    browser closes it straight away and moves its hidden inputs - row id,
+    confirmation flag and the antiforgery token - out of it, so the POST arrives
+    without them and the save fails with nothing to show for it. The inputs in the
+    row cells above reach these forms through their form="..." attribute instead.
+*@
+<div class="row-forms d-none" aria-hidden="true">
+    @if (canAdd)
+    {
+        <form id="createEngineeringForm" asp-controller="Engineering" asp-action="Create" method="post">
+            <input type="hidden" name="Confirmed" value="true" />
+        </form>
+    }
+
+    @foreach (var row in Model.Rows)
+    {
+        if (canUpdate)
+        {
+            <form id="editEngineeringForm-@row.TblRowId" asp-controller="Engineering" asp-action="Edit" method="post">
+                <input type="hidden" name="TblRowId" value="@row.TblRowId" />
+                <input type="hidden" name="Confirmed" value="true" />
+            </form>
+        }
+
+        if (canDelete)
+        {
+            <form id="deleteEngineeringForm-@row.TblRowId" asp-controller="Engineering" asp-action="Delete" method="post">
+                <input type="hidden" name="id" value="@row.TblRowId" />
+                <input type="hidden" name="confirmed" value="true" />
+            </form>
+        }
+    }
+</div>
+
+@{
+    var startPage = Math.Max(1, Model.Page - 2);
+    var endPage = Math.Min(Model.TotalPages, startPage + 4);
+    startPage = Math.Max(1, endPage - 4);
+}
+
+<div class="pagination-bar">
+    <span>Showing page @Model.Page of @Model.TotalPages, @Model.TotalRows total rows</span>
+    <nav aria-label="Engineering pages">
+        <ul class="pagination mb-0">
+            <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
+                <a class="page-link" asp-controller="Engineering" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection">Prev</a>
+            </li>
+            @for (var pageNumber = startPage; pageNumber <= endPage; pageNumber++)
+            {
+                <li class="page-item @(pageNumber == Model.Page ? "active" : "")">
+                    <a class="page-link" asp-controller="Engineering" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@pageNumber" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection">@pageNumber</a>
+                </li>
+            }
+            <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : "")">
+                <a class="page-link" asp-controller="Engineering" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page + 1)" asp-route-pageSize="@Model.PageSize" asp-route-sortBy="@Model.SortBy" asp-route-sortDirection="@Model.SortDirection">Next</a>
+            </li>
+        </ul>
+    </nav>
+</div>
+
+<div class="modal fade" id="engineeringTemplateModal" tabindex="-1" aria-labelledby="engineeringTemplateTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content modern-modal template-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="eyebrow">CSV Template</span>
+                    <h5 class="modal-title" id="engineeringTemplateTitle">Engineering upload format</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ol class="template-steps">
+                    <li>Download the template below - it carries your groups' columns, not all 23.</li>
+                    <li>Key in the values under the same headers - or delete the header row and key in the values only, in the same left-to-right order.</li>
+                    <li>In Excel, use Save As and choose CSV (Comma delimited) (*.csv).</li>
+                </ol>
+
+                <div class="template-preview-wrap">
+                    <table class="table template-preview-table align-middle">
+                        <thead>
+                            <tr>
+                                @foreach (var column in Model.Columns)
+                                {
+                                    <th>@column.Name</th>
+                                }
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+
+                <div class="template-note">
+                    LOTNUMBER is the only required column - it is what AwacsMesService matches an
+                    ENG workorder against, so a lot that is already in the table, or twice in the
+                    same file, cancels the whole import. Every other cell may be left empty: an
+                    engineering lot only fills in the steps it actually runs. Columns outside your
+                    groups are not in the template and are ignored if a file carries them.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a class="btn btn-primary" asp-controller="Engineering" asp-action="DownloadTemplate"><partial name="_Icon" model="@("download")" /> Download CSV Template</a>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><partial name="_Icon" model="@("close")" /> Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (canDelete)
+{
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modern-modal delete-confirm-modal">
+                <div class="modal-header">
+                    <div>
+                        <span class="eyebrow">Delete Validation</span>
+                        <h5 class="modal-title" id="deleteConfirmTitle">Move lot to Trash</h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">This moves <strong id="deleteTargetName"></strong> to Trash, where it can be restored.</p>
+                    <label for="deletePhrase" class="form-label">Type DELETE to continue</label>
+                    <input id="deletePhrase" class="form-control" autocomplete="off" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><partial name="_Icon" model="@("cancel")" /> Cancel</button>
+                    <button type="button" class="btn btn-nxp-orange" id="confirmDeleteButton" disabled><partial name="_Icon" model="@("delete")" /> Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* The doubled at-sign in the keyframes rule is Razor escaping: it renders as a
+   single one. A bare at-sign there would be read as a Razor expression. *@
+<style>
+    /* The divider opens each group; the tag above the first column names it. */
+    .group-col-start {
+        border-left: 2px solid rgba(128, 128, 128, 0.35);
+    }
+
+    .col-group-tag {
+        display: block;
+        font-size: 0.62rem;
+        font-weight: 600;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        opacity: 0.75;
+        margin-bottom: 0.1rem;
+    }
+
+    th.group-col-shared .col-group-tag { color: #6c757d; }
+    th.group-col-sawing .col-group-tag { color: #0a7d64; }
+    th.group-col-wirebond .col-group-tag { color: #1d6fb8; }
+    th.group-col-marker .col-group-tag { color: #b8541d; }
+
+    .row-just-saved > td {
+        animation: engineeringJustSaved 3s ease-out 1;
+    }
+
+    @@keyframes engineeringJustSaved {
+        0% { background-color: rgba(255, 176, 0, 0.55); }
+        70% { background-color: rgba(255, 176, 0, 0.35); }
+        100% { background-color: transparent; }
+    }
+</style>
+
+@section Scripts {
+    <script src="~/js/excel-grid.js" asp-append-version="true"></script>
+    <script>
+        window.excelGrid.init({
+            tableId: 'engineeringTable',
+            storageKey: 'engineering-recipe',
+            csvInputId: 'engineeringCsvFile',
+            templateModalId: 'engineeringTemplateModal'
+        });
+
+        // Bring the row that was just saved into view.
+        document.querySelector('.row-just-saved')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    </script>
+}
+
+@functions {
+    // The group a column belongs to, as CSS classes. The first column of a group
+    // additionally gets group-col-start, which draws the coloured divider that
+    // makes the bands readable without a second header row.
+    private static string GroupClass(
+        Atcbassemblyrecipe.Models.EngineeringColumn column,
+        HashSet<string> groupStarts)
+    {
+        var css = "group-col group-col-" + column.GroupName.ToLowerInvariant();
+        return groupStarts.Contains(column.Name) ? css + " group-col-start" : css;
+    }
+
+    // Matches the column widths in Database/engineering.sql, so an over-long
+    // value is stopped in the browser rather than coming back as ORA-12899.
+    private static int MaxLength(Atcbassemblyrecipe.Models.EngineeringColumn column)
+    {
+        return column.Name.ToUpperInvariant() switch
+        {
+            EngineeringColumns.No => 12,
+            EngineeringColumns.Requestor => 64,
+            EngineeringColumns.LotNumber => 64,
+            EngineeringColumns.Package => 64,
+            EngineeringColumns.Product => 64,
+            _ => 120
+        };
+    }
+
+    private static string NextSortDirection(EngineeringViewModel model, string column)
+    {
+        return string.Equals(model.SortBy, column, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(model.SortDirection, "asc", StringComparison.OrdinalIgnoreCase)
+                ? "desc"
+                : "asc";
+    }
+
+    private static string SortClass(EngineeringViewModel model, string column)
+    {
+        if (!string.Equals(model.SortBy, column, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        return string.Equals(model.SortDirection, "asc", StringComparison.OrdinalIgnoreCase)
+            ? "is-active is-asc"
+            : "is-active is-desc";
+    }
+}

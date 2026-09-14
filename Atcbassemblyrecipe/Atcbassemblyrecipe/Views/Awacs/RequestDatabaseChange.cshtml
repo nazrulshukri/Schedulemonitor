@@ -1,0 +1,231 @@
+@model DatabaseChangeRequestViewModel
+
+@{
+    ViewData["Title"] = "Database Change Validation";
+}
+
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">Security Console</span>
+        <h1>Database Change Validation</h1>
+        <p>Structural database changes are recorded for review, not executed from the web app.</p>
+    </div>
+</div>
+
+@if (!Model.EmailConfigured)
+{
+    <div class="alert alert-warning">
+        Email notifications are switched off, so reviewers will not be emailed about new requests.
+        Requests are still recorded. Set the <strong>Email</strong> section in <code>appsettings.json</code> to enable them.
+    </div>
+}
+
+<form asp-action="RequestDatabaseChange" method="post" class="data-panel">
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label asp-for="RequestType" class="form-label"></label>
+            <select asp-for="RequestType" class="form-select">
+                <option value="">Select request</option>
+                @foreach (var requestType in RequestTypes.All)
+                {
+                    <option value="@requestType">@requestType</option>
+                }
+            </select>
+            <span asp-validation-for="RequestType" class="text-danger"></span>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="TargetTable" class="form-label"></label>
+            <select asp-for="TargetTable" class="form-select">
+                <option value="">Select table</option>
+                <option>AWACSWSTYPE</option>
+                <option>TBLSAWING</option>
+                <option>AWACSRECIPEBYWSTYPE</option>
+                <option>TBLACCESS</option>
+            </select>
+            <span asp-validation-for="TargetTable" class="text-danger"></span>
+        </div>
+        <div class="col-12">
+            <label asp-for="Reason" class="form-label"></label>
+            <textarea asp-for="Reason" class="form-control" rows="4" placeholder="Explain why this change is needed, and what it affects."></textarea>
+            <span asp-validation-for="Reason" class="text-danger"></span>
+        </div>
+    </div>
+
+    <div class="alert alert-warning mt-3">
+        Direct DDL such as TRUNCATE, ADD COLUMN, and CREATE TABLE is blocked in this web app.
+        Submitting here records the request and notifies the reviewers by email; a DBA still performs the change manually.
+    </div>
+
+    <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary"><partial name="_Icon" model="@("submit")" /> Submit for Validation</button>
+        <a asp-controller="Home" asp-action="Index" class="btn btn-outline-secondary"><partial name="_Icon" model="@("cancel")" /> Cancel</a>
+    </div>
+</form>
+
+<section class="data-panel mt-3">
+    <div class="section-title">
+        <div>
+            <h2>Request History</h2>
+            <p>Pending requests are listed first. Reviewing a request does not run it - it records the decision.</p>
+        </div>
+        <span class="count-pill">@Model.RecentRequests.Count</span>
+    </div>
+
+    <div class="permission-table-wrap">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Type</th>
+                    <th>Table</th>
+                    <th>Reason</th>
+                    <th>Requested By</th>
+                    <th>Requested</th>
+                    <th>Status</th>
+                    <th>Reviewed By</th>
+                    @if (Model.CanReview)
+                    {
+                        <th>Decision</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.RecentRequests.Count == 0)
+                {
+                    <tr>
+                        <td colspan="@(Model.CanReview ? 9 : 8)" class="text-center text-muted py-4">
+                            No requests recorded yet.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var request in Model.RecentRequests)
+                    {
+                        var statusClass = request.Status switch
+                        {
+                            RequestStatus.Approved => "is-approved",
+                            RequestStatus.Rejected => "is-rejected",
+                            _ => "is-pending"
+                        };
+
+                        <tr>
+                            <td>@request.RequestId</td>
+                            <td class="fw-semibold">@request.RequestType</td>
+                            <td>@request.TargetTable</td>
+                            <td class="request-reason">@request.Reason</td>
+                            <td>@request.RequestedBy</td>
+                            <td>@request.RequestedDate.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td><span class="request-status @statusClass">@request.Status</span></td>
+                            <td>
+                                @request.ReviewedBy
+                                @if (!string.IsNullOrWhiteSpace(request.ReviewNote))
+                                {
+                                    <small class="d-block text-muted">@request.ReviewNote</small>
+                                }
+                            </td>
+                            @if (Model.CanReview)
+                            {
+                                <td>
+                                    @if (request.Status == RequestStatus.Pending)
+                                    {
+                                        <div class="review-actions">
+                                            <button type="button" class="btn btn-sm btn-primary"
+                                                    data-review-request="@request.RequestId"
+                                                    data-review-decision="approve"
+                                                    data-review-label="@request.RequestType on @request.TargetTable">
+                                                <partial name="_Icon" model="@("check")" /> Approve
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                    data-review-request="@request.RequestId"
+                                                    data-review-decision="reject"
+                                                    data-review-label="@request.RequestType on @request.TargetTable">
+                                                <partial name="_Icon" model="@("cancel")" /> Reject
+                                            </button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">@request.ReviewedDate?.ToString("yyyy-MM-dd HH:mm")</span>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@if (Model.CanReview)
+{
+    <form id="reviewRequestForm" asp-action="ReviewDatabaseChange" method="post" class="d-none">
+        <input type="hidden" name="requestId" id="reviewRequestId" />
+        <input type="hidden" name="decision" id="reviewDecision" />
+        <input type="hidden" name="reviewNote" id="reviewNoteValue" />
+    </form>
+
+    <div class="modal fade" id="reviewModal" tabindex="-1" aria-labelledby="reviewModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modern-modal template-modal">
+                <div class="modal-header">
+                    <div>
+                        <span class="eyebrow">Validation Decision</span>
+                        <h5 class="modal-title" id="reviewModalTitle">Review request</h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2" id="reviewSummary"></p>
+                    <label for="reviewNote" class="form-label">Note (optional)</label>
+                    <textarea id="reviewNote" class="form-control" rows="3" maxlength="500"
+                              placeholder="e.g. approved, scheduled for the next maintenance window"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><partial name="_Icon" model="@("cancel")" /> Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmReviewButton"><partial name="_Icon" model="@("check")" /> Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const modalElement = document.getElementById('reviewModal');
+            if (!modalElement || !window.bootstrap) {
+                return;
+            }
+
+            if (modalElement.parentElement !== document.body) {
+                document.body.appendChild(modalElement);
+            }
+
+            const reviewModal = new bootstrap.Modal(modalElement);
+            const summary = document.getElementById('reviewSummary');
+            const note = document.getElementById('reviewNote');
+
+            document.querySelectorAll('[data-review-request]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const decision = button.getAttribute('data-review-decision');
+                    document.getElementById('reviewRequestId').value = button.getAttribute('data-review-request') || '';
+                    document.getElementById('reviewDecision').value = decision || '';
+                    summary.textContent = `${decision === 'approve' ? 'Approve' : 'Reject'} request #${button.getAttribute('data-review-request')} — ${button.getAttribute('data-review-label')}.`;
+                    note.value = '';
+                    reviewModal.show();
+                    setTimeout(() => note.focus(), 180);
+                });
+            });
+
+            document.getElementById('confirmReviewButton')?.addEventListener('click', () => {
+                document.getElementById('reviewNoteValue').value = note.value.trim();
+                document.getElementById('reviewRequestForm')?.submit();
+            });
+        })();
+    </script>
+}

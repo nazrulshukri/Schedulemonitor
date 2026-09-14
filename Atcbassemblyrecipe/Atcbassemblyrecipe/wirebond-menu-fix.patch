@@ -1,0 +1,15 @@
+--- a/Atcbassemblyrecipe/Views/Shared/_Layout.cshtml
++++ b/Atcbassemblyrecipe/Views/Shared/_Layout.cshtml
+@@ -54,10 +54,10 @@
+         var pageTitle = ViewData["Title"]?.ToString() ?? "Mainpage";
+         var isSettingsPage = isAccessActive || isValidationActive || isRecycleBinActive;
+         var breadcrumbLayer = isSettingsPage ? "Settings" : "Operations";
+-        var operationsOpen = isTableActive || isSawingActive || isMarkerActive || isAwacsLfActive;
++        var operationsOpen = isTableActive || isSawingActive || isWirebondActive || isMarkerActive || isAwacsLfActive;
+         // The pages whose grid is resizable, and so the pages whose account
+         // menu carries the table sizing controls.
+-        var hasGridControls = isTableActive || isSawingActive || isMarkerActive || isAwacsLfActive;
++        var hasGridControls = isTableActive || isSawingActive || isWirebondActive || isMarkerActive || isAwacsLfActive;
+         var settingsOpen = isSettingsPage;
+ 
+         // Sidebar links follow the same TBLACCESS grants that gate the pages themselves,

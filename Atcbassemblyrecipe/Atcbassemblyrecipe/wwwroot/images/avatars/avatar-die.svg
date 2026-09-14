@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="Chip die">
+  <circle cx="48" cy="48" r="48" fill="#007c84"/>
+  <g stroke="#e4f3f4" stroke-width="5" stroke-linecap="round">
+    <path d="M30 38H18M30 48H18M30 58H18M66 38h12M66 48h12M66 58h12"/>
+    <path d="M38 30V18M48 30V18M58 30V18M38 78V66M48 78V66M58 78V66"/>
+  </g>
+  <rect x="28" y="28" width="40" height="40" rx="6" fill="#e4f3f4"/>
+  <rect x="37" y="37" width="22" height="22" rx="3" fill="#ff4f26"/>
+</svg>

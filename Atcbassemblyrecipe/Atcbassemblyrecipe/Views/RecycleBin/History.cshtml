@@ -1,0 +1,171 @@
+@model ChangeHistoryViewModel
+
+@{
+    ViewData["Title"] = "Change History";
+    var permission = await Access.GetAsync(ModuleNames.RecycleBin);
+    var canRevert = permission.CanUpdate;
+}
+
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">Settings</span>
+        <h1>Change History</h1>
+        <p>Every saved edit, with the values the row had before it. Revert writes those old values back.</p>
+    </div>
+    <a asp-controller="RecycleBin" asp-action="Index" class="btn btn-outline-secondary"><partial name="_Icon" model="@("delete")" /> Trash</a>
+</div>
+
+<section class="data-panel excel-toolbar-panel">
+    <form asp-controller="RecycleBin" asp-action="History" method="get" class="excel-search">
+        <div>
+            <label for="search" class="form-label">Search</label>
+            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Search table, row, or who changed it" />
+        </div>
+        <div>
+            <label for="pageSize" class="form-label">Rows</label>
+            <select id="pageSize" name="pageSize" class="form-select">
+                <option value="25" selected="@(Model.PageSize == 25)">25</option>
+                <option value="50" selected="@(Model.PageSize == 50)">50</option>
+                <option value="100" selected="@(Model.PageSize == 100)">100</option>
+            </select>
+        </div>
+        <div class="form-check align-self-end mb-2">
+            <input class="form-check-input" type="checkbox" id="includeReverted" name="includeReverted" value="true" checked="@Model.IncludeReverted" />
+            <label class="form-check-label" for="includeReverted">Show already reverted</label>
+        </div>
+        <button type="submit" class="btn btn-primary"><partial name="_Icon" model="@("search")" /> Search</button>
+        <a asp-controller="RecycleBin" asp-action="History" class="btn btn-outline-secondary"><partial name="_Icon" model="@("clear")" /> Clear</a>
+    </form>
+</section>
+
+<div class="table-responsive data-panel excel-panel">
+    <table class="table table-hover align-middle excel-table audit-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Table</th>
+                <th>Row</th>
+                <th>Changed By</th>
+                <th>Changed</th>
+                <th>What changed</th>
+                <th>Status</th>
+                <th class="text-center">Revert</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Rows.Count == 0)
+            {
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">No changes recorded yet.</td>
+                </tr>
+            }
+            else
+            {
+                var rowNumber = ((Model.Page - 1) * Model.PageSize) + 1;
+                foreach (var entry in Model.Rows)
+                {
+                    // LASTUPDATE and LASTUPDATEDBY move on every save, so listing them
+                    // as "what changed" would bury the edit the user actually made.
+                    var changes = entry.ChangedColumns
+                        .Where(change => change.Column is not ("LASTUPDATE" or "LASTUPDATEDBY"))
+                        .ToList();
+                    var revertLabel = $"Put {entry.TargetLabel} back to the values it had before {entry.ChangedDate:yyyy-MM-dd HH:mm}?";
+
+                    <tr>
+                        <td>@rowNumber</td>
+                        <td class="fw-semibold">@entry.TableName</td>
+                        <td>@entry.TargetLabel</td>
+                        <td title="@entry.ChangedBy">@(await Directory.GetDisplayNameAsync(entry.ChangedBy))</td>
+                        <td>@entry.ChangedDate.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>
+                            @if (changes.Count == 0)
+                            {
+                                <span class="text-muted">Only the timestamp moved.</span>
+                            }
+                            else
+                            {
+                                <ul class="audit-change-list">
+                                    @foreach (var change in changes)
+                                    {
+                                        <li>
+                                            <span class="audit-column">@change.Column</span>
+                                            <span class="audit-from">@(string.IsNullOrEmpty(change.From) ? "(empty)" : change.From)</span>
+                                            <span class="audit-arrow" aria-label="changed to">&rarr;</span>
+                                            <span class="audit-to">@(string.IsNullOrEmpty(change.To) ? "(empty)" : change.To)</span>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </td>
+                        <td>
+                            @if (entry.Reverted)
+                            {
+                                <span class="audit-badge is-done" title="@entry.RevertedBy">Reverted by @(await Directory.GetDisplayNameAsync(entry.RevertedBy))</span>
+                            }
+                            else
+                            {
+                                <span class="audit-badge">Applied</span>
+                            }
+                        </td>
+                        <td class="text-center">
+                            @if (canRevert && !entry.Reverted)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-confirm-form="revertForm-@entry.HistoryId"
+                                        data-confirm-label="@revertLabel" data-confirm-phrase="REVERT">
+                                    <partial name="_Icon" model="@("reset")" /> Revert
+                                </button>
+                            }
+                        </td>
+                    </tr>
+
+                    rowNumber += 1;
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="row-forms d-none" aria-hidden="true">
+    @foreach (var entry in Model.Rows)
+    {
+        if (canRevert && !entry.Reverted)
+        {
+            <form id="revertForm-@entry.HistoryId" asp-controller="RecycleBin" asp-action="Revert" method="post">
+                <input type="hidden" name="historyId" value="@entry.HistoryId" />
+                <input type="hidden" name="confirmed" value="true" />
+            </form>
+        }
+    }
+</div>
+
+@{
+    var startPage = Math.Max(1, Model.Page - 2);
+    var endPage = Math.Min(Model.TotalPages, startPage + 4);
+    startPage = Math.Max(1, endPage - 4);
+}
+
+<div class="pagination-bar">
+    <span>Showing page @Model.Page of @Model.TotalPages, @Model.TotalRows total rows</span>
+    <nav aria-label="Change History pages">
+        <ul class="pagination mb-0">
+            <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
+                <a class="page-link" asp-controller="RecycleBin" asp-action="History" asp-route-search="@Model.Search" asp-route-page="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize" asp-route-includeReverted="@Model.IncludeReverted">Prev</a>
+            </li>
+            @for (var pageNumber = startPage; pageNumber <= endPage; pageNumber++)
+            {
+                <li class="page-item @(pageNumber == Model.Page ? "active" : "")">
+                    <a class="page-link" asp-controller="RecycleBin" asp-action="History" asp-route-search="@Model.Search" asp-route-page="@pageNumber" asp-route-pageSize="@Model.PageSize" asp-route-includeReverted="@Model.IncludeReverted">@pageNumber</a>
+                </li>
+            }
+            <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : "")">
+                <a class="page-link" asp-controller="RecycleBin" asp-action="History" asp-route-search="@Model.Search" asp-route-page="@(Model.Page + 1)" asp-route-pageSize="@Model.PageSize" asp-route-includeReverted="@Model.IncludeReverted">Next</a>
+            </li>
+        </ul>
+    </nav>
+</div>
+
+<partial name="_ConfirmActionModal" />
+
+@section Scripts {
+    <script src="~/js/confirm-action.js" asp-append-version="true"></script>
+}

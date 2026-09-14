@@ -1,0 +1,50 @@
+@model AwacsWstypeInputModel
+
+@{
+    var isEdit = !string.IsNullOrWhiteSpace(Model.TblRowId);
+}
+
+<div class="page-heading">
+    <div>
+        <h1>@(isEdit ? "Edit AWACSWSTYPE" : "Add AWACSWSTYPE")</h1>
+        <p>Only AWACSWSTYPE is saved.</p>
+    </div>
+</div>
+
+<form asp-action="@(isEdit ? "Edit" : "Create")" method="post" class="data-panel">
+    <input asp-for="TblRowId" type="hidden" />
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+    <div class="row g-3">
+        <div class="col-md-3">
+            <label asp-for="WsId" class="form-label"></label>
+            <input asp-for="WsId" class="form-control" />
+            <span asp-validation-for="WsId" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="WsType" class="form-label"></label>
+            <input asp-for="WsType" class="form-control" readonly />
+            <span asp-validation-for="WsType" class="text-danger"></span>
+        </div>
+        <div class="col-md-3 align-self-end">
+            @* WSDB was removed from the UI - it is always TBLSAWING. The value is
+               still posted so the NOT NULL column keeps getting written. *@
+            <input asp-for="WsDb" type="hidden" />
+            <button type="button" id="validateWsDb" class="btn btn-outline-primary w-100"><partial name="_Icon" model="@("check")" /> Validate TBLSAWING</button>
+        </div>
+        <div class="col-12">
+            <div class="form-check">
+                <input asp-for="Confirmed" class="form-check-input" />
+                <label asp-for="Confirmed" class="form-check-label"></label>
+            </div>
+            <span asp-validation-for="Confirmed" class="text-danger"></span>
+        </div>
+    </div>
+
+    <div id="referencePreview" class="reference-preview mt-3 d-none"></div>
+
+    <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary"><partial name="_Icon" model="@("validate")" /> Validate and Save</button>
+        <a asp-controller="Home" asp-action="Index" class="btn btn-outline-secondary"><partial name="_Icon" model="@("cancel")" /> Cancel</a>
+    </div>
+</form>

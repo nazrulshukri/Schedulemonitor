@@ -1,0 +1,156 @@
+@model LoginViewModel
+
+@{
+    ViewData["Title"] = "Login";
+    Layout = "_AuthLayout";
+
+    // Nothing on this page is written into the markup any more: the logos, the
+    // wording and the optional backdrop video all come from TBLAPPSETTING
+    // (module LOGIN), so the page can be re-branded from the database.
+    var ui = await Settings.GetAsync();
+    var company = ui[SettingModules.App, "CompanyName"];
+    var backdropVideo = ui[SettingModules.Login, "BackgroundVideoUrl"];
+    var submitBusyText = ui[SettingModules.Login, "SubmitBusyText"];
+}
+
+<div class="auth-stage">
+@if (!string.IsNullOrWhiteSpace(backdropVideo))
+{
+    @* A video is used only when LOGIN.BackgroundVideoUrl carries one; with the
+       row empty the CSS photo backdrop stays as it is. *@
+    <video class="auth-backdrop-video" autoplay muted loop playsinline
+           poster="@Url.Content(ui[SettingModules.Login, "BackgroundImageUrl"])">
+        <source src="@Url.Content(backdropVideo)" />
+    </video>
+}
+    <div class="auth-display-menu">
+        <button type="button" id="authDisplayToggle" class="auth-settings-toggle" aria-controls="authDisplayPanel" aria-expanded="false" aria-label="Open display settings">
+            <span></span>
+        </button>
+        <div id="authDisplayPanel" class="auth-display-panel" hidden>
+            <div class="display-panel-head">
+                <strong>Display Options</strong>
+                <button type="button" class="display-panel-close" data-auth-display-close aria-label="Close display settings"></button>
+            </div>
+            <div class="display-panel-section">
+                <span>Mode</span>
+                <button type="button" id="themeToggle" class="auth-theme-toggle" aria-label="Toggle dark mode">
+                    <span class="theme-toggle-track">
+                        <span class="theme-toggle-knob"></span>
+                    </span>
+                    <span class="theme-icon" aria-hidden="true"></span>
+                </button>
+            </div>
+            <div class="display-panel-section">
+                <span>Zoom</span>
+                <div class="zoom-control auth-zoom" role="group" aria-label="Page zoom controls">
+                    <button type="button" class="zoom-button" data-zoom-out aria-label="Zoom out" title="Zoom out">-</button>
+                    <output class="zoom-value" data-zoom-value>100%</output>
+                    <button type="button" class="zoom-button" data-zoom-in aria-label="Zoom in" title="Zoom in">+</button>
+                    <button type="button" class="zoom-button zoom-reset" data-zoom-reset aria-label="Reset zoom" title="Reset zoom">100</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="auth-frame">
+        <div class="auth-left">
+            <div class="auth-logo-mark">
+                <img src="@Url.Content(ui[SettingModules.Login, "LogoUrl"])" alt="@company" />
+            </div>
+            <div class="auth-title-stack">
+                <h1>@ui[SettingModules.Login, "Headline"]</h1>
+            </div>
+        </div>
+
+        <section class="auth-glass">
+            <div class="auth-form-head">
+                <img src="@Url.Content(ui[SettingModules.Login, "FormLogoUrl"])" alt="@company" class="auth-logo" />
+                <span class="auth-kicker">@ui[SettingModules.Login, "Kicker"]</span>
+                <h2>@ui[SettingModules.Login, "FormTitle"]</h2>
+            </div>
+
+            <form id="loginForm" asp-action="Login" asp-route-returnUrl="@ViewData["ReturnUrl"]" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                <div class="mb-3">
+                    <label asp-for="UserName" class="form-label"></label>
+                    <div class="input-icon">
+                        <span>ID</span>
+                        <input asp-for="UserName" class="form-control" autocomplete="username" placeholder="@ui[SettingModules.Login, "UserPlaceholder"]" />
+                    </div>
+                    <span asp-validation-for="UserName" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Password" class="form-label"></label>
+                    <div class="input-icon">
+                        <span>PW</span>
+                        <input asp-for="Password" class="form-control" autocomplete="current-password" placeholder="@ui[SettingModules.Login, "PasswordPlaceholder"]" />
+                    </div>
+                    <span asp-validation-for="Password" class="text-danger"></span>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input asp-for="RememberMe" class="form-check-input" />
+                    <label asp-for="RememberMe" class="form-check-label">Remember username</label>
+                </div>
+
+                <button id="loginButton" type="submit" class="btn btn-nxp-orange auth-submit">
+                    <span class="submit-loader" aria-hidden="true"></span>
+                    <span class="submit-text"><partial name="_Icon" model="@("login")" /> @ui[SettingModules.Login, "SubmitText"]</span>
+                </button>
+            </form>
+        </section>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        const loginButton = document.getElementById('loginButton');
+
+        loginForm.addEventListener('submit', () => {
+            if (window.jQuery && !$(loginForm).valid()) {
+                return;
+            }
+
+            if (!loginForm.checkValidity()) {
+                return;
+            }
+
+            loginButton.classList.add('is-loading');
+            loginButton.disabled = true;
+            loginButton.querySelector('.submit-text').textContent = @Json.Serialize(submitBusyText);
+        });
+
+        const displayToggle = document.getElementById('authDisplayToggle');
+        const displayPanel = document.getElementById('authDisplayPanel');
+        const closeDisplayPanel = document.querySelector('[data-auth-display-close]');
+
+        const setDisplayPanel = (open) => {
+            displayPanel.hidden = !open;
+            displayToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            displayToggle.classList.toggle('active', open);
+        };
+
+        displayToggle.addEventListener('click', () => {
+            setDisplayPanel(displayPanel.hidden);
+        });
+
+        closeDisplayPanel.addEventListener('click', () => setDisplayPanel(false));
+
+        document.addEventListener('click', (event) => {
+            if (!displayPanel.hidden && !event.target.closest('.auth-display-menu')) {
+                setDisplayPanel(false);
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                setDisplayPanel(false);
+            }
+        });
+    </script>
+}

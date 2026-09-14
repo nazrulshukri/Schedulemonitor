@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="Silicon wafer">
+  <circle cx="48" cy="48" r="48" fill="#0d6971"/>
+  <circle cx="48" cy="48" r="31" fill="#e4f3f4"/>
+  <path d="M48 17a31 31 0 0 1 12 2.4L48 31z" fill="#0d6971"/>
+  <g fill="#007c84">
+    <rect x="30" y="30" width="11" height="11" rx="1.5"/><rect x="43" y="30" width="11" height="11" rx="1.5"/><rect x="56" y="30" width="11" height="11" rx="1.5"/>
+    <rect x="30" y="43" width="11" height="11" rx="1.5"/><rect x="43" y="43" width="11" height="11" rx="1.5" fill="#ff4f26"/><rect x="56" y="43" width="11" height="11" rx="1.5"/>
+    <rect x="30" y="56" width="11" height="11" rx="1.5"/><rect x="43" y="56" width="11" height="11" rx="1.5"/><rect x="56" y="56" width="11" height="11" rx="1.5"/>
+  </g>
+</svg>

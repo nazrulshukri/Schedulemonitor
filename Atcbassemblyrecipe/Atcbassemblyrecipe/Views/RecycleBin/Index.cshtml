@@ -1,0 +1,178 @@
+@model RecycleBinViewModel
+
+@{
+    ViewData["Title"] = "Trash";
+    var permission = await Access.GetAsync(ModuleNames.RecycleBin);
+    var canRestore = permission.CanUpdate;
+    var canPurge = permission.CanDelete;
+}
+
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">Settings</span>
+        <h1>Trash</h1>
+        <p>Rows deleted from AWACSWSTYPE, AWACSRECIPEBYWSTYPE and AWACSLF. Restore puts one back exactly as it was.</p>
+    </div>
+    <a asp-controller="RecycleBin" asp-action="History" class="btn btn-outline-secondary"><partial name="_Icon" model="@("review")" /> Change History</a>
+</div>
+
+<section class="data-panel excel-toolbar-panel">
+    <form asp-controller="RecycleBin" asp-action="Index" method="get" class="excel-search">
+        <div>
+            <label for="search" class="form-label">Search</label>
+            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Search table, row, or who deleted it" />
+        </div>
+        <div>
+            <label for="pageSize" class="form-label">Rows</label>
+            <select id="pageSize" name="pageSize" class="form-select">
+                <option value="25" selected="@(Model.PageSize == 25)">25</option>
+                <option value="50" selected="@(Model.PageSize == 50)">50</option>
+                <option value="100" selected="@(Model.PageSize == 100)">100</option>
+            </select>
+        </div>
+        <div class="form-check align-self-end mb-2">
+            <input class="form-check-input" type="checkbox" id="includeRestored" name="includeRestored" value="true" checked="@Model.IncludeRestored" />
+            <label class="form-check-label" for="includeRestored">Show already restored</label>
+        </div>
+        <button type="submit" class="btn btn-primary"><partial name="_Icon" model="@("search")" /> Search</button>
+        <a asp-controller="RecycleBin" asp-action="Index" class="btn btn-outline-secondary"><partial name="_Icon" model="@("clear")" /> Clear</a>
+    </form>
+</section>
+
+<div class="table-responsive data-panel excel-panel">
+    <table class="table table-hover align-middle excel-table audit-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Table</th>
+                <th>Row</th>
+                <th>Deleted By</th>
+                <th>Deleted</th>
+                <th>Saved values</th>
+                <th>Status</th>
+                <th class="text-center">Restore</th>
+                <th class="text-center">Purge</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Rows.Count == 0)
+            {
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-4">Trash is empty.</td>
+                </tr>
+            }
+            else
+            {
+                var rowNumber = ((Model.Page - 1) * Model.PageSize) + 1;
+                foreach (var entry in Model.Rows)
+                {
+                    var restoreLabel = $"Restore {entry.TargetLabel} back into {entry.TableName}? It is written back exactly as it was deleted.";
+                    var purgeLabel = $"Purge {entry.TargetLabel} for good? After this it can no longer be restored.";
+
+                    <tr>
+                        <td>@rowNumber</td>
+                        <td class="fw-semibold">@entry.TableName</td>
+                        <td>@entry.TargetLabel</td>
+                        <td title="@entry.DeletedBy">@(await Directory.GetDisplayNameAsync(entry.DeletedBy))</td>
+                        <td>@entry.DeletedDate.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>
+                            <details class="audit-values">
+                                <summary>@entry.RowData.Count columns</summary>
+                                <dl>
+                                    @foreach (var (column, value) in entry.RowData)
+                                    {
+                                        <dt>@column</dt>
+                                        <dd>@(string.IsNullOrEmpty(value) ? "(empty)" : value)</dd>
+                                    }
+                                </dl>
+                            </details>
+                        </td>
+                        <td>
+                            @if (entry.Restored)
+                            {
+                                <span class="audit-badge is-done">Restored by @entry.RestoredBy</span>
+                            }
+                            else
+                            {
+                                <span class="audit-badge">In trash</span>
+                            }
+                        </td>
+                        <td class="text-center">
+                            @if (canRestore && !entry.Restored)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-confirm-form="restoreForm-@entry.TrashId"
+                                        data-confirm-label="@restoreLabel" data-confirm-phrase="RESTORE">
+                                    <partial name="_Icon" model="@("reset")" /> Restore
+                                </button>
+                            }
+                        </td>
+                        <td class="text-center">
+                            @if (canPurge && !entry.Restored)
+                            {
+                                <button type="button" class="btn btn-sm btn-nxp-orange" data-confirm-form="purgeForm-@entry.TrashId"
+                                        data-confirm-label="@purgeLabel" data-confirm-phrase="PURGE">
+                                    <partial name="_Icon" model="@("delete")" /> Purge
+                                </button>
+                            }
+                        </td>
+                    </tr>
+
+                    rowNumber += 1;
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="row-forms d-none" aria-hidden="true">
+    @foreach (var entry in Model.Rows)
+    {
+        if (canRestore && !entry.Restored)
+        {
+            <form id="restoreForm-@entry.TrashId" asp-controller="RecycleBin" asp-action="Restore" method="post">
+                <input type="hidden" name="trashId" value="@entry.TrashId" />
+                <input type="hidden" name="confirmed" value="true" />
+            </form>
+        }
+
+        if (canPurge && !entry.Restored)
+        {
+            <form id="purgeForm-@entry.TrashId" asp-controller="RecycleBin" asp-action="Purge" method="post">
+                <input type="hidden" name="trashId" value="@entry.TrashId" />
+                <input type="hidden" name="confirmed" value="true" />
+            </form>
+        }
+    }
+</div>
+
+@{
+    var startPage = Math.Max(1, Model.Page - 2);
+    var endPage = Math.Min(Model.TotalPages, startPage + 4);
+    startPage = Math.Max(1, endPage - 4);
+}
+
+<div class="pagination-bar">
+    <span>Showing page @Model.Page of @Model.TotalPages, @Model.TotalRows total rows</span>
+    <nav aria-label="Trash pages">
+        <ul class="pagination mb-0">
+            <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
+                <a class="page-link" asp-controller="RecycleBin" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize" asp-route-includeRestored="@Model.IncludeRestored">Prev</a>
+            </li>
+            @for (var pageNumber = startPage; pageNumber <= endPage; pageNumber++)
+            {
+                <li class="page-item @(pageNumber == Model.Page ? "active" : "")">
+                    <a class="page-link" asp-controller="RecycleBin" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@pageNumber" asp-route-pageSize="@Model.PageSize" asp-route-includeRestored="@Model.IncludeRestored">@pageNumber</a>
+                </li>
+            }
+            <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : "")">
+                <a class="page-link" asp-controller="RecycleBin" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.Page + 1)" asp-route-pageSize="@Model.PageSize" asp-route-includeRestored="@Model.IncludeRestored">Next</a>
+            </li>
+        </ul>
+    </nav>
+</div>
+
+<partial name="_ConfirmActionModal" />
+
+@section Scripts {
+    <script src="~/js/confirm-action.js" asp-append-version="true"></script>
+}
