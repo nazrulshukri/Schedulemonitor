@@ -54,7 +54,20 @@
     </div>
 </div>
 
-@if (Model.UserGroups.Count == 0)
+@if (Model.Columns.Count == 0)
+{
+    <div class="alert alert-danger">
+        <strong>No columns could be read from ENGINEERING.</strong>
+        The table is missing, or it does not carry the columns this page expects -
+        <code>"NO"</code>, <code>REQUESTOR</code>, <code>LOTNUMBER</code>, <code>"PACKAGE"</code>,
+        <code>PRODUCT</code>, <code>RECIPESAWING</code>, <code>RECIPEWIREBOND</code>,
+        <code>RECIPEMARKER</code>. Run <code>Database/engineering-check.sql</code> to see what it
+        really has, then <code>Database/engineering.sql</code> and
+        <code>Database/engineeringcolumngroup.sql</code>. The application log names each column
+        that was dropped.
+    </div>
+}
+else if (Model.UserGroups.Count == 0)
 {
     <div class="alert alert-warning">
         You are not in any of the Sawing, Wirebond or Marker groups, so no recipe column is shown -

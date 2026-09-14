@@ -156,12 +156,15 @@ namespace Atcbassemblyrecipe.Services
                 await using var connection = _connectionFactory.CreateConnection();
                 await connection.OpenAsync();
 
-                // The real shape of ENGINEERING, so a config row naming a column
-                // that does not exist is dropped instead of reaching a SELECT.
+                // The real shape of ENGINEERING. NOTHING is handed back that is
+                // not in this set - not a row of ENGINEERINGCOLUMNGROUP, and not
+                // the built-in fallback either. A column name that is not really
+                // there reaches the SELECT as an identifier and comes back as
+                // ORA-00904, which reads like a broken app rather than what it
+                // is: the table not matching the mapping.
                 //
                 // GetColumnsAsync throws rather than answering an empty list when
-                // the table is not in the data dictionary at all, which is the one
-                // case worth its own message - it names the script to run.
+                // the table is not in the data dictionary at all.
                 HashSet<string> actualColumns;
                 try
                 {
@@ -171,87 +174,126 @@ namespace Atcbassemblyrecipe.Services
                 }
                 catch (InvalidOperationException)
                 {
+                    // No table, so no verified column exists and there is nothing
+                    // safe to guess. An empty mapping renders a page that says so.
                     _logger.LogWarning(
-                        "ENGINEERING is not in the data dictionary. Run Database/engineering.sql against the OCAPSYS schema. The Engineering page cannot show any rows until it exists.");
-                    return new Mapping(Defaults(), false);
+                        "ENGINEERING is not in the data dictionary. Run Database/engineering.sql against the OCAPSYS schema.");
+                    return Mapping.Missing;
                 }
-
-                await using var command = connection.CreateCommand();
-                command.CommandText = """
-                    SELECT column_name, group_name, display_label, sort_order
-                    FROM   engineeringcolumngroup
-                    ORDER  BY CASE UPPER(group_name)
-                                WHEN 'SHARED'   THEN 0
-                                WHEN 'SAWING'   THEN 1
-                                WHEN 'WIREBOND' THEN 2
-                                WHEN 'MARKER'   THEN 3
-                                ELSE 4
-                              END,
-                              sort_order,
-                              column_name
-                    """;
 
                 var columns = new List<EngineeringColumn>();
 
-                await using var reader = await command.ExecuteReaderTracedAsync();
-                while (await reader.ReadAsync())
+                await using (var command = connection.CreateCommand())
                 {
-                    var name = (reader.IsDBNull(0) ? string.Empty : reader.GetString(0)).Trim().ToUpperInvariant();
-                    var group = (reader.IsDBNull(1) ? string.Empty : reader.GetString(1)).Trim().ToUpperInvariant();
+                    command.CommandText = """
+                        SELECT column_name, group_name, display_label, sort_order
+                        FROM   engineeringcolumngroup
+                        ORDER  BY CASE UPPER(group_name)
+                                    WHEN 'SHARED'   THEN 0
+                                    WHEN 'SAWING'   THEN 1
+                                    WHEN 'WIREBOND' THEN 2
+                                    WHEN 'MARKER'   THEN 3
+                                    ELSE 4
+                                  END,
+                                  sort_order,
+                                  column_name
+                        """;
 
-                    if (!SafeIdentifier().IsMatch(name))
+                    await using var reader = await command.ExecuteReaderTracedAsync();
+                    while (await reader.ReadAsync())
                     {
-                        _logger.LogWarning("ENGINEERINGCOLUMNGROUP row '{Column}' is not a valid column name and was ignored.", name);
-                        continue;
+                        var name = (reader.IsDBNull(0) ? string.Empty : reader.GetString(0)).Trim().ToUpperInvariant();
+                        var group = (reader.IsDBNull(1) ? string.Empty : reader.GetString(1)).Trim().ToUpperInvariant();
+
+                        if (!IsUsable(name, group, actualColumns, "ENGINEERINGCOLUMNGROUP"))
+                        {
+                            continue;
+                        }
+
+                        var label = reader.IsDBNull(2) ? name : reader.GetString(2).Trim();
+                        var sortOrder = reader.IsDBNull(3) ? 0 : Convert.ToInt32(reader.GetValue(3));
+
+                        columns.Add(new EngineeringColumn(
+                            name,
+                            group,
+                            string.IsNullOrWhiteSpace(label) ? name : label,
+                            sortOrder));
                     }
-
-                    if (!actualColumns.Contains(name))
-                    {
-                        _logger.LogWarning("ENGINEERINGCOLUMNGROUP names {Column}, which is not a column of ENGINEERING. Ignored.", name);
-                        continue;
-                    }
-
-                    if (EngineeringColumns.Bookkeeping.Contains(name, StringComparer.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    if (!EngineeringGroups.All.Contains(group, StringComparer.OrdinalIgnoreCase))
-                    {
-                        _logger.LogWarning(
-                            "ENGINEERINGCOLUMNGROUP gives {Column} the group '{Group}', which is not one of SAWING, WIREBOND, MARKER or SHARED. Ignored.",
-                            name, group);
-                        continue;
-                    }
-
-                    var label = reader.IsDBNull(2) ? name : reader.GetString(2).Trim();
-                    var sortOrder = reader.IsDBNull(3) ? 0 : Convert.ToInt32(reader.GetValue(3));
-
-                    columns.Add(new EngineeringColumn(
-                        name,
-                        group,
-                        string.IsNullOrWhiteSpace(label) ? name : label,
-                        sortOrder));
                 }
 
-                if (columns.Count == 0)
+                if (columns.Count > 0)
                 {
-                    _logger.LogWarning(
-                        "ENGINEERINGCOLUMNGROUP is empty, so the built-in column mapping is being used. Run Database/engineeringcolumngroup.sql to manage it from the database.");
-                    return new Mapping(Defaults(), false);
+                    return new Mapping(columns, true);
                 }
 
-                return new Mapping(columns, true);
+                _logger.LogWarning(
+                    "ENGINEERINGCOLUMNGROUP is empty, or none of its rows name a real ENGINEERING column, so the built-in mapping is being used. Run Database/engineeringcolumngroup.sql.");
+
+                return Fallback(actualColumns);
             }
             catch (Exception ex) when (ex is OracleException or InvalidOperationException)
             {
-                // A missing config table must not take the page down: fall back
-                // to the seed the SQL script installs, and say so once.
+                // The config table is missing or unreadable. The shape of
+                // ENGINEERING is unknown from here, so there is nothing that can
+                // be verified and nothing is guessed.
                 _logger.LogWarning(
                     ex,
-                    "Could not read ENGINEERINGCOLUMNGROUP, so the built-in column mapping is being used. Run Database/engineeringcolumngroup.sql.");
-                return new Mapping(Defaults(), false);
+                    "Could not read ENGINEERINGCOLUMNGROUP. Run Database/engineeringcolumngroup.sql against the OCAPSYS schema.");
+                return Mapping.Missing;
             }
+        }
+
+        // The built-in mapping, narrowed to the columns ENGINEERING actually has.
+        // A default naming a column the table does not carry is dropped and named
+        // in the log - which is the difference between a page that says "run the
+        // script" and one that answers every request with ORA-00904.
+        private Mapping Fallback(HashSet<string> actualColumns)
+        {
+            var usable = Defaults()
+                .Where(column => IsUsable(column.Name, column.GroupName, actualColumns, "the built-in mapping"))
+                .ToList();
+
+            if (usable.Count == 0)
+            {
+                _logger.LogWarning(
+                    "ENGINEERING carries none of the columns this app knows about. It is probably still the old per-step shape - run Database/engineering.sql to rebuild it as the three-recipe one.");
+            }
+
+            return new Mapping(usable, false);
+        }
+
+        // One gate for both sources: a plain identifier, a real column of
+        // ENGINEERING, not bookkeeping, and a group the app understands.
+        private bool IsUsable(string name, string group, HashSet<string> actualColumns, string source)
+        {
+            if (!SafeIdentifier().IsMatch(name))
+            {
+                _logger.LogWarning("{Source} row '{Column}' is not a valid column name and was ignored.", source, name);
+                return false;
+            }
+
+            if (EngineeringColumns.Bookkeeping.Contains(name, StringComparer.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (!actualColumns.Contains(name))
+            {
+                _logger.LogWarning(
+                    "{Source} names {Column}, which is not a column of ENGINEERING. Ignored - check the table against Database/engineering.sql.",
+                    source, name);
+                return false;
+            }
+
+            if (!EngineeringGroups.All.Contains(group, StringComparer.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "{Source} gives {Column} the group '{Group}', which is not one of SAWING, WIREBOND, MARKER or SHARED. Ignored.",
+                    source, name, group);
+                return false;
+            }
+
+            return true;
         }
 
         // The same mapping Database/engineeringcolumngroup.sql seeds. Kept here
@@ -278,6 +320,12 @@ namespace Atcbassemblyrecipe.Services
             ];
         }
 
-        private sealed record Mapping(IReadOnlyList<EngineeringColumn> Columns, bool FromDatabase);
+        private sealed record Mapping(IReadOnlyList<EngineeringColumn> Columns, bool FromDatabase)
+        {
+            // Nothing could be verified against the data dictionary, so no column
+            // is offered at all. The page says the table is missing rather than
+            // asking Oracle for columns that may not be there.
+            public static readonly Mapping Missing = new([], false);
+        }
     }
 }

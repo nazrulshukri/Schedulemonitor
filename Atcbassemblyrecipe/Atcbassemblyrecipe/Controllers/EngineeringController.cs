@@ -350,7 +350,18 @@ namespace Atcbassemblyrecipe.Controllers
             {
                 if (oracle.Number == 942)
                 {
-                    return "ORA-00942: ENGINEERING does not exist yet. Run Database/engineering.sql against the OCAPSYS schema, then Database/engineeringcolumngroup.sql.";
+                    return "ORA-00942: ENGINEERING does not exist yet. Run Database/engineering.sql against the OCAPSYS schema, then Database/engineeringcolumngroup.sql and Database/engineeringwstype.sql.";
+                }
+
+                // ORA-00904 here means a column this page asked for is not on the
+                // table - so the table and the mapping disagree. Almost always an
+                // ENGINEERING left over from an earlier shape.
+                if (oracle.Number == 904)
+                {
+                    return $"{oracle.Message.Trim()} - that column is not on the ENGINEERING table. "
+                         + "The table and ENGINEERINGCOLUMNGROUP disagree: ENGINEERING should carry \"NO\", REQUESTOR, "
+                         + "LOTNUMBER, \"PACKAGE\", PRODUCT, RECIPESAWING, RECIPEWIREBOND and RECIPEMARKER. "
+                         + "Run Database/engineering-check.sql to see what it actually has, then Database/engineering.sql to rebuild it.";
                 }
 
                 return $"ORA-{oracle.Number:00000}: {oracle.Message.Trim()}";

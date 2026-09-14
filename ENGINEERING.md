@@ -17,6 +17,7 @@ Database/engineering.sql             -- the table, its index, the undo-table con
 Database/engineeringcolumngroup.sql  -- which group owns which column      (read by the web app)
 Database/engineeringwstype.sql       -- which WSTYPE reads which column    (read by AwacsMesService)
 Database/engineering-access.sql      -- optional: put a user in a group
+Database/engineering-check.sql       -- diagnostic, read only: run it on any ORA-00904
 ```
 
 `ENGINEERING` has eight data columns and no more:
@@ -26,10 +27,27 @@ Database/engineering-access.sql      -- optional: put a user in a group
 | identity | `"NO"` `REQUESTOR` `LOTNUMBER` `"PACKAGE"` `PRODUCT` |
 | recipes | `RECIPESAWING` `RECIPEWIREBOND` `RECIPEMARKER` |
 
-plus `TBLROWID` / `LASTUPDATE` / `LASTUPDATEDBY`. Anything naming a per-step column
-from an earlier draft — `RECIPEFINALTEST`, `RECIPEWPROBER`, `RECIPEDA` — now fails
-with **ORA-00904: invalid identifier**. That is this shape, not a broken install;
-`engineering.sql` section 3 carries old rows across.
+plus `TBLROWID` / `LASTUPDATE` / `LASTUPDATEDBY`.
+
+### ORA-00904: "<column>": invalid identifier
+
+It always means one thing: something asked `ENGINEERING` for a column it does not
+have, so **the table and the mapping disagree**. Run `Database/engineering-check.sql`
+— query 2 lists what the table really has, query 3 lists what the mapping asks for and
+cannot find.
+
+Two usual causes:
+
+* **The table is still an older shape.** Per-step names (`RECIPEFINALTEST`,
+  `RECIPEWPROBER`, `RECIPEDA`) mean the 23-column draft is still there. Back it up
+  (`CREATE TABLE engineering_bak AS SELECT * FROM engineering;`) and run
+  `engineering.sql`; its section 3 carries the rows across.
+* **`engineering.sql` ran but `engineeringcolumngroup.sql` did not** — or the app
+  cannot read that table. The app used to fall back to its built-in column list
+  without checking it, which produced exactly this error. It no longer does: every
+  column name, from the table or from the fallback, is checked against the data
+  dictionary first, and anything missing is dropped and named in the log. The page
+  then says what to run instead of failing every query.
 
 `ENGINEERING` is the SQL Server table `awacs.dbo.ENGINEERING` moved into Oracle. It is
 in Oracle because both consumers already connect there — the recipe app over its
