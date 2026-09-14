@@ -58,13 +58,17 @@
 {
     <div class="alert alert-danger">
         <strong>No columns could be read from ENGINEERING.</strong>
-        The table is missing, or it does not carry the columns this page expects -
-        <code>"NO"</code>, <code>REQUESTOR</code>, <code>LOTNUMBER</code>, <code>"PACKAGE"</code>,
-        <code>PRODUCT</code>, <code>SAWING</code>, <code>WIREBOND</code>,
-        <code>MARKER</code>. Run <code>Database/engineering-check.sql</code> to see what it
-        really has, then <code>Database/engineering.sql</code> and
-        <code>Database/engineeringcolumngroup.sql</code>. The application log names each column
-        that was dropped.
+        @if (!string.IsNullOrWhiteSpace(Model.ColumnsProblem))
+        {
+            @* The actual reason, not a guess at it. *@
+            <div class="mt-2 mb-2"><code>@Model.ColumnsProblem</code></div>
+        }
+        This page expects <code>"NO"</code>, <code>REQUESTOR</code>, <code>LOTNUMBER</code>,
+        <code>"PACKAGE"</code>, <code>PRODUCT</code>, <code>SAWING</code>, <code>WIREBOND</code>,
+        <code>MARKER</code>, and <code>OCAPSYS.ENGINEERINGCOLUMNGROUP</code> to say which group
+        owns which. Run <code>Database/engineering-check.sql</code> <strong>as the user named
+        above</strong> - a table your SQL client can see is not necessarily one this connection
+        can. The application log names every column that was dropped.
     </div>
 }
 else if (Model.UserGroups.Count == 0)
@@ -76,10 +80,17 @@ else if (Model.UserGroups.Count == 0)
     </div>
 }
 
-@if (!Model.ColumnsFromDatabase)
+@* Only when the built-in mapping is genuinely in use. When nothing could be read
+   at all the red alert above has already said so, and repeating it here as
+   "the built-in defaults are being used" would be untrue - there are none. *@
+@if (!Model.ColumnsFromDatabase && Model.Columns.Count > 0)
 {
     <div class="alert alert-warning">
         The column groups are the built-in defaults: OCAPSYS.ENGINEERINGCOLUMNGROUP could not be read.
+        @if (!string.IsNullOrWhiteSpace(Model.ColumnsProblem))
+        {
+            <code>@Model.ColumnsProblem</code>
+        }
         Run <code>Database/engineeringcolumngroup.sql</code> to manage which group owns which recipe
         column from the database.
     </div>

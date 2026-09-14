@@ -26,6 +26,15 @@ namespace Atcbassemblyrecipe.Services
         // when the table is missing or unreadable and the built-in seed is
         // standing in for it.
         Task<bool> IsFromDatabaseAsync();
+
+        // Why the mapping is not coming from the database - the Oracle error, the
+        // connected user, and the table it was reading. Null when all is well.
+        //
+        // This used to go only to the application log, which meant the page said
+        // "could not be read" and the one fact that would explain it - ORA-00942
+        // as OCAPSYS, say, or ORA-01017 - was somewhere the person looking at the
+        // page could not see.
+        Task<string?> GetProblemAsync();
     }
 
     // Reads OCAPSYS.ENGINEERINGCOLUMNGROUP - which ENGINEERING column belongs to
@@ -90,6 +99,11 @@ namespace Atcbassemblyrecipe.Services
         public async Task<bool> IsFromDatabaseAsync()
         {
             return (await LoadAsync()).FromDatabase;
+        }
+
+        public async Task<string?> GetProblemAsync()
+        {
+            return (await LoadAsync()).Problem;
         }
 
         public async Task<IReadOnlyList<string>> GetUserGroupsAsync()
@@ -172,13 +186,17 @@ namespace Atcbassemblyrecipe.Services
                         .Select(column => column.Name)
                         .ToHashSet(StringComparer.OrdinalIgnoreCase);
                 }
-                catch (InvalidOperationException)
+                catch (InvalidOperationException ex)
                 {
                     // No table, so no verified column exists and there is nothing
                     // safe to guess. An empty mapping renders a page that says so.
-                    _logger.LogWarning(
-                        "ENGINEERING is not in the data dictionary. Run Database/engineering.sql against the OCAPSYS schema.");
-                    return Mapping.Missing;
+                    _logger.LogWarning(ex, "ENGINEERING is not in the data dictionary as {User}.", ConnectedUser(connection));
+                    return Mapping.Missing(
+                        $"ENGINEERING is not visible to the user this app connects as ({ConnectedUser(connection)}). "
+                        + "It exists for somebody - your SQL client can see it - but not for this connection. "
+                        + "Either it is in another schema and this user has no synonym or SELECT grant on it, or "
+                        + "the app is pointed at a different database. Run Database/engineering-check.sql WHILE "
+                        + $"CONNECTED AS {ConnectedUser(connection)} - query 1 shows which owners have it.");
                 }
 
                 var columns = new List<EngineeringColumn>();
@@ -236,10 +254,36 @@ namespace Atcbassemblyrecipe.Services
                 // The config table is missing or unreadable. The shape of
                 // ENGINEERING is unknown from here, so there is nothing that can
                 // be verified and nothing is guessed.
-                _logger.LogWarning(
-                    ex,
-                    "Could not read ENGINEERINGCOLUMNGROUP. Run Database/engineeringcolumngroup.sql against the OCAPSYS schema.");
-                return Mapping.Missing;
+                _logger.LogWarning(ex, "Could not read ENGINEERINGCOLUMNGROUP.");
+
+                var detail = ex is OracleException oracle
+                    ? $"ORA-{oracle.Number:00000}: {oracle.Message.Trim()}"
+                    : ex.Message.Trim();
+
+                var hint = ex is OracleException { Number: 942 }
+                    ? " ORA-00942 means the table is not there FOR THIS USER. Running the script as a different "
+                      + "user is the usual cause - so is forgetting the COMMIT, which leaves the table invisible "
+                      + "to every other session."
+                    : string.Empty;
+
+                return Mapping.Missing(detail + hint);
+            }
+        }
+
+        // Which Oracle user the app is actually connected as. The single most
+        // useful fact when a table is visible in SQL Developer and not here, and
+        // the one nobody can look up from the page.
+        private static string ConnectedUser(OracleConnection connection)
+        {
+            try
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = "SELECT SYS_CONTEXT('USERENV', 'SESSION_USER') FROM dual";
+                return Convert.ToString(command.ExecuteScalar()) ?? "unknown";
+            }
+            catch
+            {
+                return "unknown";
             }
         }
 
@@ -320,12 +364,15 @@ namespace Atcbassemblyrecipe.Services
             ];
         }
 
-        private sealed record Mapping(IReadOnlyList<EngineeringColumn> Columns, bool FromDatabase)
+        private sealed record Mapping(
+            IReadOnlyList<EngineeringColumn> Columns,
+            bool FromDatabase,
+            string? Problem = null)
         {
             // Nothing could be verified against the data dictionary, so no column
             // is offered at all. The page says the table is missing rather than
             // asking Oracle for columns that may not be there.
-            public static readonly Mapping Missing = new([], false);
+            public static Mapping Missing(string problem) => new([], false, problem);
         }
     }
 }

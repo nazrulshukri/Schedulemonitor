@@ -8,6 +8,15 @@
 --
 -- Nothing here changes anything. Read only.
 --
+-- >>> RUN IT CONNECTED AS THE USER THE APP CONNECTS AS. <<<
+-- That is the User ID in appsettings.json, ConnectionStrings:OCAP -
+-- OCAPSYS in a stock install. A table your own SQL Developer session
+-- can see is not necessarily one the app can: a different user, a
+-- missing synonym, a missing SELECT grant, or an uncommitted CREATE all
+-- look exactly like "the table is not there" from the app and exactly
+-- like "the table is fine" from your session. Query 1 and query 8 are
+-- the ones that settle it.
+--
 -- WHAT ENGINEERING SHOULD LOOK LIKE - eleven columns, no more:
 --
 --   TBLROWID  LASTUPDATE  LASTUPDATEDBY          bookkeeping
@@ -113,6 +122,31 @@ UNION ALL
 SELECT 'ENGINEERINGWSTYPE', COUNT(*) FROM OCAPSYS.ENGINEERINGWSTYPE
 UNION ALL
 SELECT 'ENGINEERING', COUNT(*) FROM OCAPSYS.ENGINEERING;
+
+
+-- ---------------------------------------------------------------------
+-- 8. Can THIS session actually read the three tables?
+--
+-- The decisive test, and the one that matches what the app does: an
+-- unqualified SELECT, resolved the same way the app resolves it. Run it
+-- as the app's user. ORA-00942 here and rows in query 1 means the table
+-- exists but this user cannot reach it - grant it:
+--
+--   GRANT SELECT ON <owner>.ENGINEERING            TO <app_user>;
+--   GRANT SELECT ON <owner>.ENGINEERINGCOLUMNGROUP TO <app_user>;
+--   GRANT SELECT ON <owner>.ENGINEERINGWSTYPE      TO <app_user>;
+--   CREATE OR REPLACE SYNONYM <app_user>.ENGINEERING            FOR <owner>.ENGINEERING;
+--   CREATE OR REPLACE SYNONYM <app_user>.ENGINEERINGCOLUMNGROUP FOR <owner>.ENGINEERINGCOLUMNGROUP;
+--   CREATE OR REPLACE SYNONYM <app_user>.ENGINEERINGWSTYPE      FOR <owner>.ENGINEERINGWSTYPE;
+--
+-- The app needs INSERT, UPDATE and DELETE on ENGINEERING as well - it is
+-- an editable page, not a report.
+-- ---------------------------------------------------------------------
+SELECT 'ENGINEERING'            AS table_name, COUNT(*) AS readable_rows FROM engineering
+UNION ALL
+SELECT 'ENGINEERINGCOLUMNGROUP', COUNT(*) FROM engineeringcolumngroup
+UNION ALL
+SELECT 'ENGINEERINGWSTYPE',      COUNT(*) FROM engineeringwstype;
 
 
 -- ---------------------------------------------------------------------

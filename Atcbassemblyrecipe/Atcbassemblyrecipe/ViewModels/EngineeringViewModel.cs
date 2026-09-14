@@ -15,9 +15,15 @@ namespace Atcbassemblyrecipe.ViewModels
         // why two people see different columns on the same page.
         public IReadOnlyList<string> UserGroups { get; set; } = [];
 
-        // False means ENGINEERINGCOLUMNGROUP could not be read and the built-in
-        // mapping is standing in. The page says so rather than looking correct.
+        // False means ENGINEERINGCOLUMNGROUP could not be read. The page says so
+        // rather than looking correct.
         public bool ColumnsFromDatabase { get; set; } = true;
+
+        // The Oracle error behind that, and the user the app connects as. Null
+        // when nothing is wrong. Printed on the page, because "could not be read"
+        // with the reason left in a log file is not something the person looking
+        // at the page can act on.
+        public string? ColumnsProblem { get; set; }
 
         public string Search { get; set; } = string.Empty;
         public int Page { get; set; } = 1;

@@ -58,6 +58,7 @@ namespace Atcbassemblyrecipe.Controllers
                 model.Columns = await _columnGroups.GetVisibleAsync();
                 model.UserGroups = await _columnGroups.GetUserGroupsAsync();
                 model.ColumnsFromDatabase = await _columnGroups.IsFromDatabaseAsync();
+                model.ColumnsProblem = await _columnGroups.GetProblemAsync();
 
                 var result = await _engineeringService.GetAsync(search, page, pageSize, model.SortBy, model.SortDirection);
                 model.Rows = result.Rows;
