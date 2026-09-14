@@ -4,7 +4,7 @@ Three pieces, in the order they have to be put in place.
 
 | Piece | Where |
 |---|---|
-| `OCAPSYS.ENGINEERING` and its column-group map | `Atcbassemblyrecipe/Atcbassemblyrecipe/Database/engineering*.sql` |
+| `OCAPSYS.ENGINEERING` and its two little map tables | `Atcbassemblyrecipe/Atcbassemblyrecipe/Database/engineering*.sql` |
 | The Engineering page | `Atcbassemblyrecipe` (controller, service, view) |
 | The `ENG` workorder lookup | `awacsMesInterface/AwacsMesService.cs` |
 
@@ -14,9 +14,22 @@ Run against the **OCAPSYS** schema, in this order:
 
 ```
 Database/engineering.sql             -- the table, its index, the undo-table constraints
-Database/engineeringcolumngroup.sql  -- which group owns which recipe column
-Database/engineering-access.sql      -- optional: grant a user the page and a group
+Database/engineeringcolumngroup.sql  -- which group owns which column      (read by the web app)
+Database/engineeringwstype.sql       -- which WSTYPE reads which column    (read by AwacsMesService)
+Database/engineering-access.sql      -- optional: put a user in a group
 ```
+
+`ENGINEERING` has eight data columns and no more:
+
+| | |
+|---|---|
+| identity | `"NO"` `REQUESTOR` `LOTNUMBER` `"PACKAGE"` `PRODUCT` |
+| recipes | `RECIPESAWING` `RECIPEWIREBOND` `RECIPEMARKER` |
+
+plus `TBLROWID` / `LASTUPDATE` / `LASTUPDATEDBY`. Anything naming a per-step column
+from an earlier draft — `RECIPEFINALTEST`, `RECIPEWPROBER`, `RECIPEDA` — now fails
+with **ORA-00904: invalid identifier**. That is this shape, not a broken install;
+`engineering.sql` section 3 carries old rows across.
 
 `ENGINEERING` is the SQL Server table `awacs.dbo.ENGINEERING` moved into Oracle. It is
 in Oracle because both consumers already connect there — the recipe app over its
@@ -35,37 +48,39 @@ every column name.
 `/Engineering` — one row per engineering lot, add / edit / delete / export / import,
 the same grid as Wirebond, and the same Trash and Change History behind it.
 
-### Who sees which columns
+### One grant decides both the pages and the column
 
-`ENGINEERING` carries 23 recipe columns and nobody works on all 23, so the page shows
-a user their own group's columns and hides the rest.
+A user's group is the `Sawing`, `Wirebond` or `Marker` module grant already in
+`TBLACCESS`. That single grant does two jobs: it opens that group's own page, **and**
+it puts that group's recipe column on the Engineering page. There is nothing else to
+keep in step.
 
-* **Which group** a user is in is not a new thing to administer. It is the `Sawing`,
-  `Wirebond` and `Marker` module grants already in `TBLACCESS`: grant somebody Sawing
-  and the sawing recipes appear on their Engineering page. Two grants means both sets.
-  A Super Admin sees everything.
-* **Which columns belong to which group** is a row in `OCAPSYS.ENGINEERINGCOLUMNGROUP`,
-  not a line of code. Moving a column is an `UPDATE`, visible within the cache window
-  (`AppSettings:CacheSeconds`, default 60 seconds) with no redeploy:
+So a group profile is four grants, and the sidebar follows:
 
-  ```sql
-  UPDATE OCAPSYS.ENGINEERINGCOLUMNGROUP SET group_name = 'WIREBOND' WHERE column_name = 'RECIPERM';
-  COMMIT;
-  ```
+| The user holds | Their sidebar reads | On the Engineering page they see |
+|---|---|---|
+| AWACSWSTYPE, **Sawing**, Engineering, AWACSLF | AWACSWSTYPE · Sawing · Engineering · AWACSLF | identity + `RECIPESAWING` |
+| AWACSWSTYPE, **Wirebond**, Engineering, AWACSLF | AWACSWSTYPE · Wirebond · Engineering · AWACSLF | identity + `RECIPEWIREBOND` |
+| AWACSWSTYPE, **Marker**, Engineering, AWACSLF | AWACSWSTYPE · Marker · Engineering · AWACSLF | identity + `RECIPEMARKER` |
 
-`SHARED` is the fourth group and is not a team: `NO`, `REQUESTOR`, `LOTNUMBER`,
-`PACKAGE`, `PRODUCT` and `ADAT` are the row's identity and are shown to everybody who
-can open the page.
+A sawing user has no Wirebond or Marker link at all, and no wirebond or marker recipe
+column. Two group grants means both pages and both columns. A **Super Admin** sees
+every page and all three columns without any grant — which is what makes the Super
+Admin the person who hands the groups out, from **Access Management** in the app or
+from `engineering-access.sql`.
 
-The seeded mapping is a starting point — check it against how the groups really
-divide the work:
+`SHARED` is the fourth group name and is not a team: `NO`, `REQUESTOR`, `LOTNUMBER`,
+`PACKAGE` and `PRODUCT` are the row's identity and are shown to everybody who can open
+the page.
 
-| Group | Columns |
-|---|---|
-| SAWING | `RECIPES1` `RECIPES2` `RECIPEBACKGRIND` `RECIPEWPROBER` `RECIPEWAFERTEST` `RECIPEWAOI` `RECIPEWLTR` |
-| WIREBOND | `RECIPEDA` `RECIPECA` `RECIPEMCDWB` `RECIPEAX` `RECIPEAOI` `RECIPEL200` `RECIPEPHICOM` |
-| MARKER | `RECIPEMD` `RECIPE2DMARKER` `RECIPEMOULD` `RECIPEMOLD` `RECIPETF` `RECIPERM` `RECIPESTRIPTEST` `RECIPEFINALTEST` |
-| SHARED | `NO` `REQUESTOR` `LOTNUMBER` `PACKAGE` `PRODUCT` `ADAT` |
+Which column belongs to which group is a row in `OCAPSYS.ENGINEERINGCOLUMNGROUP`, not
+a line of code. Moving one is an `UPDATE`, visible within the cache window
+(`AppSettings:CacheSeconds`, default 60 seconds) with no redeploy:
+
+```sql
+UPDATE OCAPSYS.ENGINEERINGCOLUMNGROUP SET group_name = 'MARKER' WHERE column_name = 'RECIPEWIREBOND';
+COMMIT;
+```
 
 Hiding a column is a permission, not a decoration. `EngineeringService` narrows the
 `SELECT`, the search, the `INSERT` and the `UPDATE` to the caller's own columns, so a
@@ -99,9 +114,11 @@ of two web service round trips that cannot succeed.
 What it does:
 
 1. `getWSType(WsId)` — the workstation's type, from `AWACSWSTYPE`, exactly as before.
-2. `getEngineeringRecipeColumn(wstype)` — the `ENGINEERING` column for that step, from
-   `ENGINEERINGCOLUMNGROUP.WSTYPE`. So `SAWING` → `RECIPES1`, `DIEBOND` → `RECIPEDA`,
-   `2DMARKER` → `RECIPE2DMARKER`. A new step is a row in that table, not a code change.
+2. `getEngineeringRecipeColumn(wstype)` — the `ENGINEERING` column that machine reads,
+   from `ENGINEERINGWSTYPE`. Many workstation types share one column: `SAWING` and
+   `WAOI` both answer `RECIPESAWING`; `DIEBOND`, `ASMWB`, `ASMWBM`, `ASMWBD` and `ADAT`
+   answer `RECIPEWIREBOND`; `MARKER`, `2DMARKER`, `MOULD`, `TRIMFORM` and `PLATING`
+   answer `RECIPEMARKER`. A new machine type is a row in that table, not a code change.
 3. `getEngineeringLot(woid, column)` — the row by `LOTNUMBER`, carrying that one cell.
 4. Sets `RECIPE`, and `PACKAGE` / `PRODUCT` / `DEVICE` when the row carries them.
 
@@ -111,7 +128,7 @@ what to do about it:
 | Situation | RESULT |
 |---|---|
 | WSID not in `AWACSWSTYPE` | `WSID:{0} not exist in recipe!` |
-| WSTYPE not mapped to a column | `WSTYPE:{0} has no ENGINEERING recipe column. Map it in ENGINEERINGCOLUMNGROUP.` |
+| WSTYPE not mapped to a column | `WSTYPE:{0} has no ENGINEERING recipe column. Map it in ENGINEERINGWSTYPE.` |
 | Lot not in the table | `Engineering lot {0} is not in the ENGINEERING table. Add it on the Engineering page first.` |
 | The cell is empty | `Engineering lot {0} has no {1} recipe for WSTYPE:{2}. Fill that cell in on the Engineering page.` |
 
@@ -130,11 +147,13 @@ It needs read access to both new tables — the grants are commented at the bott
 each SQL script:
 
 ```sql
-GRANT SELECT ON OCAPSYS.ENGINEERING             TO <mes_user>;
-GRANT SELECT ON OCAPSYS.ENGINEERINGCOLUMNGROUP  TO <mes_user>;
-CREATE OR REPLACE SYNONYM <mes_user>.ENGINEERING            FOR OCAPSYS.ENGINEERING;
-CREATE OR REPLACE SYNONYM <mes_user>.ENGINEERINGCOLUMNGROUP FOR OCAPSYS.ENGINEERINGCOLUMNGROUP;
+GRANT SELECT ON OCAPSYS.ENGINEERING         TO <mes_user>;
+GRANT SELECT ON OCAPSYS.ENGINEERINGWSTYPE   TO <mes_user>;
+CREATE OR REPLACE SYNONYM <mes_user>.ENGINEERING       FOR OCAPSYS.ENGINEERING;
+CREATE OR REPLACE SYNONYM <mes_user>.ENGINEERINGWSTYPE FOR OCAPSYS.ENGINEERINGWSTYPE;
 ```
+
+It does **not** need `ENGINEERINGCOLUMNGROUP` — that one is the web app's.
 
 ## The `ENG` prefix
 

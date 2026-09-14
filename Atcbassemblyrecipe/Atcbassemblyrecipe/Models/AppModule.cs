@@ -57,7 +57,7 @@ namespace Atcbassemblyrecipe.Models
             new()
             {
                 Name = ModuleNames.Engineering,
-                Description = "ENGINEERING: engineering lots and their recipes. The Sawing, Wirebond and Marker grants decide which recipe columns are shown inside the page."
+                Description = "ENGINEERING: engineering lots and their recipes. The Sawing, Wirebond and Marker grants decide which of the three recipe columns is shown inside the page."
             },
             new()
             {

@@ -31,10 +31,10 @@ namespace Atcbassemblyrecipe.Services
     // Reads OCAPSYS.ENGINEERINGCOLUMNGROUP - which ENGINEERING column belongs to
     // which user group - and answers what the current user may see.
     //
-    // Why a table and not a C# array: ENGINEERING carries 23 recipe columns and
-    // which team owns which is a production decision, not a code one. Moving
-    // RECIPERM from Marker to Wirebond is an UPDATE and a cache expiry, not a
-    // redeploy.
+    // Why a table and not a C# array: which team owns which recipe column is a
+    // production decision, not a code one. Moving RECIPEWIREBOND to the marker
+    // group, or adding a fourth column for a fourth group, is an UPDATE and a
+    // cache expiry rather than a redeploy.
     //
     // Two safety rules, because these names reach an Oracle statement as
     // identifiers and identifiers cannot be bound as parameters:
@@ -178,7 +178,7 @@ namespace Atcbassemblyrecipe.Services
 
                 await using var command = connection.CreateCommand();
                 command.CommandText = """
-                    SELECT column_name, group_name, wstype, display_label, sort_order
+                    SELECT column_name, group_name, display_label, sort_order
                     FROM   engineeringcolumngroup
                     ORDER  BY CASE UPPER(group_name)
                                 WHEN 'SHARED'   THEN 0
@@ -224,14 +224,12 @@ namespace Atcbassemblyrecipe.Services
                         continue;
                     }
 
-                    var wsType = reader.IsDBNull(2) ? null : reader.GetString(2).Trim().ToUpperInvariant();
-                    var label = reader.IsDBNull(3) ? name : reader.GetString(3).Trim();
-                    var sortOrder = reader.IsDBNull(4) ? 0 : Convert.ToInt32(reader.GetValue(4));
+                    var label = reader.IsDBNull(2) ? name : reader.GetString(2).Trim();
+                    var sortOrder = reader.IsDBNull(3) ? 0 : Convert.ToInt32(reader.GetValue(3));
 
                     columns.Add(new EngineeringColumn(
                         name,
                         group,
-                        string.IsNullOrWhiteSpace(wsType) ? null : wsType,
                         string.IsNullOrWhiteSpace(label) ? name : label,
                         sortOrder));
                 }
@@ -260,41 +258,23 @@ namespace Atcbassemblyrecipe.Services
         // so the page works the moment ENGINEERING exists, before anybody has
         // run the second script - and so the two can be compared when they
         // disagree.
+        // The same mapping Database/engineeringcolumngroup.sql seeds. Kept here
+        // so the page works the moment ENGINEERING exists, before anybody has
+        // run the second script - and so the two can be compared when they
+        // disagree.
         private static List<EngineeringColumn> Defaults()
         {
             return
             [
-                new("NO", EngineeringGroups.Shared, null, "No", 10),
-                new("REQUESTOR", EngineeringGroups.Shared, null, "Requestor", 20),
-                new("LOTNUMBER", EngineeringGroups.Shared, null, "Lot Number", 30),
-                new("PACKAGE", EngineeringGroups.Shared, null, "Package", 40),
-                new("PRODUCT", EngineeringGroups.Shared, null, "Product", 50),
-                new("ADAT", EngineeringGroups.Shared, "ADAT", "ADAT", 60),
+                new("NO", EngineeringGroups.Shared, "No", 10),
+                new("REQUESTOR", EngineeringGroups.Shared, "Requestor", 20),
+                new("LOTNUMBER", EngineeringGroups.Shared, "Lot Number", 30),
+                new("PACKAGE", EngineeringGroups.Shared, "Package", 40),
+                new("PRODUCT", EngineeringGroups.Shared, "Product", 50),
 
-                new("RECIPES1", EngineeringGroups.Sawing, "SAWING", "Sawing 1", 10),
-                new("RECIPES2", EngineeringGroups.Sawing, null, "Sawing 2", 20),
-                new("RECIPEBACKGRIND", EngineeringGroups.Sawing, "BACKGRIND", "Backgrind", 30),
-                new("RECIPEWPROBER", EngineeringGroups.Sawing, "WPROBER", "Wafer Prober", 40),
-                new("RECIPEWAFERTEST", EngineeringGroups.Sawing, "WAFERTEST", "Wafer Test", 50),
-                new("RECIPEWAOI", EngineeringGroups.Sawing, "WAOI", "Wafer AOI", 60),
-                new("RECIPEWLTR", EngineeringGroups.Sawing, "WLTR", "WLTR", 70),
-
-                new("RECIPEDA", EngineeringGroups.Wirebond, "DIEBOND", "Die Attach", 10),
-                new("RECIPECA", EngineeringGroups.Wirebond, "CLIPATTACH", "Clip Attach", 20),
-                new("RECIPEMCDWB", EngineeringGroups.Wirebond, "ASMWB", "MCD Wirebond", 30),
-                new("RECIPEAX", EngineeringGroups.Wirebond, "AX", "AX", 40),
-                new("RECIPEAOI", EngineeringGroups.Wirebond, "AOI", "AOI", 50),
-                new("RECIPEL200", EngineeringGroups.Wirebond, "L200", "L200", 60),
-                new("RECIPEPHICOM", EngineeringGroups.Wirebond, "PHICOM", "Phicom", 70),
-
-                new("RECIPEMD", EngineeringGroups.Marker, "MARKER", "Marker", 10),
-                new("RECIPE2DMARKER", EngineeringGroups.Marker, "2DMARKER", "2D Marker", 20),
-                new("RECIPEMOULD", EngineeringGroups.Marker, "MOULD", "Mould", 30),
-                new("RECIPEMOLD", EngineeringGroups.Marker, "MOLD", "Mold", 40),
-                new("RECIPETF", EngineeringGroups.Marker, "TRIMFORM", "Trim Form", 50),
-                new("RECIPERM", EngineeringGroups.Marker, "RM", "RM", 60),
-                new("RECIPESTRIPTEST", EngineeringGroups.Marker, "STRIPTEST", "Strip Test", 70),
-                new("RECIPEFINALTEST", EngineeringGroups.Marker, "FINALTEST", "Final Test", 80)
+                new("RECIPESAWING", EngineeringGroups.Sawing, "Sawing Recipe", 10),
+                new("RECIPEWIREBOND", EngineeringGroups.Wirebond, "Wirebond Recipe", 10),
+                new("RECIPEMARKER", EngineeringGroups.Marker, "Marker Recipe", 10)
             ];
         }
 

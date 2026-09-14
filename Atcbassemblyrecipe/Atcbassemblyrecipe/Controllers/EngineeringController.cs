@@ -21,9 +21,9 @@ namespace Atcbassemblyrecipe.Controllers
     //     at all, and whether Add / Edit / Delete are offered - the same
     //     [ModuleAccess] gate every other page uses.
     //   * The Sawing / Wirebond / Marker module grants decide WHICH RECIPE
-    //     COLUMNS the user sees inside it. ENGINEERING carries 23 of them and
-    //     nobody works on all 23, so a user granted Sawing gets the sawing
-    //     recipes and neither sees nor can write the other two groups'.
+    //     COLUMN the user sees inside it. ENGINEERING carries one recipe per
+    //     group, so a user granted Sawing gets RECIPESAWING and neither sees
+    //     nor can write the other two groups' columns.
     //
     // The second one is enforced in EngineeringService, not here and not in the
     // view: hiding a column in Razor is presentation only, so the service drops
@@ -76,8 +76,8 @@ namespace Atcbassemblyrecipe.Controllers
         }
 
         // The template is the user's own columns, so somebody in the sawing
-        // group downloads a sawing-shaped file rather than 23 columns of which
-        // 16 they may not fill in.
+        // group downloads a sawing-shaped file rather than one carrying two
+        // recipe columns they may not fill in.
         [ModuleAccess(ModuleNames.Engineering, ModuleAction.View)]
         public async Task<IActionResult> DownloadTemplate()
         {

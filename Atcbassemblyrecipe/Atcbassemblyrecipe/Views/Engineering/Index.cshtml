@@ -14,7 +14,7 @@
     var canDelete = permission.CanDelete;
 
     // The other one is the Sawing / Wirebond / Marker grants, which decide which
-    // recipe COLUMNS are in Model.Columns at all. That filtering happens in
+    // recipe COLUMN is in Model.Columns at all. That filtering happens in
     // EngineeringColumnGroupProvider and is enforced again in EngineeringService
     // on every write - what is hidden here cannot be posted back either.
     var groupLabel = Model.UserGroups.Count == 0
@@ -47,9 +47,9 @@
         <span class="eyebrow">Operations</span>
         <h1>Engineering</h1>
         <p>
-            Engineering lots and the recipe each process step runs. ENGINEERING carries a recipe column
-            for every step; this page shows the lot's identity plus the columns belonging to your groups -
-            <strong>@groupLabel</strong> - and hides the rest.
+            Engineering lots and their recipes. ENGINEERING carries one recipe per group; this page
+            shows the lot's identity plus the recipe belonging to your group -
+            <strong>@groupLabel</strong> - and hides the other groups'.
         </p>
     </div>
 </div>
@@ -57,7 +57,7 @@
 @if (Model.UserGroups.Count == 0)
 {
     <div class="alert alert-warning">
-        You are not in any of the Sawing, Wirebond or Marker groups, so no recipe columns are shown -
+        You are not in any of the Sawing, Wirebond or Marker groups, so no recipe column is shown -
         only the lot's identity. Ask a Super Admin to grant you the module for your group on the
         Access Management page.
     </div>
@@ -341,7 +341,7 @@
             </div>
             <div class="modal-body">
                 <ol class="template-steps">
-                    <li>Download the template below - it carries your groups' columns, not all 23.</li>
+                    <li>Download the template below - it carries your group's columns only.</li>
                     <li>Key in the values under the same headers - or delete the header row and key in the values only, in the same left-to-right order.</li>
                     <li>In Excel, use Save As and choose CSV (Comma delimited) (*.csv).</li>
                 </ol>
@@ -363,8 +363,8 @@
                     LOTNUMBER is the only required column - it is what AwacsMesService matches an
                     ENG workorder against, so a lot that is already in the table, or twice in the
                     same file, cancels the whole import. Every other cell may be left empty: an
-                    engineering lot only fills in the steps it actually runs. Columns outside your
-                    groups are not in the template and are ignored if a file carries them.
+                    engineering lot only fills in the steps it actually runs. The other groups'
+                    recipe columns are not in the template and are ignored if a file carries them.
                 </div>
             </div>
             <div class="modal-footer">

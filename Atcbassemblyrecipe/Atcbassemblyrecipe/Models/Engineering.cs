@@ -3,13 +3,15 @@ namespace Atcbassemblyrecipe.Models
     // One row of OCAPSYS.ENGINEERING - an engineering lot and the recipe it
     // uses at every process step it runs.
     //
-    // The recipe columns are NOT properties. There are 23 of them, which
-    // group owns which is decided in OCAPSYS.ENGINEERINGCOLUMNGROUP rather
-    // than in code, and moving a column between groups must not need a
-    // recompile - so the values arrive in a dictionary keyed by column name
-    // and the page renders whichever columns the signed-in user's groups
-    // entitle them to. The identity of the row (lot number, package,
-    // product) is reached the same way, through the indexer.
+    // Five columns identify the lot and three hold its recipes, one per
+    // group: RECIPESAWING, RECIPEWIREBOND, RECIPEMARKER.
+    //
+    // None of them are properties. Which group owns which column is decided
+    // in OCAPSYS.ENGINEERINGCOLUMNGROUP rather than in code, and moving a
+    // column between groups must not need a recompile - so the values arrive
+    // in a dictionary keyed by column name and the page renders whichever
+    // columns the signed-in user's groups entitle them to. The identity of
+    // the row is reached the same way, through the indexer.
     //
     // Rows are addressed by Oracle ROWID (handed to the page as TblRowId),
     // the way AWACSLF, AWACSRECIPEBYWSTYPE and TBLWIREBOND already are.
@@ -72,13 +74,17 @@ namespace Atcbassemblyrecipe.Models
         }
     }
 
-    // One row of OCAPSYS.ENGINEERINGCOLUMNGROUP: an ENGINEERING column, the
-    // user group that owns it, and the AWACSWSTYPE.WSTYPE it is the recipe
-    // for on the MES side (null for a column no workstation asks for).
+    // One row of OCAPSYS.ENGINEERINGCOLUMNGROUP: an ENGINEERING column and the
+    // user group that owns it.
+    //
+    // There is no WSTYPE here. ENGINEERING holds one recipe per group, and a
+    // line has several workstation types per group - SAWING and WAOI are both
+    // sawing machines - so the WSTYPE mapping is many-to-one and lives in its
+    // own table, ENGINEERINGWSTYPE, read by AwacsMesService. The web app never
+    // needs it.
     public sealed record EngineeringColumn(
         string Name,
         string GroupName,
-        string? WsType,
         string Label,
         int SortOrder)
     {

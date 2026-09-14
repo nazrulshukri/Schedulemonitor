@@ -2,33 +2,40 @@
 -- OCAPSYS.ENGINEERING - the engineering lot recipe table.
 -- RUN THIS ONCE against the OCAPSYS schema.
 --
--- One row = one engineering lot and every recipe that lot needs, one
--- column per process step. The shape is the SQL Server table
--- awacs.dbo.ENGINEERING, moved into Oracle so the recipe web app and
--- AwacsMesService can read it over the connection they already have
--- instead of each carrying a second driver and a second connection
--- string.
+-- One row = one engineering lot. Five columns identify the lot, and
+-- THREE columns hold its recipes - one per group:
+--
+--     RECIPESAWING     the sawing group's recipe
+--     RECIPEWIREBOND   the wirebond group's recipe
+--     RECIPEMARKER     the marker group's recipe
+--
+-- That is the whole table. The 23-column version this replaced carried
+-- one column per process step (RECIPEFINALTEST, RECIPEWPROBER and the
+-- rest); those are gone. If a query still names one of them it fails
+-- with ORA-00904: invalid identifier - that is this change, not a
+-- broken install. Section 3 below carries the rows over from the old
+-- shape if you already created it.
 --
 -- WHO READS IT:
---   * The Engineering page of the ATCB assembly recipe app (add, edit,
---     delete, export). Which recipe columns a user sees is decided by
---     their TBLACCESS module grants - see engineeringcolumngroup.sql.
+--   * The Engineering page of the ATCB assembly recipe app. A user sees
+--     the five identity columns plus their own group's recipe column;
+--     the other two groups' columns are hidden - see
+--     engineeringcolumngroup.sql.
 --   * AwacsMesService.DBorderUpdate, for a WOID that starts with ENG.
 --     An engineering lot is not in MES, so RMS/MES lookup returns
---     nothing for it; the service reads this table by LOTNUMBER instead
---     and answers with the recipe column that matches the workstation's
---     WSTYPE.
+--     nothing for it; the service reads this table by LOTNUMBER and
+--     answers with the column its workstation's WSTYPE maps to - see
+--     engineeringwstype.sql.
 --
 -- TWO RESERVED-WORD COLUMNS. Both must be written double-quoted and
 -- UPPERCASE - "NO" and "PACKAGE" - everywhere they appear, here and in
--- every query. Unquoted or lowercase raises ORA-00904. AWACSRECIPEBYWSTYPE
--- and TBLWIREBOND already do this for "PACKAGE".
+-- every query. Unquoted or lowercase raises ORA-00904.
 --
 -- THE DROP BELOW IS DESTRUCTIVE. If the table already exists, keep a
 -- copy first:
 --   CREATE TABLE engineering_bak AS SELECT * FROM engineering;
 --
--- Run section 4 as well, or Edit and Delete on the page will fail.
+-- Run section 5 as well, or Edit and Delete on the page will fail.
 -- =====================================================================
 
 
@@ -39,42 +46,21 @@ DROP TABLE OCAPSYS.ENGINEERING CASCADE CONSTRAINTS;
 
 CREATE TABLE OCAPSYS.ENGINEERING
 (
-  TBLROWID          VARCHAR2(50 BYTE),   -- row key: RAWTOHEX(SYS_GUID()), same as AWACSWSTYPE
-  LASTUPDATE        DATE,                -- SYSDATE on every write
-  LASTUPDATEDBY     VARCHAR2(50 BYTE),   -- sAMAccountName, e.g. NX487878
+  TBLROWID        VARCHAR2(50 BYTE),   -- row key: RAWTOHEX(SYS_GUID()), same as AWACSWSTYPE
+  LASTUPDATE      DATE,                -- SYSDATE on every write
+  LASTUPDATEDBY   VARCHAR2(50 BYTE),   -- sAMAccountName, e.g. NX487878
 
-  "NO"              NUMBER,              -- the engineering request number
-  REQUESTOR         VARCHAR2(64 BYTE),   -- who asked for the lot
-  LOTNUMBER         VARCHAR2(64 BYTE),   -- ENG... - matched against the MES WOID
-  "PACKAGE"         VARCHAR2(64 BYTE),
-  PRODUCT           VARCHAR2(64 BYTE),
+  "NO"            NUMBER,              -- the engineering request number
+  REQUESTOR       VARCHAR2(64 BYTE),   -- who asked for the lot
+  LOTNUMBER       VARCHAR2(64 BYTE),   -- ENG... - matched against the MES WOID
+  "PACKAGE"       VARCHAR2(64 BYTE),
+  PRODUCT         VARCHAR2(64 BYTE),
 
-  -- One column per process step. All optional: an engineering lot only
-  -- fills in the steps it actually runs, which is why the grid is mostly
-  -- empty cells.
-  RECIPES1          VARCHAR2(120 BYTE),
-  RECIPES2          VARCHAR2(120 BYTE),
-  RECIPEAX          VARCHAR2(120 BYTE),
-  RECIPEDA          VARCHAR2(120 BYTE),
-  RECIPECA          VARCHAR2(120 BYTE),
-  RECIPEAOI         VARCHAR2(120 BYTE),
-  RECIPEMOLD        VARCHAR2(120 BYTE),
-  RECIPERM          VARCHAR2(120 BYTE),
-  RECIPETF          VARCHAR2(120 BYTE),
-  RECIPEMD          VARCHAR2(120 BYTE),
-  RECIPEWPROBER     VARCHAR2(120 BYTE),
-  RECIPEFINALTEST   VARCHAR2(120 BYTE),
-  RECIPEWAFERTEST   VARCHAR2(120 BYTE),
-  RECIPEMCDWB       VARCHAR2(120 BYTE),
-  RECIPEWAOI        VARCHAR2(120 BYTE),
-  RECIPE2DMARKER    VARCHAR2(120 BYTE),
-  RECIPEL200        VARCHAR2(120 BYTE),
-  RECIPEMOULD       VARCHAR2(120 BYTE),
-  RECIPESTRIPTEST   VARCHAR2(120 BYTE),
-  RECIPEBACKGRIND   VARCHAR2(120 BYTE),
-  RECIPEWLTR        VARCHAR2(120 BYTE),
-  RECIPEPHICOM      VARCHAR2(120 BYTE),
-  ADAT              VARCHAR2(120 BYTE)
+  -- One recipe per group. All three optional: a lot only fills in the
+  -- steps it actually runs.
+  RECIPESAWING    VARCHAR2(120 BYTE),
+  RECIPEWIREBOND  VARCHAR2(120 BYTE),
+  RECIPEMARKER    VARCHAR2(120 BYTE)
 );
 
 -- No TABLESPACE clause on purpose: naming one that does not exist fails
@@ -98,17 +84,32 @@ CREATE INDEX ix_engineering_lotnumber ON OCAPSYS.ENGINEERING (LOTNUMBER);
 
 
 -- ---------------------------------------------------------------------
--- 3. Optional: carry the existing SQL Server rows over
+-- 3. Carrying old rows over
 --
--- If awacs.dbo.ENGINEERING already holds the live data, export it to CSV
--- (SSMS: right-click the database > Tasks > Export Data) and upload it
--- on the Engineering page with Import CSV. The page reads the same
--- column names as the headers, so an export of the SELECT you already
--- run loads without editing:
+-- (a) FROM THE 23-COLUMN VERSION, if you already created it. Back it up
+--     first (the DROP above has already removed it otherwise):
 --
---   SELECT [NO],[Requestor],[LOTNUMBER],[PACKAGE],[PRODUCT],[RECIPES1],
---          ... ,[ADAT]
---   FROM   [awacs].[dbo].[ENGINEERING]
+--     CREATE TABLE engineering_bak AS SELECT * FROM engineering;   -- BEFORE running this script
+--
+--     then, after the CREATE TABLE above:
+--
+--     INSERT INTO OCAPSYS.ENGINEERING
+--         (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "NO", REQUESTOR, LOTNUMBER,
+--          "PACKAGE", PRODUCT, RECIPESAWING, RECIPEWIREBOND, RECIPEMARKER)
+--     SELECT TBLROWID, LASTUPDATE, LASTUPDATEDBY, "NO", REQUESTOR, LOTNUMBER,
+--            "PACKAGE", PRODUCT,
+--            COALESCE(RECIPES1, RECIPES2),        -- sawing
+--            COALESCE(RECIPEDA, RECIPECA),        -- wirebond: die attach, else clip attach
+--            COALESCE(RECIPEMD, RECIPE2DMARKER)   -- marker
+--     FROM   engineering_bak;
+--     COMMIT;
+--
+-- (b) FROM SQL SERVER awacs.dbo.ENGINEERING. Export the five identity
+--     columns plus whichever three recipe columns your groups actually
+--     use to CSV (SSMS: right-click the database > Tasks > Export Data),
+--     rename the three headers to RECIPESAWING / RECIPEWIREBOND /
+--     RECIPEMARKER, and upload it on the Engineering page with
+--     Import CSV.
 -- ---------------------------------------------------------------------
 
 
@@ -149,7 +150,7 @@ ALTER TABLE OCAPSYS.TBLRECIPETRASH ADD CONSTRAINT ck_tblrecipetrash_table
 
 
 -- ---------------------------------------------------------------------
--- 6. Quick check that it all worked
+-- 6. Quick check that it all worked. Eleven columns, no more.
 -- ---------------------------------------------------------------------
 SELECT column_name, data_type, data_length
 FROM   all_tab_columns

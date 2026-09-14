@@ -580,7 +580,7 @@ namespace EWFM.AwacsMes
 
             if (string.IsNullOrEmpty(column))
             {
-                return string.Format("WSTYPE:{0} (WSID:{1}) has no ENGINEERING column mapped in ENGINEERINGCOLUMNGROUP.", wstype, wsid);
+                return string.Format("WSTYPE:{0} (WSID:{1}) has no ENGINEERING column mapped in ENGINEERINGWSTYPE.", wstype, wsid);
             }
 
             EngineeringLot lot = getEngineeringLot(woid, column);
@@ -3364,11 +3364,11 @@ and so.containername = :pSOid
          /// Answers a DBorderUpdate for an engineering lot out of the OCAP
          /// ENGINEERING table.
          ///
-         /// ENGINEERING holds one row per engineering lot and one column per
-         /// process step - RECIPES1 for sawing, RECIPEDA for diebond, RECIPEMD for
-         /// marking and so on. Which column belongs to which step is not hard
-         /// coded here: ENGINEERINGCOLUMNGROUP maps a WSTYPE to its column, so a
-         /// new step is a row in that table rather than a change to this service.
+         /// ENGINEERING holds one row per engineering lot and one recipe per
+         /// group - RECIPESAWING, RECIPEWIREBOND, RECIPEMARKER. Which column a
+         /// machine reads is not hard coded here: ENGINEERINGWSTYPE maps a WSTYPE
+         /// to its column, so a new machine type is a row in that table rather
+         /// than a change to this service.
          /// </summary>
          private static void dbOrderUpdateByEngineering(TraceLog tracelog, DBorderUpdate dbOrderUpdate, string woid, string wsid, string wstype)
          {
@@ -3385,7 +3385,7 @@ and so.containername = :pSOid
              if (string.IsNullOrEmpty(column))
              {
                  dbOrderUpdate.Workorder.Attributes.Add(new Attribute("RESULT",
-                     string.Format("WSTYPE:{0} has no ENGINEERING recipe column. Map it in ENGINEERINGCOLUMNGROUP.", wstype)));
+                     string.Format("WSTYPE:{0} has no ENGINEERING recipe column. Map it in ENGINEERINGWSTYPE.", wstype)));
                  return;
              }
 
@@ -3426,7 +3426,13 @@ and so.containername = :pSOid
 
          /// <summary>
          /// The ENGINEERING column holding the recipe for a workstation type, from
-         /// ENGINEERINGCOLUMNGROUP. Empty when that WSTYPE is not mapped.
+         /// ENGINEERINGWSTYPE. Empty when that WSTYPE is not mapped.
+         ///
+         /// ENGINEERING carries one recipe per group - RECIPESAWING,
+         /// RECIPEWIREBOND, RECIPEMARKER - and a line has several workstation
+         /// types per group, so this is a many-to-one lookup: SAWING and WAOI
+         /// both answer RECIPESAWING. Adding a machine type is a row in that
+         /// table, not a change here.
          /// </summary>
          private static string getEngineeringRecipeColumn(string wstype)
          {
@@ -3443,7 +3449,7 @@ and so.containername = :pSOid
                  using (OracleCommand cmd = ocapDbConn.CreateCommand())
                  {
                      cmd.BindByName = true;
-                     cmd.CommandText = "SELECT column_name FROM engineeringcolumngroup WHERE UPPER(wstype) = UPPER(:wstype)";
+                     cmd.CommandText = "SELECT column_name FROM engineeringwstype WHERE UPPER(wstype) = UPPER(:wstype)";
                      cmd.Parameters.Add(new OracleParameter("wstype", wstype.Trim()));
 
                      using (OracleDataReader reader = cmd.ExecuteReader())
@@ -3466,7 +3472,7 @@ and so.containername = :pSOid
                  using (TraceLog traceLog = TraceLog.Create("AwacsMesService.getEngineeringRecipeColumn"))
                  {
                      traceLog.LogException(new InvalidOperationException(
-                         string.Format("ENGINEERINGCOLUMNGROUP maps WSTYPE {0} to '{1}', which is not a valid column name.", wstype, column)));
+                         string.Format("ENGINEERINGWSTYPE maps WSTYPE {0} to '{1}', which is not a valid column name.", wstype, column)));
                  }
 
                  return "";
