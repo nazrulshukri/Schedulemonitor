@@ -22,7 +22,7 @@ namespace Atcbassemblyrecipe.Controllers
     //     [ModuleAccess] gate every other page uses.
     //   * The Sawing / Wirebond / Marker module grants decide WHICH RECIPE
     //     COLUMN the user sees inside it. ENGINEERING carries one recipe per
-    //     group, so a user granted Sawing gets RECIPESAWING and neither sees
+    //     group, so a user granted Sawing gets SAWING and neither sees
     //     nor can write the other two groups' columns.
     //
     // The second one is enforced in EngineeringService, not here and not in the
@@ -360,7 +360,7 @@ namespace Atcbassemblyrecipe.Controllers
                 {
                     return $"{oracle.Message.Trim()} - that column is not on the ENGINEERING table. "
                          + "The table and ENGINEERINGCOLUMNGROUP disagree: ENGINEERING should carry \"NO\", REQUESTOR, "
-                         + "LOTNUMBER, \"PACKAGE\", PRODUCT, RECIPESAWING, RECIPEWIREBOND and RECIPEMARKER. "
+                         + "LOTNUMBER, \"PACKAGE\", PRODUCT, SAWING, WIREBOND and MARKER. "
                          + "Run Database/engineering-check.sql to see what it actually has, then Database/engineering.sql to rebuild it.";
                 }
 

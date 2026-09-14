@@ -6,14 +6,14 @@
 -- Eight rows, because ENGINEERING has eight data columns:
 --
 --   SHARED    "NO"  REQUESTOR  LOTNUMBER  "PACKAGE"  PRODUCT
---   SAWING    RECIPESAWING
---   WIREBOND  RECIPEWIREBOND
---   MARKER    RECIPEMARKER
+--   SAWING    SAWING
+--   WIREBOND  WIREBOND
+--   MARKER    MARKER
 --
 -- The Engineering page shows a user the SHARED columns plus the recipe
 -- column of each group they belong to, and hides the others. A user's
 -- group is the Sawing / Wirebond / Marker module grant they already hold
--- in TBLACCESS - granting somebody Sawing is what puts RECIPESAWING on
+-- in TBLACCESS - granting somebody Sawing is what puts SAWING on
 -- their page. Two grants means two recipe columns. A Super Admin sees
 -- all three.
 --
@@ -26,7 +26,7 @@
 --
 --   UPDATE OCAPSYS.ENGINEERINGCOLUMNGROUP
 --      SET group_name = 'MARKER'
---    WHERE column_name = 'RECIPEWIREBOND';
+--    WHERE column_name = 'WIREBOND';
 --   COMMIT;
 --
 -- The WSTYPE side of the old version of this table has moved out to
@@ -60,9 +60,9 @@ INSERT INTO OCAPSYS.ENGINEERINGCOLUMNGROUP (column_name, group_name, display_lab
 INSERT INTO OCAPSYS.ENGINEERINGCOLUMNGROUP (column_name, group_name, display_label, sort_order) VALUES ('PRODUCT',   'SHARED', 'Product',    50);
 
 -- One recipe per group.
-INSERT INTO OCAPSYS.ENGINEERINGCOLUMNGROUP (column_name, group_name, display_label, sort_order) VALUES ('RECIPESAWING',   'SAWING',   'Sawing Recipe',   10);
-INSERT INTO OCAPSYS.ENGINEERINGCOLUMNGROUP (column_name, group_name, display_label, sort_order) VALUES ('RECIPEWIREBOND', 'WIREBOND', 'Wirebond Recipe', 10);
-INSERT INTO OCAPSYS.ENGINEERINGCOLUMNGROUP (column_name, group_name, display_label, sort_order) VALUES ('RECIPEMARKER',   'MARKER',   'Marker Recipe',   10);
+INSERT INTO OCAPSYS.ENGINEERINGCOLUMNGROUP (column_name, group_name, display_label, sort_order) VALUES ('SAWING',   'SAWING',   'Sawing Recipe',   10);
+INSERT INTO OCAPSYS.ENGINEERINGCOLUMNGROUP (column_name, group_name, display_label, sort_order) VALUES ('WIREBOND', 'WIREBOND', 'Wirebond Recipe', 10);
+INSERT INTO OCAPSYS.ENGINEERINGCOLUMNGROUP (column_name, group_name, display_label, sort_order) VALUES ('MARKER',   'MARKER',   'Marker Recipe',   10);
 
 COMMIT;
 

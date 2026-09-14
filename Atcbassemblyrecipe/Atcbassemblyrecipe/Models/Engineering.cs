@@ -4,7 +4,7 @@ namespace Atcbassemblyrecipe.Models
     // uses at every process step it runs.
     //
     // Five columns identify the lot and three hold its recipes, one per
-    // group: RECIPESAWING, RECIPEWIREBOND, RECIPEMARKER.
+    // group: SAWING, WIREBOND, MARKER.
     //
     // None of them are properties. Which group owns which column is decided
     // in OCAPSYS.ENGINEERINGCOLUMNGROUP rather than in code, and moving a

@@ -12,7 +12,7 @@
 --
 --   TBLROWID  LASTUPDATE  LASTUPDATEDBY          bookkeeping
 --   "NO"  REQUESTOR  LOTNUMBER  "PACKAGE"  PRODUCT    identity
---   RECIPESAWING  RECIPEWIREBOND  RECIPEMARKER        recipes
+--   SAWING  WIREBOND  MARKER        recipes
 --
 -- If query 2 shows RECIPES1, RECIPEDA, RECIPEFINALTEST or any other
 -- per-step column, the table is still the OLD 23-column shape. Back it
@@ -91,7 +91,7 @@ ORDER  BY 1;
 -- 5. Table columns nobody has grouped.
 --
 -- These exist but are invisible on the page - harmless, but if
--- RECIPESAWING turns up here it means engineeringcolumngroup.sql has not
+-- SAWING turns up here it means engineeringcolumngroup.sql has not
 -- been run.
 -- ---------------------------------------------------------------------
 SELECT c.column_name AS present_but_ungrouped

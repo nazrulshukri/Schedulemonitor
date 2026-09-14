@@ -9,7 +9,7 @@ namespace Atcbassemblyrecipe.ViewModels
     // The cells arrive as a dictionary rather than as properties because the
     // column list is configuration, not code - see
     // OCAPSYS.ENGINEERINGCOLUMNGROUP. The form posts them as
-    // Values[LOTNUMBER], Values[RECIPESAWING] and so on, which is what the default
+    // Values[LOTNUMBER], Values[SAWING] and so on, which is what the default
     // model binder reads a Dictionary<string, string> from.
     //
     // What is NOT here is a whitelist of which keys are allowed. That check

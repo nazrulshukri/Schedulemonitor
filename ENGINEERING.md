@@ -25,7 +25,7 @@ Database/engineering-check.sql       -- diagnostic, read only: run it on any ORA
 | | |
 |---|---|
 | identity | `"NO"` `REQUESTOR` `LOTNUMBER` `"PACKAGE"` `PRODUCT` |
-| recipes | `RECIPESAWING` `RECIPEWIREBOND` `RECIPEMARKER` |
+| recipes | `SAWING` `WIREBOND` `MARKER` |
 
 plus `TBLROWID` / `LASTUPDATE` / `LASTUPDATEDBY`.
 
@@ -86,9 +86,9 @@ So a group profile is four grants, and the sidebar follows:
 
 | The user holds | Their sidebar reads | On the Engineering page they see |
 |---|---|---|
-| AWACSWSTYPE, **Sawing**, Engineering, AWACSLF | AWACSWSTYPE · Sawing · Engineering · AWACSLF | identity + `RECIPESAWING` |
-| AWACSWSTYPE, **Wirebond**, Engineering, AWACSLF | AWACSWSTYPE · Wirebond · Engineering · AWACSLF | identity + `RECIPEWIREBOND` |
-| AWACSWSTYPE, **Marker**, Engineering, AWACSLF | AWACSWSTYPE · Marker · Engineering · AWACSLF | identity + `RECIPEMARKER` |
+| AWACSWSTYPE, **Sawing**, Engineering, AWACSLF | AWACSWSTYPE · Sawing · Engineering · AWACSLF | identity + `SAWING` |
+| AWACSWSTYPE, **Wirebond**, Engineering, AWACSLF | AWACSWSTYPE · Wirebond · Engineering · AWACSLF | identity + `WIREBOND` |
+| AWACSWSTYPE, **Marker**, Engineering, AWACSLF | AWACSWSTYPE · Marker · Engineering · AWACSLF | identity + `MARKER` |
 
 A sawing user has no Wirebond or Marker link at all, and no wirebond or marker recipe
 column. Two group grants means both pages and both columns. A **Super Admin** sees
@@ -105,7 +105,7 @@ a line of code. Moving one is an `UPDATE`, visible within the cache window
 (`AppSettings:CacheSeconds`, default 60 seconds) with no redeploy:
 
 ```sql
-UPDATE OCAPSYS.ENGINEERINGCOLUMNGROUP SET group_name = 'MARKER' WHERE column_name = 'RECIPEWIREBOND';
+UPDATE OCAPSYS.ENGINEERINGCOLUMNGROUP SET group_name = 'MARKER' WHERE column_name = 'WIREBOND';
 COMMIT;
 ```
 
@@ -143,9 +143,9 @@ What it does:
 1. `getWSType(WsId)` — the workstation's type, from `AWACSWSTYPE`, exactly as before.
 2. `getEngineeringRecipeColumn(wstype)` — the `ENGINEERING` column that machine reads,
    from `ENGINEERINGWSTYPE`. Many workstation types share one column: `SAWING` and
-   `WAOI` both answer `RECIPESAWING`; `DIEBOND`, `ASMWB`, `ASMWBM`, `ASMWBD` and `ADAT`
-   answer `RECIPEWIREBOND`; `MARKER`, `2DMARKER`, `MOULD`, `TRIMFORM` and `PLATING`
-   answer `RECIPEMARKER`. A new machine type is a row in that table, not a code change.
+   `WAOI` both answer `SAWING`; `DIEBOND`, `ASMWB`, `ASMWBM`, `ASMWBD` and `ADAT`
+   answer `WIREBOND`; `MARKER`, `2DMARKER`, `MOULD`, `TRIMFORM` and `PLATING`
+   answer `MARKER`. A new machine type is a row in that table, not a code change.
 3. `getEngineeringLot(woid, column)` — the row by `LOTNUMBER`, carrying that one cell.
 4. Sets `RECIPE`, and `PACKAGE` / `PRODUCT` / `DEVICE` when the row carries them.
 

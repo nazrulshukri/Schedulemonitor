@@ -45,7 +45,7 @@
 -- A SAWING user.
 -- Sees: AWACSWSTYPE, Sawing, Engineering, AWACSLF.
 -- On the Engineering page: No, Requestor, Lot Number, Package, Product
---                          and RECIPESAWING. The wirebond and marker
+--                          and SAWING. The wirebond and marker
 --                          recipe columns are not rendered, not
 --                          searched, and cannot be written.
 -- ---------------------------------------------------------------------

@@ -1,13 +1,29 @@
 -- =====================================================================
 -- OCAPSYS.ENGINEERING - the engineering lot recipe table.
--- RUN THIS ONCE against the OCAPSYS schema.
+--
+-- >>> DO NOT RUN THIS IF THE TABLE ALREADY EXISTS AND LOOKS RIGHT. <<<
+-- Section 1 DROPs it. Check first - this should list eleven columns:
+--
+--   SELECT column_name FROM all_tab_columns
+--   WHERE  table_name = 'ENGINEERING' ORDER BY column_id;
+--
+--   TBLROWID  LASTUPDATE  LASTUPDATEDBY
+--   NO  REQUESTOR  LOTNUMBER  PACKAGE  PRODUCT
+--   SAWING  WIREBOND  MARKER
+--
+-- If that is what you see, this script has nothing to do: skip straight
+-- to engineeringcolumngroup.sql and engineeringwstype.sql, which is
+-- where the page gets its column list from.
+--
+-- RUN THIS ONCE against the OCAPSYS schema, for a table that does not
+-- exist yet.
 --
 -- One row = one engineering lot. Five columns identify the lot, and
 -- THREE columns hold its recipes - one per group:
 --
---     RECIPESAWING     the sawing group's recipe
---     RECIPEWIREBOND   the wirebond group's recipe
---     RECIPEMARKER     the marker group's recipe
+--     SAWING     the sawing group's recipe
+--     WIREBOND   the wirebond group's recipe
+--     MARKER     the marker group's recipe
 --
 -- That is the whole table. The 23-column version this replaced carried
 -- one column per process step (RECIPEFINALTEST, RECIPEWPROBER and the
@@ -58,9 +74,9 @@ CREATE TABLE OCAPSYS.ENGINEERING
 
   -- One recipe per group. All three optional: a lot only fills in the
   -- steps it actually runs.
-  RECIPESAWING    VARCHAR2(120 BYTE),
-  RECIPEWIREBOND  VARCHAR2(120 BYTE),
-  RECIPEMARKER    VARCHAR2(120 BYTE)
+  SAWING    VARCHAR2(120 BYTE),
+  WIREBOND  VARCHAR2(120 BYTE),
+  MARKER    VARCHAR2(120 BYTE)
 );
 
 -- No TABLESPACE clause on purpose: naming one that does not exist fails
@@ -95,7 +111,7 @@ CREATE INDEX ix_engineering_lotnumber ON OCAPSYS.ENGINEERING (LOTNUMBER);
 --
 --     INSERT INTO OCAPSYS.ENGINEERING
 --         (TBLROWID, LASTUPDATE, LASTUPDATEDBY, "NO", REQUESTOR, LOTNUMBER,
---          "PACKAGE", PRODUCT, RECIPESAWING, RECIPEWIREBOND, RECIPEMARKER)
+--          "PACKAGE", PRODUCT, SAWING, WIREBOND, MARKER)
 --     SELECT TBLROWID, LASTUPDATE, LASTUPDATEDBY, "NO", REQUESTOR, LOTNUMBER,
 --            "PACKAGE", PRODUCT,
 --            COALESCE(RECIPES1, RECIPES2),        -- sawing
@@ -107,8 +123,8 @@ CREATE INDEX ix_engineering_lotnumber ON OCAPSYS.ENGINEERING (LOTNUMBER);
 -- (b) FROM SQL SERVER awacs.dbo.ENGINEERING. Export the five identity
 --     columns plus whichever three recipe columns your groups actually
 --     use to CSV (SSMS: right-click the database > Tasks > Export Data),
---     rename the three headers to RECIPESAWING / RECIPEWIREBOND /
---     RECIPEMARKER, and upload it on the Engineering page with
+--     rename the three headers to SAWING / WIREBOND /
+--     MARKER, and upload it on the Engineering page with
 --     Import CSV.
 -- ---------------------------------------------------------------------
 

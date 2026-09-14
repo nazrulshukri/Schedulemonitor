@@ -32,7 +32,7 @@ namespace Atcbassemblyrecipe.Services
     // which user group - and answers what the current user may see.
     //
     // Why a table and not a C# array: which team owns which recipe column is a
-    // production decision, not a code one. Moving RECIPEWIREBOND to the marker
+    // production decision, not a code one. Moving WIREBOND to the marker
     // group, or adding a fourth column for a fourth group, is an UPDATE and a
     // cache expiry rather than a redeploy.
     //
@@ -314,9 +314,9 @@ namespace Atcbassemblyrecipe.Services
                 new("PACKAGE", EngineeringGroups.Shared, "Package", 40),
                 new("PRODUCT", EngineeringGroups.Shared, "Product", 50),
 
-                new("RECIPESAWING", EngineeringGroups.Sawing, "Sawing Recipe", 10),
-                new("RECIPEWIREBOND", EngineeringGroups.Wirebond, "Wirebond Recipe", 10),
-                new("RECIPEMARKER", EngineeringGroups.Marker, "Marker Recipe", 10)
+                new("SAWING", EngineeringGroups.Sawing, "Sawing Recipe", 10),
+                new("WIREBOND", EngineeringGroups.Wirebond, "Wirebond Recipe", 10),
+                new("MARKER", EngineeringGroups.Marker, "Marker Recipe", 10)
             ];
         }
 
