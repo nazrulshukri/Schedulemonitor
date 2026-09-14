@@ -91,6 +91,14 @@ namespace Atcbassemblyrecipe.Controllers
                 var profile = await _accessRepository.GetProfileAsync(model.UserId);
                 var userName = string.IsNullOrWhiteSpace(profile?.UserName) ? model.UserId : profile.UserName;
 
+                // A group grant carries its working set with it: ticking Sawing,
+                // Wirebond or Marker also hands over AWACSWSTYPE, Engineering,
+                // AWACSLF and Trash. Applied here rather than only in the browser,
+                // so the rule holds for a posted form as well as a clicked one.
+                // It raises rows and never lowers them, so every box the Super
+                // Admin ticked above survives.
+                AccessBundles.Apply(model.TableAccess);
+
                 var modules = model.TableAccess
                     .Select(module => new ModuleAccessGrant(module.Module, module.CanView, module.CanAdd, module.CanUpdate, module.CanDelete))
                     .ToList();
@@ -139,6 +147,10 @@ namespace Atcbassemblyrecipe.Controllers
                 // second Save Validation pass.
                 if (result.Success && model.TableAccess.Count > 0)
                 {
+                    // Same rule as Save: a new user ticked into a group is created
+                    // with that group's whole working set, not just its own page.
+                    AccessBundles.Apply(model.TableAccess);
+
                     var modules = model.TableAccess
                         .Select(module => new ModuleAccessGrant(module.Module, module.CanView, module.CanAdd, module.CanUpdate, module.CanDelete))
                         .ToList();

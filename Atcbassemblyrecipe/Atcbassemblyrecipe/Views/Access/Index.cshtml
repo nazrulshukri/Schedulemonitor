@@ -141,10 +141,14 @@
                             <tbody>
                                 @for (var i = 0; i < Model.NewUserAccess.Count; i++)
                                 {
-                                    <tr>
+                                    <tr data-module="@Model.NewUserAccess[i].Module" data-group-row="@AccessBundles.IsGroupModule(Model.NewUserAccess[i].Module).ToString().ToLowerInvariant()">
                                         <td>
                                             <input type="hidden" name="TableAccess[@i].Module" value="@Model.NewUserAccess[i].Module" />
                                             <strong>@Model.NewUserAccess[i].Module</strong>
+                                            @if (AccessBundles.IsGroupModule(Model.NewUserAccess[i].Module))
+                                            {
+                                                <span class="group-pill" title="Ticking this row also grants AWACSWSTYPE, Engineering, AWACSLF and Trash">group</span>
+                                            }
                                         </td>
                                         <td>@Model.NewUserAccess[i].Description</td>
                                         <td>
@@ -314,10 +318,16 @@
                         {
                             for (var i = 0; i < Model.TableAccess.Count; i++)
                             {
-                                <tr>
+                                var moduleName = Model.TableAccess[i].Module;
+                                var isGroupRow = AccessBundles.IsGroupModule(moduleName);
+                                <tr data-module="@moduleName" data-group-row="@isGroupRow.ToString().ToLowerInvariant()">
                                     <td>
                                         <input type="hidden" asp-for="TableAccess[i].Module" />
-                                        <strong>@Model.TableAccess[i].Module</strong>
+                                        <strong>@moduleName</strong>
+                                        @if (isGroupRow)
+                                        {
+                                            <span class="group-pill" title="Ticking this row also grants AWACSWSTYPE, Engineering, AWACSLF and Trash">group</span>
+                                        }
                                     </td>
                                     <td>@Model.TableAccess[i].Description</td>
                                     @* Row toggle only - not posted back. It ticks the four real
@@ -336,6 +346,13 @@
                     </tbody>
                 </table>
             </div>
+
+            @* The rule is written out rather than left to be discovered: a Super
+               Admin who ticks Sawing and sees four other rows tick themselves
+               should be able to read why on the same screen. *@
+            <p class="bundle-note">
+                <strong>Group rows carry their working set.</strong> @AccessBundles.Describe()
+            </p>
         </section>
         </form>
     </div>
@@ -416,6 +433,36 @@
     </div>
 }
 
+<style>
+    /* Marks the three rows that hand over a working set rather than just a page. */
+    .group-pill {
+        display: inline-block;
+        margin-left: 0.4rem;
+        padding: 0.05rem 0.4rem;
+        border-radius: 999px;
+        border: 1px solid rgba(128, 128, 128, 0.45);
+        font-size: 0.62rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0.8;
+        vertical-align: middle;
+    }
+
+    /* A row the group grant just filled in, so the Super Admin can see which
+       ticks were theirs and which came with the group. */
+    .permission-table tbody tr.bundle-applied > td:first-child {
+        box-shadow: inset 3px 0 0 rgba(255, 176, 0, 0.85);
+    }
+
+    .bundle-note {
+        margin: 0.75rem 0 0;
+        font-size: 0.82rem;
+        opacity: 0.85;
+        line-height: 1.5;
+    }
+</style>
+
 @section Scripts {
     <script>
         (() => {
@@ -467,6 +514,83 @@
                     row.all.indeterminate = false;
                 });
                 row.perms.forEach((perm) => perm.addEventListener('change', () => syncRow(row)));
+            });
+
+            // Group rows carry their working set.
+            //
+            // Ticking Sawing, Wirebond or Marker also grants AWACSWSTYPE,
+            // Engineering, AWACSLF and Trash, so a user who is put in a group
+            // gets a sidebar they can actually work from. AccessController
+            // applies the same rule on save - this is only so the Super Admin
+            // SEES it happen instead of finding out afterwards.
+            //
+            // Raise only, exactly like the server side: a box already ticked is
+            // never cleared, so extra permissions survive, and clearing a group
+            // row leaves the companions alone rather than quietly stripping a
+            // user who is also in a second group.
+            const PERM_INDEX = { view: 0, add: 1, update: 2, delete: 3 };
+
+            // Which companions a group hands over, and at what level. "mirror"
+            // means "copy whatever the group row has" - the Engineering page is
+            // as writable as the group's own page, no more.
+            const GROUP_BUNDLE = [
+                { module: 'AWACSWSTYPE', view: true },
+                { module: 'Engineering', view: true, add: 'mirror', update: 'mirror' },
+                { module: 'AWACSLF', view: true },
+                { module: 'Recycle Bin', view: true, update: true }
+            ];
+
+            const rowFor = (table, moduleName) => table.querySelector(
+                `tbody tr[data-module="${window.CSS && CSS.escape ? CSS.escape(moduleName) : moduleName}"]`);
+
+            const applyBundle = (table, groupRow) => {
+                const groupPerms = Array.from(groupRow.querySelectorAll('[data-row-perm]'));
+                if (groupPerms.length < 4 || !groupPerms[PERM_INDEX.view].checked) {
+                    return;
+                }
+
+                GROUP_BUNDLE.forEach((bundled) => {
+                    const target = rowFor(table, bundled.module);
+                    if (!target) {
+                        return;
+                    }
+
+                    const perms = Array.from(target.querySelectorAll('[data-row-perm]'));
+                    if (perms.length < 4) {
+                        return;
+                    }
+
+                    Object.keys(PERM_INDEX).forEach((key) => {
+                        const wanted = bundled[key];
+                        if (!wanted) {
+                            return;
+                        }
+
+                        const give = wanted === 'mirror'
+                            ? groupPerms[PERM_INDEX[key]].checked
+                            : true;
+
+                        if (give) {
+                            perms[PERM_INDEX[key]].checked = true;
+                        }
+                    });
+
+                    target.classList.add('bundle-applied');
+                    perms.forEach((perm) => perm.dispatchEvent(new Event('change', { bubbles: false })));
+                    const all = target.querySelector('[data-row-all]');
+                    if (all) {
+                        const ticked = perms.filter((perm) => perm.checked).length;
+                        all.checked = ticked === perms.length;
+                        all.indeterminate = ticked > 0 && ticked < perms.length;
+                    }
+                });
+            };
+
+            document.querySelectorAll('.permission-table').forEach((table) => {
+                table.querySelectorAll('tbody tr[data-group-row="true"]').forEach((groupRow) => {
+                    groupRow.querySelectorAll('[data-row-perm], [data-row-all]').forEach((box) =>
+                        box.addEventListener('change', () => applyBundle(table, groupRow)));
+                });
             });
 
             const newUserCheckboxes = () =>

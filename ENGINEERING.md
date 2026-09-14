@@ -73,6 +73,15 @@ A user's group is the `Sawing`, `Wirebond` or `Marker` module grant already in
 it puts that group's recipe column on the Engineering page. There is nothing else to
 keep in step.
 
+**One tick does it.** In Access Management the three group rows are marked
+`group`: ticking Sawing, Wirebond or Marker also grants AWACSWSTYPE (view),
+Engineering (matching the group's own add/update), AWACSLF (view) and Trash
+(view + restore). The rule runs in the browser so the Super Admin watches it
+happen, and again in `AccessController` on save so it holds for a posted form
+too. It only ever **raises** — anything extra ticked on a companion row survives,
+and a user in two groups keeps the higher of the two. Trash **Delete** (purge for
+good) is deliberately not in the bundle; that stays a separate tick.
+
 So a group profile is four grants, and the sidebar follows:
 
 | The user holds | Their sidebar reads | On the Engineering page they see |

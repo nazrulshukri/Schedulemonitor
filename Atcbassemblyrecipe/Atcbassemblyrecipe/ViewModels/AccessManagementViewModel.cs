@@ -45,7 +45,10 @@ namespace Atcbassemblyrecipe.ViewModels
         public string? AvatarUrl { get; set; }
     }
 
-    public class TableAccessViewModel
+    // Implements IModulePermissionSet so AccessBundles.Apply can raise the
+    // companion rows of a group grant in place, on the very list the controller
+    // is about to save.
+    public class TableAccessViewModel : IModulePermissionSet
     {
         public string Module { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
