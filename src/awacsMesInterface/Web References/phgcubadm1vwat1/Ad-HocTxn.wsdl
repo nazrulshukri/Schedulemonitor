@@ -1,0 +1,1802 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wsdl:definitions xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:tm="http://microsoft.com/wsdl/mime/textMatching/" xmlns:mime="http://schemas.xmlsoap.org/wsdl/mime/" xmlns:tns="http://tempuri.org/" xmlns:http="http://schemas.xmlsoap.org/wsdl/http/" xmlns:s="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://schemas.xmlsoap.org/wsdl/soap12/" targetNamespace="http://tempuri.org/" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">
+  <wsdl:types>
+    <s:schema elementFormDefault="qualified" targetNamespace="http://tempuri.org/">
+      <s:element name="GetVersion">
+        <s:complexType />
+      </s:element>
+      <s:element name="GetVersionResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="GetVersionResult">
+              <s:complexType mixed="true">
+                <s:sequence>
+                  <s:any />
+                </s:sequence>
+              </s:complexType>
+            </s:element>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotHold">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="container" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="holdLocation" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="holdReason" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="comment" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="employee" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotHoldResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="LotHoldResult">
+              <s:complexType mixed="true">
+                <s:sequence>
+                  <s:any />
+                </s:sequence>
+              </s:complexType>
+            </s:element>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotRelease">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="container" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="ReleaseAllHoldLocations" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="ReleaseHoldLocationsOnly" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="ReleaseReason" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="holdcode" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="ApplyToChildLots" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="comment" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotReleaseResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="LotReleaseResult">
+              <s:complexType mixed="true">
+                <s:sequence>
+                  <s:any />
+                </s:sequence>
+              </s:complexType>
+            </s:element>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="ModifyLotHoldcode">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="lot" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="old_holdcode" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="new_holdcode" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="holdlocation" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="comment" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="employee" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="ModifyLotHoldcodeResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="ModifyLotHoldcodeResult">
+              <s:complexType mixed="true">
+                <s:sequence>
+                  <s:any />
+                </s:sequence>
+              </s:complexType>
+            </s:element>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotFutureHoldSetup">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="container" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="spec" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="specRev" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="holdLocation" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="holdReason" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="expectedHoldDays" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="comment" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotFutureHoldSetupResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="LotFutureHoldSetupResult">
+              <s:complexType mixed="true">
+                <s:sequence>
+                  <s:any />
+                </s:sequence>
+              </s:complexType>
+            </s:element>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="ModifyLotAttribute">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="lot" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="name" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="value" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="ModifyLotAttributeResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="ModifyLotAttributeResult">
+              <s:complexType mixed="true">
+                <s:sequence>
+                  <s:any />
+                </s:sequence>
+              </s:complexType>
+            </s:element>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="FutureHoldSetupByDiffusionBatch">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="DiffusionBatch" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="spec" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="specRev" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="holdReason" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="comment" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="holdlocation" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="FutureHoldSetupByDiffusionBatchResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="FutureHoldSetupByDiffusionBatchResult">
+              <s:complexType mixed="true">
+                <s:sequence>
+                  <s:any />
+                </s:sequence>
+              </s:complexType>
+            </s:element>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="RemoveFutureHoldSetup">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="FutureHoldSetupName" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="RemoveFutureHoldSetupResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="RemoveFutureHoldSetupResult" type="tns:ResultMessage" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:complexType name="ResultMessage">
+        <s:sequence>
+          <s:element minOccurs="1" maxOccurs="1" name="Code" type="s:int" />
+          <s:element minOccurs="0" maxOccurs="1" name="Message" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="ResultObject" />
+          <s:element minOccurs="0" maxOccurs="1" name="DetailMessage" type="s:string" />
+        </s:sequence>
+      </s:complexType>
+      <s:element name="ModifyLotItems">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="lot" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="item" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="waferSliceNum" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="ocrId" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="qty" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="sortEquipment" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="ModifyLotItemsResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="ModifyLotItemsResult" type="tns:ResultMessage" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotHoldDispose">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="container" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="reason" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="comment" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotHoldDisposeResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="LotHoldDisposeResult" type="tns:ResultMessage" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotHoldTransaction">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="container" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotHoldTransactionResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="LotHoldTransactionResult" type="tns:ResultMessage" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="RemoveLotFutureHold">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="container" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="specName" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="RemoveLotFutureHoldResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="RemoveLotFutureHoldResult" type="tns:ResultMessage" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotModifyMarkingContent">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="Markinformation">
+              <s:complexType mixed="true">
+                <s:sequence>
+                  <s:any />
+                </s:sequence>
+              </s:complexType>
+            </s:element>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotModifyMarkingContentResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="LotModifyMarkingContentResult">
+              <s:complexType mixed="true">
+                <s:sequence>
+                  <s:any />
+                </s:sequence>
+              </s:complexType>
+            </s:element>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="AddVendorName">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="VendorName" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="AddVendorNameResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="AddVendorNameResult" type="tns:ResultMessage" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="Printing">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="PrintingSetup" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="Lot" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="Box1" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="Box2" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="PrintingResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="PrintingResult" type="tns:ResultMessage" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotAddSI">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="container" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="SIName" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="SIComments" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="employee" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotAddSIResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="LotAddSIResult">
+              <s:complexType mixed="true">
+                <s:sequence>
+                  <s:any />
+                </s:sequence>
+              </s:complexType>
+            </s:element>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotReleaseSI">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="container" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="SIName" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="SIComments" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="Comments" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="employee" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LotReleaseSIResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="LotReleaseSIResult">
+              <s:complexType mixed="true">
+                <s:sequence>
+                  <s:any />
+                </s:sequence>
+              </s:complexType>
+            </s:element>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="GetQueryResult">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="queryname" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="paramnames" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="paramvalues" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="GetQueryResultResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="GetQueryResultResult">
+              <s:complexType mixed="true">
+                <s:sequence>
+                  <s:any />
+                </s:sequence>
+              </s:complexType>
+            </s:element>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="ModifyLotReels">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="container" type="s:string" />
+            <s:element minOccurs="0" maxOccurs="1" name="reels" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="ModifyLotReelsResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="ModifyLotReelsResult">
+              <s:complexType mixed="true">
+                <s:sequence>
+                  <s:any />
+                </s:sequence>
+              </s:complexType>
+            </s:element>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="ResultMessage" nillable="true" type="tns:ResultMessage" />
+    </s:schema>
+  </wsdl:types>
+  <wsdl:message name="GetVersionSoapIn">
+    <wsdl:part name="parameters" element="tns:GetVersion" />
+  </wsdl:message>
+  <wsdl:message name="GetVersionSoapOut">
+    <wsdl:part name="parameters" element="tns:GetVersionResponse" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldSoapIn">
+    <wsdl:part name="parameters" element="tns:LotHold" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldSoapOut">
+    <wsdl:part name="parameters" element="tns:LotHoldResponse" />
+  </wsdl:message>
+  <wsdl:message name="LotReleaseSoapIn">
+    <wsdl:part name="parameters" element="tns:LotRelease" />
+  </wsdl:message>
+  <wsdl:message name="LotReleaseSoapOut">
+    <wsdl:part name="parameters" element="tns:LotReleaseResponse" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotHoldcodeSoapIn">
+    <wsdl:part name="parameters" element="tns:ModifyLotHoldcode" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotHoldcodeSoapOut">
+    <wsdl:part name="parameters" element="tns:ModifyLotHoldcodeResponse" />
+  </wsdl:message>
+  <wsdl:message name="LotFutureHoldSetupSoapIn">
+    <wsdl:part name="parameters" element="tns:LotFutureHoldSetup" />
+  </wsdl:message>
+  <wsdl:message name="LotFutureHoldSetupSoapOut">
+    <wsdl:part name="parameters" element="tns:LotFutureHoldSetupResponse" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotAttributeSoapIn">
+    <wsdl:part name="parameters" element="tns:ModifyLotAttribute" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotAttributeSoapOut">
+    <wsdl:part name="parameters" element="tns:ModifyLotAttributeResponse" />
+  </wsdl:message>
+  <wsdl:message name="FutureHoldSetupByDiffusionBatchSoapIn">
+    <wsdl:part name="parameters" element="tns:FutureHoldSetupByDiffusionBatch" />
+  </wsdl:message>
+  <wsdl:message name="FutureHoldSetupByDiffusionBatchSoapOut">
+    <wsdl:part name="parameters" element="tns:FutureHoldSetupByDiffusionBatchResponse" />
+  </wsdl:message>
+  <wsdl:message name="RemoveFutureHoldSetupSoapIn">
+    <wsdl:part name="parameters" element="tns:RemoveFutureHoldSetup" />
+  </wsdl:message>
+  <wsdl:message name="RemoveFutureHoldSetupSoapOut">
+    <wsdl:part name="parameters" element="tns:RemoveFutureHoldSetupResponse" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotItemsSoapIn">
+    <wsdl:part name="parameters" element="tns:ModifyLotItems" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotItemsSoapOut">
+    <wsdl:part name="parameters" element="tns:ModifyLotItemsResponse" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldDisposeSoapIn">
+    <wsdl:part name="parameters" element="tns:LotHoldDispose" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldDisposeSoapOut">
+    <wsdl:part name="parameters" element="tns:LotHoldDisposeResponse" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldTransactionSoapIn">
+    <wsdl:part name="parameters" element="tns:LotHoldTransaction" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldTransactionSoapOut">
+    <wsdl:part name="parameters" element="tns:LotHoldTransactionResponse" />
+  </wsdl:message>
+  <wsdl:message name="RemoveLotFutureHoldSoapIn">
+    <wsdl:part name="parameters" element="tns:RemoveLotFutureHold" />
+  </wsdl:message>
+  <wsdl:message name="RemoveLotFutureHoldSoapOut">
+    <wsdl:part name="parameters" element="tns:RemoveLotFutureHoldResponse" />
+  </wsdl:message>
+  <wsdl:message name="LotModifyMarkingContentSoapIn">
+    <wsdl:part name="parameters" element="tns:LotModifyMarkingContent" />
+  </wsdl:message>
+  <wsdl:message name="LotModifyMarkingContentSoapOut">
+    <wsdl:part name="parameters" element="tns:LotModifyMarkingContentResponse" />
+  </wsdl:message>
+  <wsdl:message name="AddVendorNameSoapIn">
+    <wsdl:part name="parameters" element="tns:AddVendorName" />
+  </wsdl:message>
+  <wsdl:message name="AddVendorNameSoapOut">
+    <wsdl:part name="parameters" element="tns:AddVendorNameResponse" />
+  </wsdl:message>
+  <wsdl:message name="PrintingSoapIn">
+    <wsdl:part name="parameters" element="tns:Printing" />
+  </wsdl:message>
+  <wsdl:message name="PrintingSoapOut">
+    <wsdl:part name="parameters" element="tns:PrintingResponse" />
+  </wsdl:message>
+  <wsdl:message name="LotAddSISoapIn">
+    <wsdl:part name="parameters" element="tns:LotAddSI" />
+  </wsdl:message>
+  <wsdl:message name="LotAddSISoapOut">
+    <wsdl:part name="parameters" element="tns:LotAddSIResponse" />
+  </wsdl:message>
+  <wsdl:message name="LotReleaseSISoapIn">
+    <wsdl:part name="parameters" element="tns:LotReleaseSI" />
+  </wsdl:message>
+  <wsdl:message name="LotReleaseSISoapOut">
+    <wsdl:part name="parameters" element="tns:LotReleaseSIResponse" />
+  </wsdl:message>
+  <wsdl:message name="GetQueryResultSoapIn">
+    <wsdl:part name="parameters" element="tns:GetQueryResult" />
+  </wsdl:message>
+  <wsdl:message name="GetQueryResultSoapOut">
+    <wsdl:part name="parameters" element="tns:GetQueryResultResponse" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotReelsSoapIn">
+    <wsdl:part name="parameters" element="tns:ModifyLotReels" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotReelsSoapOut">
+    <wsdl:part name="parameters" element="tns:ModifyLotReelsResponse" />
+  </wsdl:message>
+  <wsdl:message name="GetVersionHttpGetIn" />
+  <wsdl:message name="GetVersionHttpGetOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldHttpGetIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="holdLocation" type="s:string" />
+    <wsdl:part name="holdReason" type="s:string" />
+    <wsdl:part name="comment" type="s:string" />
+    <wsdl:part name="employee" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldHttpGetOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="LotReleaseHttpGetIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="ReleaseAllHoldLocations" type="s:string" />
+    <wsdl:part name="ReleaseHoldLocationsOnly" type="s:string" />
+    <wsdl:part name="ReleaseReason" type="s:string" />
+    <wsdl:part name="holdcode" type="s:string" />
+    <wsdl:part name="ApplyToChildLots" type="s:string" />
+    <wsdl:part name="comment" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="LotReleaseHttpGetOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotHoldcodeHttpGetIn">
+    <wsdl:part name="lot" type="s:string" />
+    <wsdl:part name="old_holdcode" type="s:string" />
+    <wsdl:part name="new_holdcode" type="s:string" />
+    <wsdl:part name="holdlocation" type="s:string" />
+    <wsdl:part name="comment" type="s:string" />
+    <wsdl:part name="employee" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotHoldcodeHttpGetOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="LotFutureHoldSetupHttpGetIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="spec" type="s:string" />
+    <wsdl:part name="specRev" type="s:string" />
+    <wsdl:part name="holdLocation" type="s:string" />
+    <wsdl:part name="holdReason" type="s:string" />
+    <wsdl:part name="expectedHoldDays" type="s:string" />
+    <wsdl:part name="comment" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="LotFutureHoldSetupHttpGetOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotAttributeHttpGetIn">
+    <wsdl:part name="lot" type="s:string" />
+    <wsdl:part name="name" type="s:string" />
+    <wsdl:part name="value" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotAttributeHttpGetOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="FutureHoldSetupByDiffusionBatchHttpGetIn">
+    <wsdl:part name="DiffusionBatch" type="s:string" />
+    <wsdl:part name="spec" type="s:string" />
+    <wsdl:part name="specRev" type="s:string" />
+    <wsdl:part name="holdReason" type="s:string" />
+    <wsdl:part name="comment" type="s:string" />
+    <wsdl:part name="holdlocation" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="FutureHoldSetupByDiffusionBatchHttpGetOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="RemoveFutureHoldSetupHttpGetIn">
+    <wsdl:part name="FutureHoldSetupName" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="RemoveFutureHoldSetupHttpGetOut">
+    <wsdl:part name="Body" element="tns:ResultMessage" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotItemsHttpGetIn">
+    <wsdl:part name="lot" type="s:string" />
+    <wsdl:part name="item" type="s:string" />
+    <wsdl:part name="waferSliceNum" type="s:string" />
+    <wsdl:part name="ocrId" type="s:string" />
+    <wsdl:part name="qty" type="s:string" />
+    <wsdl:part name="sortEquipment" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotItemsHttpGetOut">
+    <wsdl:part name="Body" element="tns:ResultMessage" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldDisposeHttpGetIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="reason" type="s:string" />
+    <wsdl:part name="comment" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldDisposeHttpGetOut">
+    <wsdl:part name="Body" element="tns:ResultMessage" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldTransactionHttpGetIn">
+    <wsdl:part name="container" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldTransactionHttpGetOut">
+    <wsdl:part name="Body" element="tns:ResultMessage" />
+  </wsdl:message>
+  <wsdl:message name="RemoveLotFutureHoldHttpGetIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="specName" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="RemoveLotFutureHoldHttpGetOut">
+    <wsdl:part name="Body" element="tns:ResultMessage" />
+  </wsdl:message>
+  <wsdl:message name="AddVendorNameHttpGetIn">
+    <wsdl:part name="VendorName" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="AddVendorNameHttpGetOut">
+    <wsdl:part name="Body" element="tns:ResultMessage" />
+  </wsdl:message>
+  <wsdl:message name="PrintingHttpGetIn">
+    <wsdl:part name="PrintingSetup" type="s:string" />
+    <wsdl:part name="Lot" type="s:string" />
+    <wsdl:part name="Box1" type="s:string" />
+    <wsdl:part name="Box2" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="PrintingHttpGetOut">
+    <wsdl:part name="Body" element="tns:ResultMessage" />
+  </wsdl:message>
+  <wsdl:message name="LotAddSIHttpGetIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="SIName" type="s:string" />
+    <wsdl:part name="SIComments" type="s:string" />
+    <wsdl:part name="employee" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="LotAddSIHttpGetOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="LotReleaseSIHttpGetIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="SIName" type="s:string" />
+    <wsdl:part name="SIComments" type="s:string" />
+    <wsdl:part name="Comments" type="s:string" />
+    <wsdl:part name="employee" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="LotReleaseSIHttpGetOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="GetQueryResultHttpGetIn">
+    <wsdl:part name="queryname" type="s:string" />
+    <wsdl:part name="paramnames" type="s:string" />
+    <wsdl:part name="paramvalues" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="GetQueryResultHttpGetOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotReelsHttpGetIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="reels" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotReelsHttpGetOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="GetVersionHttpPostIn" />
+  <wsdl:message name="GetVersionHttpPostOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldHttpPostIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="holdLocation" type="s:string" />
+    <wsdl:part name="holdReason" type="s:string" />
+    <wsdl:part name="comment" type="s:string" />
+    <wsdl:part name="employee" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldHttpPostOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="LotReleaseHttpPostIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="ReleaseAllHoldLocations" type="s:string" />
+    <wsdl:part name="ReleaseHoldLocationsOnly" type="s:string" />
+    <wsdl:part name="ReleaseReason" type="s:string" />
+    <wsdl:part name="holdcode" type="s:string" />
+    <wsdl:part name="ApplyToChildLots" type="s:string" />
+    <wsdl:part name="comment" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="LotReleaseHttpPostOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotHoldcodeHttpPostIn">
+    <wsdl:part name="lot" type="s:string" />
+    <wsdl:part name="old_holdcode" type="s:string" />
+    <wsdl:part name="new_holdcode" type="s:string" />
+    <wsdl:part name="holdlocation" type="s:string" />
+    <wsdl:part name="comment" type="s:string" />
+    <wsdl:part name="employee" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotHoldcodeHttpPostOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="LotFutureHoldSetupHttpPostIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="spec" type="s:string" />
+    <wsdl:part name="specRev" type="s:string" />
+    <wsdl:part name="holdLocation" type="s:string" />
+    <wsdl:part name="holdReason" type="s:string" />
+    <wsdl:part name="expectedHoldDays" type="s:string" />
+    <wsdl:part name="comment" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="LotFutureHoldSetupHttpPostOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotAttributeHttpPostIn">
+    <wsdl:part name="lot" type="s:string" />
+    <wsdl:part name="name" type="s:string" />
+    <wsdl:part name="value" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotAttributeHttpPostOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="FutureHoldSetupByDiffusionBatchHttpPostIn">
+    <wsdl:part name="DiffusionBatch" type="s:string" />
+    <wsdl:part name="spec" type="s:string" />
+    <wsdl:part name="specRev" type="s:string" />
+    <wsdl:part name="holdReason" type="s:string" />
+    <wsdl:part name="comment" type="s:string" />
+    <wsdl:part name="holdlocation" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="FutureHoldSetupByDiffusionBatchHttpPostOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="RemoveFutureHoldSetupHttpPostIn">
+    <wsdl:part name="FutureHoldSetupName" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="RemoveFutureHoldSetupHttpPostOut">
+    <wsdl:part name="Body" element="tns:ResultMessage" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotItemsHttpPostIn">
+    <wsdl:part name="lot" type="s:string" />
+    <wsdl:part name="item" type="s:string" />
+    <wsdl:part name="waferSliceNum" type="s:string" />
+    <wsdl:part name="ocrId" type="s:string" />
+    <wsdl:part name="qty" type="s:string" />
+    <wsdl:part name="sortEquipment" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotItemsHttpPostOut">
+    <wsdl:part name="Body" element="tns:ResultMessage" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldDisposeHttpPostIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="reason" type="s:string" />
+    <wsdl:part name="comment" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldDisposeHttpPostOut">
+    <wsdl:part name="Body" element="tns:ResultMessage" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldTransactionHttpPostIn">
+    <wsdl:part name="container" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="LotHoldTransactionHttpPostOut">
+    <wsdl:part name="Body" element="tns:ResultMessage" />
+  </wsdl:message>
+  <wsdl:message name="RemoveLotFutureHoldHttpPostIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="specName" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="RemoveLotFutureHoldHttpPostOut">
+    <wsdl:part name="Body" element="tns:ResultMessage" />
+  </wsdl:message>
+  <wsdl:message name="AddVendorNameHttpPostIn">
+    <wsdl:part name="VendorName" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="AddVendorNameHttpPostOut">
+    <wsdl:part name="Body" element="tns:ResultMessage" />
+  </wsdl:message>
+  <wsdl:message name="PrintingHttpPostIn">
+    <wsdl:part name="PrintingSetup" type="s:string" />
+    <wsdl:part name="Lot" type="s:string" />
+    <wsdl:part name="Box1" type="s:string" />
+    <wsdl:part name="Box2" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="PrintingHttpPostOut">
+    <wsdl:part name="Body" element="tns:ResultMessage" />
+  </wsdl:message>
+  <wsdl:message name="LotAddSIHttpPostIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="SIName" type="s:string" />
+    <wsdl:part name="SIComments" type="s:string" />
+    <wsdl:part name="employee" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="LotAddSIHttpPostOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="LotReleaseSIHttpPostIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="SIName" type="s:string" />
+    <wsdl:part name="SIComments" type="s:string" />
+    <wsdl:part name="Comments" type="s:string" />
+    <wsdl:part name="employee" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="LotReleaseSIHttpPostOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="GetQueryResultHttpPostIn">
+    <wsdl:part name="queryname" type="s:string" />
+    <wsdl:part name="paramnames" type="s:string" />
+    <wsdl:part name="paramvalues" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="GetQueryResultHttpPostOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotReelsHttpPostIn">
+    <wsdl:part name="container" type="s:string" />
+    <wsdl:part name="reels" type="s:string" />
+  </wsdl:message>
+  <wsdl:message name="ModifyLotReelsHttpPostOut">
+    <wsdl:part name="Body" />
+  </wsdl:message>
+  <wsdl:portType name="Ad_HocTxnSoap">
+    <wsdl:operation name="GetVersion">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Get version of Ad-hocTxn.</wsdl:documentation>
+      <wsdl:input message="tns:GetVersionSoapIn" />
+      <wsdl:output message="tns:GetVersionSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotHold">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Puts given Container on hold(ex. N25_AP01, HOLDLOC001, AA, TEST)【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotHoldSoapIn" />
+      <wsdl:output message="tns:LotHoldSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotRelease">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Release Container by hold code.【Ad-Hoc Txn】&lt;br&gt;ReleaseAllHoldLocations: true/false&lt;br&gt;ReleaseHoldLocationsOnly: true/false&lt;br&gt;ApplyToChildLots: true/false</wsdl:documentation>
+      <wsdl:input message="tns:LotReleaseSoapIn" />
+      <wsdl:output message="tns:LotReleaseSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotHoldcode">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modify lot hold code【Ad-Hoc Txn】&lt;br&gt; holdlocation: HoldLocation</wsdl:documentation>
+      <wsdl:input message="tns:ModifyLotHoldcodeSoapIn" />
+      <wsdl:output message="tns:ModifyLotHoldcodeSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotFutureHoldSetup">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Puts given Container on FutureLotHold(ex. N25_AP01, SQA, 1, HOLDLOC003, ADD, 5, TEST_CCOMMENT)【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotFutureHoldSetupSoapIn" />
+      <wsdl:output message="tns:LotFutureHoldSetupSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotAttribute">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modify lot attribute value【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:ModifyLotAttributeSoapIn" />
+      <wsdl:output message="tns:ModifyLotAttributeSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="FutureHoldSetupByDiffusionBatch">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Setup FutureHold by DiffusionBatch【Ad-Hoc Txn】&lt;br&gt;holdlocation = HoldLocation (ATKH)</wsdl:documentation>
+      <wsdl:input message="tns:FutureHoldSetupByDiffusionBatchSoapIn" />
+      <wsdl:output message="tns:FutureHoldSetupByDiffusionBatchSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="RemoveFutureHoldSetup">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Remove a FutureHoldSetup by FutureHoldSetup Name</wsdl:documentation>
+      <wsdl:input message="tns:RemoveFutureHoldSetupSoapIn" />
+      <wsdl:output message="tns:RemoveFutureHoldSetupSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotItems">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modify lot item value【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:ModifyLotItemsSoapIn" />
+      <wsdl:output message="tns:ModifyLotItemsSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotHoldDispose">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Lot hold dispose【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotHoldDisposeSoapIn" />
+      <wsdl:output message="tns:LotHoldDisposeSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotHoldTransaction">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Lot hold transaction【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotHoldTransactionSoapIn" />
+      <wsdl:output message="tns:LotHoldTransactionSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="RemoveLotFutureHold">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Remove a future hold from lot by spec【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:RemoveLotFutureHoldSoapIn" />
+      <wsdl:output message="tns:RemoveLotFutureHoldSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotModifyMarkingContent">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modifies marking attributes for a lot.Input: Xml format.【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotModifyMarkingContentSoapIn" />
+      <wsdl:output message="tns:LotModifyMarkingContentSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="AddVendorName">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modify lot item value【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:AddVendorNameSoapIn" />
+      <wsdl:output message="tns:AddVendorNameSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="Printing">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Printing【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:PrintingSoapIn" />
+      <wsdl:output message="tns:PrintingSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotAddSI">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Lot Add Special Instruction transaction【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotAddSISoapIn" />
+      <wsdl:output message="tns:LotAddSISoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotReleaseSI">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Lot Release Special Instruction transaction【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotReleaseSISoapIn" />
+      <wsdl:output message="tns:LotReleaseSISoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="GetQueryResult">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">UserQuery. 【UserQuery Txn】,Multiple Param please use comma to separate</wsdl:documentation>
+      <wsdl:input message="tns:GetQueryResultSoapIn" />
+      <wsdl:output message="tns:GetQueryResultSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotReels">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modify Lot nxpReels &amp; SPQ ReelNo.【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:ModifyLotReelsSoapIn" />
+      <wsdl:output message="tns:ModifyLotReelsSoapOut" />
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:portType name="Ad_HocTxnHttpGet">
+    <wsdl:operation name="GetVersion">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Get version of Ad-hocTxn.</wsdl:documentation>
+      <wsdl:input message="tns:GetVersionHttpGetIn" />
+      <wsdl:output message="tns:GetVersionHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotHold">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Puts given Container on hold(ex. N25_AP01, HOLDLOC001, AA, TEST)【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotHoldHttpGetIn" />
+      <wsdl:output message="tns:LotHoldHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotRelease">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Release Container by hold code.【Ad-Hoc Txn】&lt;br&gt;ReleaseAllHoldLocations: true/false&lt;br&gt;ReleaseHoldLocationsOnly: true/false&lt;br&gt;ApplyToChildLots: true/false</wsdl:documentation>
+      <wsdl:input message="tns:LotReleaseHttpGetIn" />
+      <wsdl:output message="tns:LotReleaseHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotHoldcode">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modify lot hold code【Ad-Hoc Txn】&lt;br&gt; holdlocation: HoldLocation</wsdl:documentation>
+      <wsdl:input message="tns:ModifyLotHoldcodeHttpGetIn" />
+      <wsdl:output message="tns:ModifyLotHoldcodeHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotFutureHoldSetup">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Puts given Container on FutureLotHold(ex. N25_AP01, SQA, 1, HOLDLOC003, ADD, 5, TEST_CCOMMENT)【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotFutureHoldSetupHttpGetIn" />
+      <wsdl:output message="tns:LotFutureHoldSetupHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotAttribute">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modify lot attribute value【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:ModifyLotAttributeHttpGetIn" />
+      <wsdl:output message="tns:ModifyLotAttributeHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="FutureHoldSetupByDiffusionBatch">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Setup FutureHold by DiffusionBatch【Ad-Hoc Txn】&lt;br&gt;holdlocation = HoldLocation (ATKH)</wsdl:documentation>
+      <wsdl:input message="tns:FutureHoldSetupByDiffusionBatchHttpGetIn" />
+      <wsdl:output message="tns:FutureHoldSetupByDiffusionBatchHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="RemoveFutureHoldSetup">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Remove a FutureHoldSetup by FutureHoldSetup Name</wsdl:documentation>
+      <wsdl:input message="tns:RemoveFutureHoldSetupHttpGetIn" />
+      <wsdl:output message="tns:RemoveFutureHoldSetupHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotItems">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modify lot item value【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:ModifyLotItemsHttpGetIn" />
+      <wsdl:output message="tns:ModifyLotItemsHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotHoldDispose">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Lot hold dispose【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotHoldDisposeHttpGetIn" />
+      <wsdl:output message="tns:LotHoldDisposeHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotHoldTransaction">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Lot hold transaction【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotHoldTransactionHttpGetIn" />
+      <wsdl:output message="tns:LotHoldTransactionHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="RemoveLotFutureHold">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Remove a future hold from lot by spec【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:RemoveLotFutureHoldHttpGetIn" />
+      <wsdl:output message="tns:RemoveLotFutureHoldHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="AddVendorName">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modify lot item value【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:AddVendorNameHttpGetIn" />
+      <wsdl:output message="tns:AddVendorNameHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="Printing">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Printing【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:PrintingHttpGetIn" />
+      <wsdl:output message="tns:PrintingHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotAddSI">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Lot Add Special Instruction transaction【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotAddSIHttpGetIn" />
+      <wsdl:output message="tns:LotAddSIHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotReleaseSI">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Lot Release Special Instruction transaction【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotReleaseSIHttpGetIn" />
+      <wsdl:output message="tns:LotReleaseSIHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="GetQueryResult">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">UserQuery. 【UserQuery Txn】,Multiple Param please use comma to separate</wsdl:documentation>
+      <wsdl:input message="tns:GetQueryResultHttpGetIn" />
+      <wsdl:output message="tns:GetQueryResultHttpGetOut" />
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotReels">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modify Lot nxpReels &amp; SPQ ReelNo.【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:ModifyLotReelsHttpGetIn" />
+      <wsdl:output message="tns:ModifyLotReelsHttpGetOut" />
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:portType name="Ad_HocTxnHttpPost">
+    <wsdl:operation name="GetVersion">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Get version of Ad-hocTxn.</wsdl:documentation>
+      <wsdl:input message="tns:GetVersionHttpPostIn" />
+      <wsdl:output message="tns:GetVersionHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotHold">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Puts given Container on hold(ex. N25_AP01, HOLDLOC001, AA, TEST)【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotHoldHttpPostIn" />
+      <wsdl:output message="tns:LotHoldHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotRelease">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Release Container by hold code.【Ad-Hoc Txn】&lt;br&gt;ReleaseAllHoldLocations: true/false&lt;br&gt;ReleaseHoldLocationsOnly: true/false&lt;br&gt;ApplyToChildLots: true/false</wsdl:documentation>
+      <wsdl:input message="tns:LotReleaseHttpPostIn" />
+      <wsdl:output message="tns:LotReleaseHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotHoldcode">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modify lot hold code【Ad-Hoc Txn】&lt;br&gt; holdlocation: HoldLocation</wsdl:documentation>
+      <wsdl:input message="tns:ModifyLotHoldcodeHttpPostIn" />
+      <wsdl:output message="tns:ModifyLotHoldcodeHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotFutureHoldSetup">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Puts given Container on FutureLotHold(ex. N25_AP01, SQA, 1, HOLDLOC003, ADD, 5, TEST_CCOMMENT)【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotFutureHoldSetupHttpPostIn" />
+      <wsdl:output message="tns:LotFutureHoldSetupHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotAttribute">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modify lot attribute value【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:ModifyLotAttributeHttpPostIn" />
+      <wsdl:output message="tns:ModifyLotAttributeHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="FutureHoldSetupByDiffusionBatch">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Setup FutureHold by DiffusionBatch【Ad-Hoc Txn】&lt;br&gt;holdlocation = HoldLocation (ATKH)</wsdl:documentation>
+      <wsdl:input message="tns:FutureHoldSetupByDiffusionBatchHttpPostIn" />
+      <wsdl:output message="tns:FutureHoldSetupByDiffusionBatchHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="RemoveFutureHoldSetup">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Remove a FutureHoldSetup by FutureHoldSetup Name</wsdl:documentation>
+      <wsdl:input message="tns:RemoveFutureHoldSetupHttpPostIn" />
+      <wsdl:output message="tns:RemoveFutureHoldSetupHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotItems">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modify lot item value【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:ModifyLotItemsHttpPostIn" />
+      <wsdl:output message="tns:ModifyLotItemsHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotHoldDispose">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Lot hold dispose【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotHoldDisposeHttpPostIn" />
+      <wsdl:output message="tns:LotHoldDisposeHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotHoldTransaction">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Lot hold transaction【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotHoldTransactionHttpPostIn" />
+      <wsdl:output message="tns:LotHoldTransactionHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="RemoveLotFutureHold">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Remove a future hold from lot by spec【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:RemoveLotFutureHoldHttpPostIn" />
+      <wsdl:output message="tns:RemoveLotFutureHoldHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="AddVendorName">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modify lot item value【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:AddVendorNameHttpPostIn" />
+      <wsdl:output message="tns:AddVendorNameHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="Printing">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Printing【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:PrintingHttpPostIn" />
+      <wsdl:output message="tns:PrintingHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotAddSI">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Lot Add Special Instruction transaction【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotAddSIHttpPostIn" />
+      <wsdl:output message="tns:LotAddSIHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LotReleaseSI">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Lot Release Special Instruction transaction【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:LotReleaseSIHttpPostIn" />
+      <wsdl:output message="tns:LotReleaseSIHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="GetQueryResult">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">UserQuery. 【UserQuery Txn】,Multiple Param please use comma to separate</wsdl:documentation>
+      <wsdl:input message="tns:GetQueryResultHttpPostIn" />
+      <wsdl:output message="tns:GetQueryResultHttpPostOut" />
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotReels">
+      <wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Modify Lot nxpReels &amp; SPQ ReelNo.【Ad-Hoc Txn】</wsdl:documentation>
+      <wsdl:input message="tns:ModifyLotReelsHttpPostIn" />
+      <wsdl:output message="tns:ModifyLotReelsHttpPostOut" />
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:binding name="Ad_HocTxnSoap" type="tns:Ad_HocTxnSoap">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http" />
+    <wsdl:operation name="GetVersion">
+      <soap:operation soapAction="http://tempuri.org/GetVersion" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotHold">
+      <soap:operation soapAction="http://tempuri.org/LotHold" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotRelease">
+      <soap:operation soapAction="http://tempuri.org/LotRelease" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotHoldcode">
+      <soap:operation soapAction="http://tempuri.org/ModifyLotHoldcode" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotFutureHoldSetup">
+      <soap:operation soapAction="http://tempuri.org/LotFutureHoldSetup" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotAttribute">
+      <soap:operation soapAction="http://tempuri.org/ModifyLotAttribute" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="FutureHoldSetupByDiffusionBatch">
+      <soap:operation soapAction="http://tempuri.org/FutureHoldSetupByDiffusionBatch" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="RemoveFutureHoldSetup">
+      <soap:operation soapAction="http://tempuri.org/RemoveFutureHoldSetup" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotItems">
+      <soap:operation soapAction="http://tempuri.org/ModifyLotItems" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotHoldDispose">
+      <soap:operation soapAction="http://tempuri.org/LotHoldDispose" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotHoldTransaction">
+      <soap:operation soapAction="http://tempuri.org/LotHoldTransaction" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="RemoveLotFutureHold">
+      <soap:operation soapAction="http://tempuri.org/RemoveLotFutureHold" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotModifyMarkingContent">
+      <soap:operation soapAction="http://tempuri.org/LotModifyMarkingContent" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="AddVendorName">
+      <soap:operation soapAction="http://tempuri.org/AddVendorName" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="Printing">
+      <soap:operation soapAction="http://tempuri.org/Printing" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotAddSI">
+      <soap:operation soapAction="http://tempuri.org/LotAddSI" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotReleaseSI">
+      <soap:operation soapAction="http://tempuri.org/LotReleaseSI" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="GetQueryResult">
+      <soap:operation soapAction="http://tempuri.org/GetQueryResult" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotReels">
+      <soap:operation soapAction="http://tempuri.org/ModifyLotReels" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:binding name="Ad_HocTxnSoap12" type="tns:Ad_HocTxnSoap">
+    <soap12:binding transport="http://schemas.xmlsoap.org/soap/http" />
+    <wsdl:operation name="GetVersion">
+      <soap12:operation soapAction="http://tempuri.org/GetVersion" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotHold">
+      <soap12:operation soapAction="http://tempuri.org/LotHold" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotRelease">
+      <soap12:operation soapAction="http://tempuri.org/LotRelease" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotHoldcode">
+      <soap12:operation soapAction="http://tempuri.org/ModifyLotHoldcode" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotFutureHoldSetup">
+      <soap12:operation soapAction="http://tempuri.org/LotFutureHoldSetup" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotAttribute">
+      <soap12:operation soapAction="http://tempuri.org/ModifyLotAttribute" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="FutureHoldSetupByDiffusionBatch">
+      <soap12:operation soapAction="http://tempuri.org/FutureHoldSetupByDiffusionBatch" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="RemoveFutureHoldSetup">
+      <soap12:operation soapAction="http://tempuri.org/RemoveFutureHoldSetup" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotItems">
+      <soap12:operation soapAction="http://tempuri.org/ModifyLotItems" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotHoldDispose">
+      <soap12:operation soapAction="http://tempuri.org/LotHoldDispose" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotHoldTransaction">
+      <soap12:operation soapAction="http://tempuri.org/LotHoldTransaction" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="RemoveLotFutureHold">
+      <soap12:operation soapAction="http://tempuri.org/RemoveLotFutureHold" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotModifyMarkingContent">
+      <soap12:operation soapAction="http://tempuri.org/LotModifyMarkingContent" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="AddVendorName">
+      <soap12:operation soapAction="http://tempuri.org/AddVendorName" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="Printing">
+      <soap12:operation soapAction="http://tempuri.org/Printing" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotAddSI">
+      <soap12:operation soapAction="http://tempuri.org/LotAddSI" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotReleaseSI">
+      <soap12:operation soapAction="http://tempuri.org/LotReleaseSI" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="GetQueryResult">
+      <soap12:operation soapAction="http://tempuri.org/GetQueryResult" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotReels">
+      <soap12:operation soapAction="http://tempuri.org/ModifyLotReels" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:binding name="Ad_HocTxnHttpGet" type="tns:Ad_HocTxnHttpGet">
+    <http:binding verb="GET" />
+    <wsdl:operation name="GetVersion">
+      <http:operation location="/GetVersion" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotHold">
+      <http:operation location="/LotHold" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotRelease">
+      <http:operation location="/LotRelease" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotHoldcode">
+      <http:operation location="/ModifyLotHoldcode" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotFutureHoldSetup">
+      <http:operation location="/LotFutureHoldSetup" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotAttribute">
+      <http:operation location="/ModifyLotAttribute" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="FutureHoldSetupByDiffusionBatch">
+      <http:operation location="/FutureHoldSetupByDiffusionBatch" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="RemoveFutureHoldSetup">
+      <http:operation location="/RemoveFutureHoldSetup" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:mimeXml part="Body" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotItems">
+      <http:operation location="/ModifyLotItems" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:mimeXml part="Body" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotHoldDispose">
+      <http:operation location="/LotHoldDispose" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:mimeXml part="Body" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotHoldTransaction">
+      <http:operation location="/LotHoldTransaction" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:mimeXml part="Body" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="RemoveLotFutureHold">
+      <http:operation location="/RemoveLotFutureHold" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:mimeXml part="Body" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="AddVendorName">
+      <http:operation location="/AddVendorName" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:mimeXml part="Body" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="Printing">
+      <http:operation location="/Printing" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:mimeXml part="Body" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotAddSI">
+      <http:operation location="/LotAddSI" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotReleaseSI">
+      <http:operation location="/LotReleaseSI" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="GetQueryResult">
+      <http:operation location="/GetQueryResult" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotReels">
+      <http:operation location="/ModifyLotReels" />
+      <wsdl:input>
+        <http:urlEncoded />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:binding name="Ad_HocTxnHttpPost" type="tns:Ad_HocTxnHttpPost">
+    <http:binding verb="POST" />
+    <wsdl:operation name="GetVersion">
+      <http:operation location="/GetVersion" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotHold">
+      <http:operation location="/LotHold" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotRelease">
+      <http:operation location="/LotRelease" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotHoldcode">
+      <http:operation location="/ModifyLotHoldcode" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotFutureHoldSetup">
+      <http:operation location="/LotFutureHoldSetup" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotAttribute">
+      <http:operation location="/ModifyLotAttribute" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="FutureHoldSetupByDiffusionBatch">
+      <http:operation location="/FutureHoldSetupByDiffusionBatch" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="RemoveFutureHoldSetup">
+      <http:operation location="/RemoveFutureHoldSetup" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:mimeXml part="Body" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotItems">
+      <http:operation location="/ModifyLotItems" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:mimeXml part="Body" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotHoldDispose">
+      <http:operation location="/LotHoldDispose" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:mimeXml part="Body" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotHoldTransaction">
+      <http:operation location="/LotHoldTransaction" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:mimeXml part="Body" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="RemoveLotFutureHold">
+      <http:operation location="/RemoveLotFutureHold" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:mimeXml part="Body" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="AddVendorName">
+      <http:operation location="/AddVendorName" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:mimeXml part="Body" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="Printing">
+      <http:operation location="/Printing" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:mimeXml part="Body" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotAddSI">
+      <http:operation location="/LotAddSI" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LotReleaseSI">
+      <http:operation location="/LotReleaseSI" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="GetQueryResult">
+      <http:operation location="/GetQueryResult" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ModifyLotReels">
+      <http:operation location="/ModifyLotReels" />
+      <wsdl:input>
+        <mime:content type="application/x-www-form-urlencoded" />
+      </wsdl:input>
+      <wsdl:output>
+        <mime:content part="Body" type="text/xml" />
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:service name="Ad_HocTxn">
+    <wsdl:port name="Ad_HocTxnSoap" binding="tns:Ad_HocTxnSoap">
+      <soap:address location="http://phgcubadm1vwat1/Minsc.WebService.AI/Ad-HocTxn.asmx" />
+    </wsdl:port>
+    <wsdl:port name="Ad_HocTxnSoap12" binding="tns:Ad_HocTxnSoap12">
+      <soap12:address location="http://phgcubadm1vwat1/Minsc.WebService.AI/Ad-HocTxn.asmx" />
+    </wsdl:port>
+    <wsdl:port name="Ad_HocTxnHttpGet" binding="tns:Ad_HocTxnHttpGet">
+      <http:address location="http://phgcubadm1vwat1/Minsc.WebService.AI/Ad-HocTxn.asmx" />
+    </wsdl:port>
+    <wsdl:port name="Ad_HocTxnHttpPost" binding="tns:Ad_HocTxnHttpPost">
+      <http:address location="http://phgcubadm1vwat1/Minsc.WebService.AI/Ad-HocTxn.asmx" />
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>
